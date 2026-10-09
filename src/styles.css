@@ -1,0 +1,666 @@
+/* `hidden` must always win. Several components set `display` (e.g. the settings
+   panel is a flex column), and a class selector out-specifies the user agent's
+   `[hidden] { display: none }` — which silently leaves those panels on screen. */
+[hidden] {
+  display: none !important;
+}
+
+/* The window itself is transparent; the card inside supplies the visible
+   surface. Body must stay see-through or the widget gets a black rectangle. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  font-family: ui-sans-serif, system-ui, "Microsoft YaHei", sans-serif;
+  color: #e8eaed;
+}
+
+.widget {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.widget.is-collapsed .card,
+.widget.is-collapsed .layout-bar {
+  opacity: 0.12 !important;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.dock-handle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 998;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 4px;
+}
+
+.dock-handle:hover {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* Boot diagnostics overlay — only visible when startup failed. */
+#boot-err {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  margin: 0;
+  padding: 8px;
+  box-sizing: border-box;
+  background: rgba(60, 12, 12, 0.97);
+  color: #ffd9d9;
+  font: 10px/1.45 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow: auto;
+  border: 1px solid #e64545;
+  border-radius: 8px;
+}
+
+/* ---------------------------------------------------------------- layouts */
+
+/* ---------------------------------------------------------------- layouts */
+
+/* Layout 1 — 数字条 (横向药丸胶囊).
+   Frosted glass backdrop, single line, horizontal scroll with mouse wheel. */
+.layout-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 32px;
+  max-height: 32px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  gap: 8px;
+  background: rgba(18, 20, 26, 0.92);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: none;
+  user-select: none;
+}
+.layout-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.bar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  cursor: default;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bar-item .name {
+  font-family: ui-sans-serif, system-ui, "Microsoft YaHei", sans-serif;
+  font-size: 12px;
+  color: #e8eaed;
+  font-weight: 500;
+}
+.bar-item .price {
+  font-weight: 600;
+  font-size: 12px;
+}
+.bar-item .pct {
+  font-weight: 600;
+  font-size: 11.5px;
+}
+.bar-item .money {
+  font-size: 10.5px;
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.bar-sep {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.layout-bar.flash {
+  animation: flash-bar 0.9s ease-in-out 3;
+}
+@keyframes flash-bar {
+  0%, 100% {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  }
+  50% {
+    border-color: rgba(230, 69, 69, 0.95);
+    box-shadow: 0 0 12px rgba(230, 69, 69, 0.6);
+  }
+}
+
+/* Common Card Base for Mini & List */
+.card {
+  position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface, rgba(17, 19, 24, 0.90));
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.card.flash {
+  animation: flash 0.9s ease-in-out 3;
+}
+@keyframes flash {
+  0%, 100% {
+    border-color: rgba(255, 255, 255, 0.10);
+  }
+  50% {
+    border-color: rgba(230, 69, 69, 0.95);
+    box-shadow: 0 0 14px rgba(230, 69, 69, 0.5);
+  }
+}
+
+/* ------------------------------------------------ Layout 2: 迷你图 (Mini) */
+.layout-mini-card {
+  gap: 4px;
+}
+
+/* Top pill tabs for quick switching */
+.mini-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  white-space: nowrap;
+  padding: 0 2px 2px 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.mini-tabs::-webkit-scrollbar {
+  display: none;
+}
+.mini-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  color: #9aa1ad;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.mini-tab:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.mini-tab.active {
+  background: rgba(75, 142, 247, 0.2);
+  border-color: rgba(75, 142, 247, 0.4);
+  color: #70aaff;
+  font-weight: 500;
+}
+
+.mini-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.mini-meta .meta-left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.mini-meta .meta-left .name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+.mini-meta .meta-left .code {
+  font-size: 11px;
+  opacity: 0.6;
+  font-family: ui-monospace, monospace;
+}
+.mini-meta .meta-right {
+  font-family: ui-monospace, monospace;
+  font-size: 10.5px;
+}
+.mini-meta .stats-text {
+  display: flex;
+  gap: 6px;
+  opacity: 0.85;
+}
+.mini-meta .hover-text {
+  display: flex;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.mini-meta .hover-time {
+  opacity: 0.7;
+}
+.mini-meta .hover-price {
+  font-weight: 600;
+}
+
+.mini-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.mini-price-row .big-price {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.mini-price-row .big-pct {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+}
+.mini-pnl-group {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.profit-badge {
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  font-family: ui-monospace, monospace;
+  font-weight: 500;
+}
+
+/* ------------------------------------------------ Layout 3: 列表看板 (List) */
+.layout-list-card {
+  padding: 6px 8px;
+}
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11.5px;
+}
+.list-head .title-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.list-head .title {
+  font-weight: 600;
+  color: #f3f4f6;
+  font-size: 12px;
+}
+.list-head .count {
+  opacity: 0.6;
+  font-size: 11px;
+}
+.summary-pnl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: ui-monospace, monospace;
+  font-size: 10.5px;
+}
+.summary-pnl .pnl-sep {
+  opacity: 0.3;
+}
+
+.table-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  margin: 3px 0;
+}
+.table-head {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
+  font-size: 10.5px;
+  color: #9aa1ad;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+}
+.table-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.table-body::-webkit-scrollbar {
+  width: 4px;
+}
+.table-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 2px;
+}
+
+.table-row {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease;
+}
+.table-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.table-row.active {
+  background: rgba(75, 142, 247, 0.15);
+}
+
+/* Table columns */
+.col-name {
+  flex: 1.2;
+  min-width: 68px;
+  overflow: hidden;
+}
+.col-price {
+  flex: 0.9;
+  text-align: right;
+  font-weight: 600;
+}
+.col-pct {
+  flex: 1;
+  text-align: right;
+}
+.col-trend {
+  flex: 0 0 58px;
+  width: 58px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.col-pnl {
+  flex: 1.2;
+  text-align: right;
+}
+
+.cell-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.cell-name .name-text {
+  font-family: ui-sans-serif, system-ui, "Microsoft YaHei", sans-serif;
+  color: #f3f4f6;
+  font-size: 11.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell-name .code-text {
+  font-size: 9.5px;
+  opacity: 0.55;
+}
+
+.badge-pct {
+  display: inline-block;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.pnl-stack {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  align-items: flex-end;
+}
+.pnl-val {
+  font-weight: 500;
+  font-size: 11px;
+}
+.pnl-sub {
+  font-size: 9.5px;
+  opacity: 0.85;
+}
+.pnl-dash {
+  opacity: 0.35;
+}
+
+/* Sparkline canvas wrapper */
+.sparkline-wrap {
+  position: relative;
+  width: 54px;
+  height: 18px;
+}
+.sparkline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.empty-row {
+  padding: 16px 8px;
+  text-align: center;
+  opacity: 0.5;
+  font-size: 11.5px;
+}
+
+/* Chart container in Mini */
+.chart-wrap {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+.chart {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.up {
+  color: #e64545;
+}
+.down {
+  color: #2fae66;
+}
+.flat {
+  color: #9ca3af;
+}
+
+/* Resize grip. A frameless window's native resize border is only a few pixels
+   wide, which is fiddly on a widget this small, so there is an explicit handle
+   that drives `startResizeDragging`. */
+.grip {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0.3;
+}
+.grip::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid #fff;
+  border-bottom: 1.5px solid #fff;
+}
+.card:hover .grip {
+  opacity: 0.65;
+}
+
+/* ----------------------------------------------------------------- status */
+
+.status {
+  font-size: 9.5px;
+  opacity: 0.45;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.status .err {
+  color: #e6a045;
+}
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot.live {
+  background: #2fae66;
+}
+.dot.closed {
+  background: #6b7280;
+}
+.dot.error {
+  background: #e6a045;
+}
+
+/* ------------------------------------------------------------ context menu */
+
+.menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 150px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(24, 26, 32, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+}
+.menu-item {
+  padding: 5px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.menu-item .check {
+  width: 10px;
+  opacity: 0.9;
+}
+.menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.menu-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.menu-range input[type='range'] {
+  width: 84px;
+  accent-color: #4b8ef7;
+}
+
+button {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e8eaed;
+  border-radius: 5px;
+  padding: 4px 9px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+}
+button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+button.primary {
+  background: rgba(75, 142, 247, 0.85);
+  border-color: rgba(75, 142, 247, 0.9);
+}
+button.primary:hover {
+  background: rgba(75, 142, 247, 1);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  background: rgba(230, 160, 69, 0.95);
+  color: #1a1a1a;
+  font-size: 10.5px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  z-index: 70;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Boot diagnostics overlay — only visible when startup failed. */
+#boot-err {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  margin: 0;
+  padding: 8px;
+  box-sizing: border-box;
+  background: rgba(60, 12, 12, 0.97);
+  color: #ffd9d9;
+  font: 10px/1.45 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow: auto;
+  border: 1px solid #e64545;
+  border-radius: 8px;
+}
