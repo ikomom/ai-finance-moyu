@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { Grip } from '../components/Grip'
 import { Sparkline } from '../components/Sparkline'
 import { StatusLine } from '../components/StatusLine'
+import { TrendBadge } from '../components/TrendBadge'
 import { selectedIndex, setSelected, snapshot } from '../store'
 import {
   fmtMoney,
@@ -84,7 +85,7 @@ export function List(props: { flash: boolean }) {
           <span class="col-name">标的</span>
           <span class="col-price">现价</span>
           <span class="col-pct">涨跌幅</span>
-          <span class="col-trend">日内走势</span>
+          <span class="col-trend">走势</span>
           <span class="col-pnl">盈亏</span>
         </div>
 
@@ -111,7 +112,12 @@ export function List(props: { flash: boolean }) {
                   >
                     <div class="col-name cell-name">
                       <span class="name-text">{q.name}</span>
-                      <span class="code-text">{q.code.replace(/^(sh|sz|bj)/, '')}</span>
+                      <div class="code-and-signal">
+                        <span class="code-text">{q.code.replace(/^(sh|sz|bj)/, '')}</span>
+                        <Show when={s().config.trendEngine && s().trendSignals?.[q.code]}>
+                          <TrendBadge signal={s().trendSignals[q.code]} compact />
+                        </Show>
+                      </div>
                     </div>
 
                     <div class="col-price cell-price">

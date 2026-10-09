@@ -50,6 +50,13 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
             const tooltip = () => {
               const it = item()
               const parts = [`${q.name} (${q.code})`, `现价: ${fmtPrice(q.price)} (${fmtPct(q.changePct)})`]
+              if (props.snapshot.config.trendEngine) {
+                const sig = props.snapshot.trendSignals?.[q.code]
+                if (sig) {
+                  parts.push(`形态诊断: ${sig.label} (评分 ${sig.score > 0 ? '+' : ''}${sig.score})`)
+                  parts.push(`均线偏离: ${sig.biasPct >= 0 ? '+' : ''}${sig.biasPct.toFixed(2)}% | ${sig.summary}`)
+                }
+              }
               if (it?.costPrice) {
                 parts.push(`成本: ${fmtPrice(it.costPrice)} | 浮盈率: ${fmtPct(profitPct(q.price, it.costPrice))}`)
               }

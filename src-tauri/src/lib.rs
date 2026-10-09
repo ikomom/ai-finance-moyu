@@ -3,9 +3,10 @@ mod crossing;
 mod market;
 mod poller;
 mod quote;
+mod search;
 mod state;
 mod tray;
-mod search;
+mod trend_engine;
 
 use std::time::{Duration, Instant};
 

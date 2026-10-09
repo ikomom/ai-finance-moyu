@@ -260,18 +260,16 @@ body {
   gap: 6px;
   opacity: 0.85;
 }
-.mini-meta .hover-text {
-  display: flex;
-  gap: 5px;
-  background: rgba(255, 255, 255, 0.08);
+.hover-time-tag {
+  font-size: 11px;
+  font-weight: 500;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.09);
   padding: 1px 5px;
   border-radius: 3px;
-}
-.mini-meta .hover-time {
-  opacity: 0.7;
-}
-.mini-meta .hover-price {
-  font-weight: 600;
+  line-height: 1.2;
+  align-self: center;
 }
 
 .mini-price-row {
@@ -392,29 +390,32 @@ body {
 
 /* Table columns */
 .col-name {
-  flex: 1.2;
-  min-width: 68px;
+  flex: 1.4;
+  min-width: 82px;
   overflow: hidden;
 }
 .col-price {
-  flex: 0.9;
+  flex: 0.85;
+  min-width: 48px;
   text-align: right;
   font-weight: 600;
 }
 .col-pct {
-  flex: 1;
+  flex: 0.9;
+  min-width: 50px;
   text-align: right;
 }
 .col-trend {
-  flex: 0 0 58px;
-  width: 58px;
-  padding: 0 4px;
+  flex: 0 0 54px;
+  width: 54px;
+  padding: 0 2px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .col-pnl {
-  flex: 1.2;
+  flex: 1.15;
+  min-width: 56px;
   text-align: right;
 }
 
@@ -434,6 +435,12 @@ body {
 .cell-name .code-text {
   font-size: 9.5px;
   opacity: 0.55;
+}
+.code-and-signal {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
 }
 
 .badge-pct {
@@ -664,3 +671,136 @@ button.primary:hover {
   border: 1px solid #e64545;
   border-radius: 8px;
 }
+
+/* ------------------------------------------------ Trend Engine Badge & Popover */
+.trend-badge-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  z-index: 20;
+}
+.trend-badge-wrap.compact .trend-badge {
+  font-size: 8.5px;
+  padding: 0 3px;
+  border-radius: 3px;
+  line-height: 13px;
+  flex-shrink: 0;
+  letter-spacing: -0.2px;
+}
+.trend-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1.5px 5.5px;
+  border-radius: 4px;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.trend-badge.bull {
+  background: rgba(230, 69, 69, 0.16);
+  color: #f87171;
+  border: 1px solid rgba(230, 69, 69, 0.35);
+}
+.trend-badge.bear {
+  background: rgba(47, 174, 102, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(47, 174, 102, 0.35);
+}
+.trend-badge.warn {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.trend-badge.neutral {
+  background: rgba(255, 255, 255, 0.08);
+  color: #9ca3af;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.trend-badge:hover {
+  filter: brightness(1.2);
+}
+
+.trend-popover {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 190px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: rgba(18, 22, 31, 0.96);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);
+  z-index: 100;
+  pointer-events: auto;
+  text-align: left;
+}
+.trend-popover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+  font-size: 11px;
+}
+.trend-popover-title {
+  font-weight: 600;
+  font-size: 11.5px;
+}
+.trend-popover-title.bull { color: #f87171; }
+.trend-popover-title.bear { color: #4ade80; }
+.trend-popover-title.warn { color: #fbbf24; }
+.trend-popover-title.neutral { color: #d1d5db; }
+
+.trend-popover-score {
+  font-size: 10px;
+  color: #9ca3af;
+}
+.trend-popover-score b.bull { color: #f87171; }
+.trend-popover-score b.bear { color: #4ade80; }
+.trend-popover-score b.warn { color: #fbbf24; }
+.trend-popover-score b.neutral { color: #d1d5db; }
+
+.trend-score-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.score-track {
+  width: 100%;
+  height: 100%;
+}
+.score-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+.score-fill.bull { background: #ef4444; }
+.score-fill.bear { background: #22c55e; }
+.score-fill.warn { background: #f59e0b; }
+.score-fill.neutral { background: #9ca3af; }
+
+.trend-popover-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+.trend-popover-row .val.bull { color: #f87171; font-weight: 500; }
+.trend-popover-row .val.bear { color: #4ade80; font-weight: 500; }
+
+.trend-popover-summary {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: #d1d5db;
+  margin-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 5px;
+  word-break: break-all;
+}
+

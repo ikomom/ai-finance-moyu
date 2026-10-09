@@ -3,6 +3,7 @@ import { createEffect, createSignal, For, Show } from 'solid-js'
 import { Chart } from '../components/Chart'
 import { Grip } from '../components/Grip'
 import { StatusLine } from '../components/StatusLine'
+import { TrendBadge } from '../components/TrendBadge'
 import { selectedIndex, setSelected, snapshot } from '../store'
 import {
   fmtHHMM,
@@ -62,6 +63,7 @@ export function Mini(props: { flash: boolean }) {
 
   createEffect(() => {
     const idx = selectedIndex()
+    setHoveredPoint(null)
     quotes()
     requestAnimationFrame(() => {
       scrollToActiveTab(idx, true)
@@ -139,60 +141,65 @@ export function Mini(props: { flash: boolean }) {
             return { high, low }
           }
 
+          // Dynamic price & real-time percent when hovering over historical points
+          const activePrice = () => hoveredPoint()?.price ?? q().price
+          const activePct = () => {
+            const hp = hoveredPoint()
+            if (hp) {
+              const base = q().preClose > 0 ? q().preClose : (q().open > 0 ? q().open : hp.price)
+              return base > 0 ? ((hp.price - base) / base) * 100 : 0
+            }
+            return q().changePct
+          }
+
           return (
             <>
               <div class="mini-meta" data-tauri-drag-region>
                 <div class="meta-left">
                   <span class="name">{q().name}</span>
                   <span class="code">{q().code.replace(/^(sh|sz|bj)/, '')}</span>
+                  <Show when={s().config.trendEngine}>
+                    <TrendBadge signal={s().trendSignals?.[q().code]} />
+                  </Show>
                 </div>
                 <div class="meta-right">
-                  <Show
-                    when={hoveredPoint()}
-                    fallback={
-                      <div class="stats-text">
-                        <span>高 <b class="up">{fmtPrice(stats().high)}</b></span>
-                        <span>低 <b class="down">{fmtPrice(stats().low)}</b></span>
-                      </div>
-                    }
-                  >
-                    {(hp) => {
-                      const chg = hp().price - q().preClose
-                      const pct = q().preClose > 0 ? (chg / q().preClose) * 100 : 0
-                      return (
-                        <div class="hover-text">
-                          <span class="hover-time">{fmtHHMM(hp().time)}</span>
-                          <span class={`hover-price ${trendClass(pct)}`}>
-                            {fmtPrice(hp().price)} ({fmtPct(pct)})
-                          </span>
-                        </div>
-                      )
-                    }}
-                  </Show>
+                  <div class="stats-text">
+                    <span>高 <b class="up">{fmtPrice(stats().high)}</b></span>
+                    <span>低 <b class="down">{fmtPrice(stats().low)}</b></span>
+                  </div>
                 </div>
               </div>
 
               <div class="mini-price-row">
-                <span class={`big-price ${trendClass(q().changePct)}`}>
-                  {fmtPrice(q().price)}
+                <span class={`big-price ${trendClass(activePct())}`}>
+                  {fmtPrice(activePrice())}
                 </span>
-                <span class={`big-pct ${trendClass(q().changePct)}`}>
-                  {fmtPct(q().changePct)}
+                <span class={`big-pct ${trendClass(activePct())}`}>
+                  {fmtPct(activePct())}
                 </span>
-                <div class="mini-pnl-group">
-                  <Show when={cost()}>
-                    {(c) => (
-                      <span class={`profit-badge ${trendClass(profitPct(q().price, c()))}`}>
-                        浮盈 {fmtPct(profitPct(q().price, c()))}
-                      </span>
-                    )}
-                  </Show>
-                  <Show when={pnl() !== null}>
-                    <span class={`profit-badge ${trendClass(pnl()!)}`}>
-                      {fmtMoney(pnl()!)}
+                <Show when={hoveredPoint()}>
+                  {(hp) => (
+                    <span class="hover-time-tag">
+                      {fmtHHMM(hp().time)}
                     </span>
-                  </Show>
-                </div>
+                  )}
+                </Show>
+                <Show when={!hoveredPoint()}>
+                  <div class="mini-pnl-group">
+                    <Show when={cost()}>
+                      {(c) => (
+                        <span class={`profit-badge ${trendClass(profitPct(q().price, c()))}`}>
+                          浮盈 {fmtPct(profitPct(q().price, c()))}
+                        </span>
+                      )}
+                    </Show>
+                    <Show when={pnl() !== null}>
+                      <span class={`profit-badge ${trendClass(pnl()!)}`}>
+                        {fmtMoney(pnl()!)}
+                      </span>
+                    </Show>
+                  </div>
+                </Show>
               </div>
 
               <Chart

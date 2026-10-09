@@ -205,6 +205,10 @@ pub struct WindowGeom {
     pub height: f64,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
@@ -228,6 +232,9 @@ pub struct Config {
     pub window: WindowGeom,
     #[serde(default)]
     pub visibility_mode: VisibilityMode,
+    /// Local volume-price structure & VWAP analysis.
+    #[serde(default = "default_true")]
+    pub trend_engine: bool,
 }
 
 impl Default for Config {
@@ -252,6 +259,7 @@ impl Default for Config {
             layout_sizes: LayoutSizes::default(),
             window: WindowGeom { x: 1400, y: 120, width: 320.0, height: 170.0 },
             visibility_mode: VisibilityMode::default(),
+            trend_engine: true,
         }
     }
 }

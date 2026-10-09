@@ -73,6 +73,29 @@ export interface Hotkeys {
   layoutList: string
 }
 
+export type TrendState =
+  | 'breakoutPullback'
+  | 'volumeSurge'
+  | 'steadyBull'
+  | 'topDivergence'
+  | 'breakdown'
+  | 'vwapResistance'
+  | 'vwapOverbought'
+  | 'vwapOversold'
+  | 'bottomRebound'
+  | 'consolidation'
+  | 'neutral'
+
+export interface TrendSignal {
+  state: TrendState
+  label: string
+  compactLabel: string
+  score: number
+  biasPct: number
+  summary: string
+  updatedAt: number
+}
+
 export interface Config {
   watchlist: WatchItem[]
   layout: Layout
@@ -87,6 +110,7 @@ export interface Config {
   autostart: boolean
   window: WindowGeom
   visibilityMode: VisibilityMode
+  trendEngine: boolean
 }
 
 export interface Quote {
@@ -132,6 +156,7 @@ export interface Snapshot {
   config: Config
   quotes: Quote[]
   trends: Record<string, Trend>
+  trendSignals: Record<string, TrendSignal>
   status: PollStatus
   dock: DockState
 }

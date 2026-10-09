@@ -39,12 +39,8 @@ export function Chart(props: ChartProps) {
   // Tracked: reading the props inside `draw` is what subscribes this effect.
   createEffect(draw)
 
-  createEffect(() => {
-    const slot = hoverSlot()
-    if (slot == null || !props.trend?.points?.length) {
-      props.onHover?.(null)
-      return
-    }
+  const findClosestPoint = (slot: number | null): TrendPoint | null => {
+    if (slot == null || !props.trend?.points?.length) return null
     const points = props.trend.points
     let closest = points[0]
     let minDiff = 999
@@ -55,7 +51,14 @@ export function Chart(props: ChartProps) {
         closest = p
       }
     }
-    props.onHover?.(closest)
+    return closest
+  }
+
+  createEffect(() => {
+    // Reset hover when trend / stock changes
+    props.trend
+    setHoverSlot(null)
+    props.onHover?.(null)
   })
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -67,10 +70,12 @@ export function Chart(props: ChartProps) {
     const relX = e.clientX - rect.left - padL
     const slot = Math.min(240, Math.max(0, Math.round((relX / plotW) * 240)))
     setHoverSlot(slot)
+    props.onHover?.(findClosestPoint(slot))
   }
 
   const handleMouseLeave = () => {
     setHoverSlot(null)
+    props.onHover?.(null)
   }
 
   return (

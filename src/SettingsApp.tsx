@@ -19,6 +19,7 @@ const [form, setForm] = createStore<Config>({
   pollTrendMs: 30000,
   notifications: true,
   autostart: false,
+  trendEngine: true,
   hotkeys: {
     toggle: 'ctrl+alt+h',
     layoutBar: 'ctrl+alt+1',
@@ -444,6 +445,20 @@ export function Settings() {
                         onChange={(e) => setForm('notifications', e.currentTarget.checked)}
                       />
                       <span>触发到价或大幅波动时弹出系统气泡通知（未勾选则仅边框柔和闪烁）</span>
+                    </label>
+                  </div>
+
+                  <div class="card">
+                    <div class="card-title-row">
+                      <h2>走势判断引擎 (Trend Engine)</h2>
+                    </div>
+                    <label class="check">
+                      <input
+                        type="checkbox"
+                        checked={form.trendEngine}
+                        onChange={(e) => setForm('trendEngine', e.currentTarget.checked)}
+                      />
+                      <span>启用本地分时走势判断（基于均线乖离、量价背离与突破回踩，实时诊断短线多空形态）</span>
                     </label>
                   </div>
                 </div>

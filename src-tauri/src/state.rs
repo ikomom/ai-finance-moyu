@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::crossing::CrossingTracker;
 use crate::quote::{Fetcher, Quote, Trend};
+use crate::trend_engine::TrendSignal;
 
 /// Which edge of the monitor the window is docked against.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -53,6 +54,7 @@ pub struct Snapshot {
     pub config: Config,
     pub quotes: Vec<Quote>,
     pub trends: HashMap<String, Trend>,
+    pub trend_signals: HashMap<String, TrendSignal>,
     pub status: PollStatus,
     pub dock: DockState,
 }
@@ -62,6 +64,7 @@ pub struct AppState {
     pub tracker: Mutex<CrossingTracker>,
     pub quotes: Mutex<HashMap<String, Quote>>,
     pub trends: Mutex<HashMap<String, Trend>>,
+    pub trend_signals: Mutex<HashMap<String, TrendSignal>>,
     pub status: Mutex<PollStatus>,
     pub fetcher: Fetcher,
     /// While set in the future, window-resize events are ignored. Used to keep
@@ -87,6 +90,7 @@ impl AppState {
             tracker: Mutex::new(CrossingTracker::new()),
             quotes: Mutex::new(HashMap::new()),
             trends: Mutex::new(HashMap::new()),
+            trend_signals: Mutex::new(HashMap::new()),
             status: Mutex::new(PollStatus::default()),
             fetcher,
             suppress_resize_until: Mutex::new(None),
@@ -103,6 +107,7 @@ impl AppState {
         let config = self.config.lock().unwrap().clone();
         let quotes = self.quotes.lock().unwrap();
         let trends = self.trends.lock().unwrap();
+        let trend_signals = self.trend_signals.lock().unwrap().clone();
         let status = self.status.lock().unwrap().clone();
         let dock = *self.dock_state.lock().unwrap();
 
@@ -112,6 +117,6 @@ impl AppState {
             .filter_map(|w| quotes.get(&w.code).cloned())
             .collect();
 
-        Snapshot { config, quotes: ordered, trends: trends.clone(), status, dock }
+        Snapshot { config, quotes: ordered, trends: trends.clone(), trend_signals, status, dock }
     }
 }

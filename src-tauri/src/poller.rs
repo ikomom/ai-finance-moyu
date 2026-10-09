@@ -99,7 +99,7 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         }
     };
 
-    let events = {
+    let (events, trend_engine_enabled) = {
         let state = app.state::<AppState>();
         let cfg = state.config.lock().unwrap();
 
@@ -134,13 +134,19 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         for q in quotes.iter() {
             store.insert(q.code.clone(), q.clone());
         }
-        events
+
+        (events, cfg.trend_engine)
     };
 
     // Let the widget flash its border on a crossing. The OS notification is
     // already sent above; this is the in-window cue.
     if !events.is_empty() {
         let _ = app.emit("alert", &events);
+    }
+
+    {
+        let state = app.state::<AppState>();
+        update_trend_signals(&state, trend_engine_enabled);
     }
 
     record_success(app, &quotes);
@@ -183,8 +189,32 @@ async fn poll_trends(app: &AppHandle) -> Result<(), String> {
         }
     }
 
+    {
+        let state = app.state::<AppState>();
+        let enabled = state.config.lock().unwrap().trend_engine;
+        update_trend_signals(&state, enabled);
+    }
+
     emit_snapshot(app);
     Ok(())
+}
+
+fn update_trend_signals(state: &AppState, enabled: bool) {
+    if !enabled {
+        state.trend_signals.lock().unwrap().clear();
+        return;
+    }
+
+    let quotes = state.quotes.lock().unwrap();
+    let trends = state.trends.lock().unwrap();
+    let mut signals = state.trend_signals.lock().unwrap();
+
+    for (code, q) in quotes.iter() {
+        let t = trends.get(code);
+        if let Some(sig) = crate::trend_engine::analyze_trend(q, t) {
+            signals.insert(code.clone(), sig);
+        }
+    }
 }
 
 fn record_success(app: &AppHandle, quotes: &[Quote]) {
