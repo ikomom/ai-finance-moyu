@@ -16,3 +16,11 @@ export function logToBackend(msg: string): void {
   if (!inTauri()) return
   void invoke('frontend_log', { msg }).catch(() => {})
 }
+
+/**
+ * Inform backend which stocks need intraday trend polling (on-demand loading).
+ */
+export function setTrendTargets(targets: string[]): void {
+  if (!inTauri()) return
+  void invoke('set_trend_targets', { targets }).catch(() => {})
+}

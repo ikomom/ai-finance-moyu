@@ -118,7 +118,18 @@ pub struct WatchSpec {
     pub price_lines: Vec<PriceLine>,
 }
 
-/// Something that just crossed a threshold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LimitBoardKind {
+    /// 触及/逼近涨停
+    NearLimitUp,
+    /// 触及/逼近跌停
+    NearLimitDown,
+    /// 涨停炸板 (打开涨停)
+    BrokenLimitUp,
+}
+
+/// Something that just crossed a threshold or triggered an anomaly.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum CrossingEvent {
@@ -128,6 +139,18 @@ pub enum CrossingEvent {
     /// Price crossed a user price line in the line's firing direction.
     #[serde(rename_all = "camelCase")]
     PriceLine { code: String, line: PriceLine, price: f64 },
+    /// 急速拉升或急速跳水
+    #[serde(rename_all = "camelCase")]
+    RapidChange { code: String, pct_delta: f64, is_surge: bool, price: f64 },
+    /// 突破日内新高或跌破日内新低
+    #[serde(rename_all = "camelCase")]
+    IntradayExtreme { code: String, is_new_high: bool, price: f64, change_pct: f64 },
+    /// 盘口短时间异动放量
+    #[serde(rename_all = "camelCase")]
+    VolumeBurst { code: String, volume_hands: f64, multiple: f64, price: f64 },
+    /// 接近涨跌停或涨停炸板
+    #[serde(rename_all = "camelCase")]
+    LimitBoard { code: String, board_kind: LimitBoardKind, price: f64, change_pct: f64 },
 }
 
 impl CrossingEvent {
@@ -135,6 +158,10 @@ impl CrossingEvent {
         match self {
             CrossingEvent::AlertPct { code, .. } => code,
             CrossingEvent::PriceLine { code, .. } => code,
+            CrossingEvent::RapidChange { code, .. } => code,
+            CrossingEvent::IntradayExtreme { code, .. } => code,
+            CrossingEvent::VolumeBurst { code, .. } => code,
+            CrossingEvent::LimitBoard { code, .. } => code,
         }
     }
 
@@ -152,8 +179,48 @@ impl CrossingEvent {
                 };
                 format!("{name} 现价 {price:.2}，{dir} {label} {:.2}", line.price)
             }
+            CrossingEvent::RapidChange { pct_delta, is_surge, price, .. } => {
+                if *is_surge {
+                    format!("{name} 🚀 急速拉升！短线拉升 +{pct_delta:.2}%，现价 {price:.2}")
+                } else {
+                    format!("{name} ⚡ 急速跳水！短线快速下挫 -{pct_delta:.2}%，现价 {price:.2}")
+                }
+            }
+            CrossingEvent::IntradayExtreme { is_new_high, price, change_pct, .. } => {
+                if *is_new_high {
+                    format!("{name} 📈 突破日内新高！现价 {price:.2} ({change_pct:+.2}%)")
+                } else {
+                    format!("{name} 📉 跌破日内新低！现价 {price:.2} ({change_pct:+.2}%)")
+                }
+            }
+            CrossingEvent::VolumeBurst { multiple, price, .. } => {
+                format!("{name} 💥 盘口异动放量！成交量激增 {multiple:.1} 倍，现价 {price:.2}")
+            }
+            CrossingEvent::LimitBoard { board_kind, price, change_pct, .. } => {
+                match board_kind {
+                    LimitBoardKind::NearLimitUp => format!("{name} 🔴 逼近涨停！现价 {price:.2} ({change_pct:+.2}%)"),
+                    LimitBoardKind::NearLimitDown => format!("{name} 🟢 逼近跌停！现价 {price:.2} ({change_pct:+.2}%)"),
+                    LimitBoardKind::BrokenLimitUp => format!("{name} ⚠️ 涨停炸板！开板回落至 {change_pct:+.2}%，现价 {price:.2}"),
+                }
+            }
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct QuoteSample {
+    time: Instant,
+    price: f64,
+    volume: f64,
+}
+
+#[derive(Debug, Clone, Default)]
+struct SecurityIntradayState {
+    samples: Vec<QuoteSample>,
+    session_high: Option<f64>,
+    session_low: Option<f64>,
+    had_hit_limit_up: bool,
+    initialized: bool,
 }
 
 /// Remembers where each security sat relative to its thresholds last tick.
@@ -166,6 +233,7 @@ pub struct CrossingTracker {
     last_fired: HashMap<String, Instant>,
     /// Anti-spam cooldown duration. Repeated alerts for the same event key within this window are throttled.
     cooldown: Duration,
+    intraday_states: HashMap<String, SecurityIntradayState>,
 }
 
 impl Default for CrossingTracker {
@@ -191,6 +259,7 @@ impl CrossingTracker {
             line_above: HashMap::new(),
             last_fired: HashMap::new(),
             cooldown,
+            intraday_states: HashMap::new(),
         }
     }
 
@@ -221,11 +290,13 @@ impl CrossingTracker {
     /// usually nothing.
     ///
     /// `price` is the current price; `pct` is the change against previous close.
+    #[allow(dead_code)]
     pub fn update(&mut self, spec: &WatchSpec, price: f64, pct: f64) -> Vec<CrossingEvent> {
         self.update_at(spec, price, pct, Instant::now())
     }
 
     /// Feed one observation at an explicit timestamp.
+    #[allow(dead_code)]
     pub fn update_at(
         &mut self,
         spec: &WatchSpec,
@@ -307,11 +378,231 @@ impl CrossingTracker {
         events
     }
 
+    /// Update quote with price line / pct band checks AND intraday anomaly detection.
+    pub fn update_quote(
+        &mut self,
+        spec: &WatchSpec,
+        quote: &crate::quote::Quote,
+        anomaly_cfg: &crate::config::AnomalyAlertConfig,
+    ) -> Vec<CrossingEvent> {
+        self.update_quote_at(spec, quote, anomaly_cfg, Instant::now())
+    }
+
+    pub fn update_quote_at(
+        &mut self,
+        spec: &WatchSpec,
+        quote: &crate::quote::Quote,
+        anomaly_cfg: &crate::config::AnomalyAlertConfig,
+        now: Instant,
+    ) -> Vec<CrossingEvent> {
+        let mut events = self.update_at(spec, quote.price, quote.change_pct, now);
+
+        if quote.price <= 0.0 {
+            return events;
+        }
+
+        let state = self.intraday_states.entry(spec.code.clone()).or_default();
+
+        if !state.initialized {
+            state.initialized = true;
+            if quote.high > 0.0 {
+                state.session_high = Some(quote.high);
+            } else {
+                state.session_high = Some(quote.price);
+            }
+            if quote.low > 0.0 {
+                state.session_low = Some(quote.low);
+            } else {
+                state.session_low = Some(quote.price);
+            }
+            state.samples.push(QuoteSample {
+                time: now,
+                price: quote.price,
+                volume: quote.volume,
+            });
+            let is_gem_or_star = quote.code.starts_with("sz30") || quote.code.starts_with("sh68");
+            let is_bse = quote.code.starts_with("bj8");
+            let is_st = quote.name.contains("ST");
+            let up_limit = if is_bse {
+                28.5
+            } else if is_gem_or_star {
+                19.0
+            } else if is_st {
+                4.8
+            } else {
+                9.6
+            };
+            if quote.change_pct >= up_limit {
+                state.had_hit_limit_up = true;
+            }
+            return events;
+        }
+
+        // Add sample and prune samples older than 120 seconds
+        state.samples.push(QuoteSample {
+            time: now,
+            price: quote.price,
+            volume: quote.volume,
+        });
+        state.samples.retain(|s| now.saturating_duration_since(s.time).as_secs() <= 120);
+
+        // 1. 急速拉升与急速跳水 (Rapid surge & drop within 120s)
+        if anomaly_cfg.rapid_change && state.samples.len() >= 2 {
+            let min_p = state.samples.iter().map(|s| s.price).fold(f64::INFINITY, f64::min);
+            let max_p = state.samples.iter().map(|s| s.price).fold(0.0, f64::max);
+
+            if min_p > 0.0 {
+                let surge_pct = (quote.price - min_p) / min_p * 100.0;
+                if surge_pct >= 1.5 {
+                    let key = format!("{}:rapid_surge", spec.code);
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                        events.push(CrossingEvent::RapidChange {
+                            code: spec.code.clone(),
+                            pct_delta: (surge_pct * 100.0).round() / 100.0,
+                            is_surge: true,
+                            price: quote.price,
+                        });
+                    }
+                }
+            }
+
+            if max_p > 0.0 {
+                let drop_pct = (max_p - quote.price) / max_p * 100.0;
+                if drop_pct >= 1.5 {
+                    let key = format!("{}:rapid_drop", spec.code);
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                        events.push(CrossingEvent::RapidChange {
+                            code: spec.code.clone(),
+                            pct_delta: (drop_pct * 100.0).round() / 100.0,
+                            is_surge: false,
+                            price: quote.price,
+                        });
+                    }
+                }
+            }
+        }
+
+        // 2. 突破日内新高与跌破日内新低 (Intraday new high / low)
+        if anomaly_cfg.intraday_extremes {
+            if let Some(prev_high) = state.session_high {
+                if quote.price > prev_high && quote.change_pct > 0.0 {
+                    let key = format!("{}:new_high", spec.code);
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                        events.push(CrossingEvent::IntradayExtreme {
+                            code: spec.code.clone(),
+                            is_new_high: true,
+                            price: quote.price,
+                            change_pct: quote.change_pct,
+                        });
+                    }
+                    state.session_high = Some(quote.price);
+                }
+            } else {
+                state.session_high = Some(quote.price);
+            }
+
+            if let Some(prev_low) = state.session_low {
+                if quote.price < prev_low && quote.change_pct < 0.0 {
+                    let key = format!("{}:new_low", spec.code);
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                        events.push(CrossingEvent::IntradayExtreme {
+                            code: spec.code.clone(),
+                            is_new_high: false,
+                            price: quote.price,
+                            change_pct: quote.change_pct,
+                        });
+                    }
+                    state.session_low = Some(quote.price);
+                }
+            } else {
+                state.session_low = Some(quote.price);
+            }
+        }
+
+        // 3. 盘口异动放量 (Volume burst)
+        if anomaly_cfg.volume_burst && state.samples.len() >= 2 {
+            if let Some(oldest_60s) = state.samples.iter().find(|s| now.saturating_duration_since(s.time).as_secs() <= 60) {
+                let delta_v = quote.volume - oldest_60s.volume;
+                let dt_secs = now.saturating_duration_since(oldest_60s.time).as_secs().max(5);
+                let rate_1min = delta_v / (dt_secs as f64) * 60.0;
+                let baseline_avg = (quote.volume / 120.0).max(200.0);
+                if rate_1min >= 600.0 && rate_1min >= 3.0 * baseline_avg {
+                    let mult = (rate_1min / baseline_avg).max(2.0);
+                    let key = format!("{}:vol_burst", spec.code);
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(240), &key, now) {
+                        events.push(CrossingEvent::VolumeBurst {
+                            code: spec.code.clone(),
+                            volume_hands: delta_v,
+                            multiple: (mult * 10.0).round() / 10.0,
+                            price: quote.price,
+                        });
+                    }
+                }
+            }
+        }
+
+        // 4. 接近涨跌停与涨停炸板 (Limit board & Broken limit)
+        if anomaly_cfg.limit_board {
+            let is_gem_or_star = quote.code.starts_with("sz30") || quote.code.starts_with("sh68");
+            let is_bse = quote.code.starts_with("bj8");
+            let is_st = quote.name.contains("ST");
+            let up_limit = if is_bse {
+                28.5
+            } else if is_gem_or_star {
+                19.0
+            } else if is_st {
+                4.8
+            } else {
+                9.6
+            };
+            let down_limit = -up_limit;
+
+            if quote.change_pct >= up_limit {
+                state.had_hit_limit_up = true;
+                let key = format!("{}:limit_up", spec.code);
+                if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
+                    events.push(CrossingEvent::LimitBoard {
+                        code: spec.code.clone(),
+                        board_kind: LimitBoardKind::NearLimitUp,
+                        price: quote.price,
+                        change_pct: quote.change_pct,
+                    });
+                }
+            } else if state.had_hit_limit_up && quote.change_pct < (up_limit - 0.8) {
+                state.had_hit_limit_up = false;
+                let key = format!("{}:broken_limit_up", spec.code);
+                if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
+                    events.push(CrossingEvent::LimitBoard {
+                        code: spec.code.clone(),
+                        board_kind: LimitBoardKind::BrokenLimitUp,
+                        price: quote.price,
+                        change_pct: quote.change_pct,
+                    });
+                }
+            }
+
+            if quote.change_pct <= down_limit {
+                let key = format!("{}:limit_down", spec.code);
+                if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
+                    events.push(CrossingEvent::LimitBoard {
+                        code: spec.code.clone(),
+                        board_kind: LimitBoardKind::NearLimitDown,
+                        price: quote.price,
+                        change_pct: quote.change_pct,
+                    });
+                }
+            }
+        }
+
+        events
+    }
+
     /// Drop remembered state for codes no longer watched, so removed-then-
     /// re-added securities re-arm from scratch.
     pub fn retain(&mut self, keep: &[String]) {
         self.pct_band.retain(|k, _| keep.contains(k));
         self.line_above.retain(|k, _| keep.contains(k));
+        self.intraday_states.retain(|k, _| keep.contains(k));
         self.last_fired.retain(|k, _| {
             k.split_once(':')
                 .map(|(code, _)| keep.iter().any(|c| c == code))
@@ -563,5 +854,86 @@ mod tests {
 
         // Third breakout after 5 minutes (t = 305s > 300s) -> fires!
         assert_eq!(t.update_at(&s, 10.0, 3.5, t0 + Duration::from_secs(305)).len(), 1);
+    }
+
+    fn mock_quote(code: &str, price: f64, pct: f64, volume: f64) -> crate::quote::Quote {
+        crate::quote::Quote {
+            code: code.to_string(),
+            name: "测试股票".to_string(),
+            price,
+            pre_close: 10.0,
+            open: 10.0,
+            high: price,
+            low: price,
+            volume,
+            change: price - 10.0,
+            change_pct: pct,
+            date: "20261012".to_string(),
+            time: "10:00:00".to_string(),
+        }
+    }
+
+    #[test]
+    fn detects_rapid_surge_and_drop() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        // Initial tick - records state, does not fire
+        let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
+        assert!(t.update_quote_at(&s, &q0, &cfg, t0).is_empty());
+
+        // Price rises by 2.0% in 10 seconds -> fires rapid surge!
+        let q1 = mock_quote("sh600000", 10.20, 2.0, 1200.0);
+        let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(10));
+        assert!(evs.iter().any(|e| matches!(e, CrossingEvent::RapidChange { is_surge: true, .. })));
+
+        // Price drops by 2.0% in 20 seconds -> fires rapid drop!
+        let q2 = mock_quote("sh600000", 9.99, -0.1, 1500.0);
+        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(30));
+        assert!(evs2.iter().any(|e| matches!(e, CrossingEvent::RapidChange { is_surge: false, .. })));
+    }
+
+    #[test]
+    fn detects_new_intraday_high_and_low() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
+        t.update_quote_at(&s, &q0, &cfg, t0);
+
+        // Price breaks new high
+        let q1 = mock_quote("sh600000", 10.5, 5.0, 1500.0);
+        let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(5));
+        assert!(evs.iter().any(|e| matches!(e, CrossingEvent::IntradayExtreme { is_new_high: true, .. })));
+
+        // Price drops to new low
+        let q2 = mock_quote("sh600000", 9.5, -5.0, 2000.0);
+        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(10));
+        assert!(evs2.iter().any(|e| matches!(e, CrossingEvent::IntradayExtreme { is_new_high: false, .. })));
+    }
+
+    #[test]
+    fn detects_limit_up_and_broken_board() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
+        t.update_quote_at(&s, &q0, &cfg, t0);
+
+        // Limit up at +9.8% -> fires near limit up
+        let q1 = mock_quote("sh600000", 10.98, 9.8, 5000.0);
+        let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(5));
+        assert!(evs.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::NearLimitUp, .. })));
+
+        // Falls back to +8.5% -> fires broken limit up (炸板)
+        let q2 = mock_quote("sh600000", 10.85, 8.5, 6000.0);
+        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(10));
+        assert!(evs2.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::BrokenLimitUp, .. })));
     }
 }

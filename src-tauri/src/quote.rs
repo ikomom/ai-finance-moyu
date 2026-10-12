@@ -485,6 +485,9 @@ fn make_point(time: u32, price: f64, cum_volume: f64, cum_amount: f64) -> TrendP
 
 // =============================================================== Fetcher
 
+pub const QUOTE_CHUNK_SIZE: usize = 50;
+
+#[derive(Clone)]
 pub struct Fetcher {
     client: reqwest::Client,
 }
@@ -492,9 +495,6 @@ pub struct Fetcher {
 impl Fetcher {
     pub fn new() -> Result<Self, FetchError> {
         let client = reqwest::Client::builder()
-            // Ignore HTTP_PROXY / HTTPS_PROXY / ALL_PROXY. Domestic quote hosts
-            // must be reached directly.
-            .no_proxy()
             .timeout(Duration::from_secs(8))
             .connect_timeout(Duration::from_secs(5))
             .user_agent(USER_AGENT)
@@ -505,8 +505,11 @@ impl Fetcher {
 
     /// One request for any number of codes — both providers accept a code list.
     ///
-    /// Codes must already be normalized (`sh600000`). Codes the server doesn't
-    /// recognise are silently absent from the result.
+    /// When there are many codes, requests are chunked in batches of up to 50
+    /// to avoid URL query length limits on CDN endpoints, fetched concurrently.
+    ///
+    /// If the primary provider fails due to a network or endpoint error,
+    /// automatically fall back to the secondary provider before returning an error.
     pub async fn fetch_quotes(
         &self,
         source: DataSource,
@@ -515,6 +518,71 @@ impl Fetcher {
         if codes.is_empty() {
             return Ok(Vec::new());
         }
+
+        if codes.len() <= QUOTE_CHUNK_SIZE {
+            return self.fetch_quotes_chunk(source, codes).await;
+        }
+
+        let mut handles = Vec::new();
+        for chunk in codes.chunks(QUOTE_CHUNK_SIZE) {
+            let fetcher = self.clone();
+            let chunk_codes = chunk.to_vec();
+            handles.push(tokio::spawn(async move {
+                fetcher.fetch_quotes_chunk(source, &chunk_codes).await
+            }));
+        }
+
+        let mut all_quotes = Vec::with_capacity(codes.len());
+        let mut first_err = None;
+        for handle in handles {
+            match handle.await {
+                Ok(Ok(quotes)) => all_quotes.extend(quotes),
+                Ok(Err(e)) => {
+                    if first_err.is_none() {
+                        first_err = Some(e);
+                    }
+                }
+                Err(e) => {
+                    if first_err.is_none() {
+                        first_err = Some(net_err(e));
+                    }
+                }
+            }
+        }
+
+        if all_quotes.is_empty() && first_err.is_some() {
+            return Err(first_err.unwrap());
+        }
+
+        Ok(all_quotes)
+    }
+
+    async fn fetch_quotes_chunk(
+        &self,
+        source: DataSource,
+        codes: &[String],
+    ) -> Result<Vec<Quote>, FetchError> {
+        match self.fetch_quotes_direct(source, codes).await {
+            Ok(quotes) if !quotes.is_empty() => Ok(quotes),
+            Ok(quotes) => Ok(quotes),
+            Err(primary_err) => {
+                let fallback = match source {
+                    DataSource::Tencent => DataSource::Sina,
+                    DataSource::Sina => DataSource::Tencent,
+                };
+                match self.fetch_quotes_direct(fallback, codes).await {
+                    Ok(quotes) => Ok(quotes),
+                    Err(_) => Err(primary_err),
+                }
+            }
+        }
+    }
+
+    async fn fetch_quotes_direct(
+        &self,
+        source: DataSource,
+        codes: &[String],
+    ) -> Result<Vec<Quote>, FetchError> {
         let (url, referer) = match source {
             DataSource::Tencent => (tencent::quote_url(codes), None),
             DataSource::Sina => (sina::quote_url(codes), Some(sina::REFERER)),
@@ -526,9 +594,30 @@ impl Fetcher {
         })
     }
 
-    /// Intraday series for a single code. Neither provider offers a batch form,
-    /// so callers should poll this far less often than quotes.
+    /// Intraday series for a single code. If the primary provider fails,
+    /// automatically falls back to the secondary provider.
     pub async fn fetch_trend(
+        &self,
+        source: DataSource,
+        code: &str,
+        pre_close: f64,
+    ) -> Result<Trend, FetchError> {
+        match self.fetch_trend_direct(source, code, pre_close).await {
+            Ok(trend) => Ok(trend),
+            Err(primary_err) => {
+                let fallback = match source {
+                    DataSource::Tencent => DataSource::Sina,
+                    DataSource::Sina => DataSource::Tencent,
+                };
+                match self.fetch_trend_direct(fallback, code, pre_close).await {
+                    Ok(trend) => Ok(trend),
+                    Err(_) => Err(primary_err),
+                }
+            }
+        }
+    }
+
+    async fn fetch_trend_direct(
         &self,
         source: DataSource,
         code: &str,
@@ -543,8 +632,6 @@ impl Fetcher {
             DataSource::Tencent => tencent::parse_trend(code, &bytes)?,
             DataSource::Sina => sina::parse_trend(code, &bytes)?,
         };
-        // Sina's series carries no previous close, so the caller supplies it
-        // from the quote it already has.
         if trend.pre_close <= 0.0 {
             trend.pre_close = pre_close;
         }
@@ -552,19 +639,38 @@ impl Fetcher {
     }
 
     async fn get_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
-        let mut req = self.client.get(url);
-        if let Some(r) = referer {
-            req = req.header(reqwest::header::REFERER, r);
+        let mut last_err = None;
+        for attempt in 0..2 {
+            if attempt > 0 {
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            let mut req = self.client.get(url);
+            if let Some(r) = referer {
+                req = req.header(reqwest::header::REFERER, r);
+            }
+            match req.send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if !status.is_success() {
+                        last_err = Some(FetchError {
+                            kind: FetchErrorKind::Network,
+                            message: format!("HTTP {status}"),
+                        });
+                        continue;
+                    }
+                    match resp.bytes().await {
+                        Ok(b) => return Ok(b.to_vec()),
+                        Err(e) => {
+                            last_err = Some(net_err(e));
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_err = Some(net_err(e));
+                }
+            }
         }
-        let resp = req.send().await.map_err(net_err)?;
-        let status = resp.status();
-        if !status.is_success() {
-            return Err(FetchError {
-                kind: FetchErrorKind::Network,
-                message: format!("HTTP {status}"),
-            });
-        }
-        Ok(resp.bytes().await.map_err(net_err)?.to_vec())
+        Err(last_err.unwrap_or_else(|| net_err("网络请求失败")))
     }
 }
 

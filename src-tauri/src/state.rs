@@ -81,15 +81,26 @@ pub struct AppState {
     pub move_gen: AtomicU64,
     /// Dynamic docking status.
     pub dock_state: Mutex<DockState>,
+    /// Codes requested by active layout for intraday trend polling (on-demand loading).
+    pub active_trend_targets: Mutex<Option<Vec<String>>>,
 }
 
 impl AppState {
-    pub fn new(config: Config, fetcher: Fetcher) -> Self {
+    pub fn new(config: Config, fetcher: Fetcher, cache: crate::config::QuotesCache) -> Self {
+        let mut quotes_map = HashMap::new();
+        for q in cache.quotes {
+            quotes_map.insert(q.code.clone(), q);
+        }
+        let mut trends_map = HashMap::new();
+        for (code, t) in cache.trends {
+            trends_map.insert(code, t);
+        }
+
         Self {
             config: Mutex::new(config),
             tracker: Mutex::new(CrossingTracker::new()),
-            quotes: Mutex::new(HashMap::new()),
-            trends: Mutex::new(HashMap::new()),
+            quotes: Mutex::new(quotes_map),
+            trends: Mutex::new(trends_map),
             trend_signals: Mutex::new(HashMap::new()),
             status: Mutex::new(PollStatus::default()),
             fetcher,
@@ -98,11 +109,13 @@ impl AppState {
             suppress_move_until: Mutex::new(None),
             move_gen: AtomicU64::new(0),
             dock_state: Mutex::new(DockState::default()),
+            active_trend_targets: Mutex::new(None),
         }
     }
 
-    /// Build a renderable snapshot. Keeps quotes ordered as the watchlist is,
-    /// so the UI never has to re-sort and rows don't jump around.
+    /// Build a renderable snapshot. Keeps quotes ordered as the watchlist is.
+    /// If a quote has not yet arrived or network is disconnected, fallback to
+    /// cached/placeholder item so watchlist items NEVER vanish from the UI.
     pub fn snapshot(&self) -> Snapshot {
         let config = self.config.lock().unwrap().clone();
         let quotes = self.quotes.lock().unwrap();
@@ -114,7 +127,26 @@ impl AppState {
         let ordered = config
             .watchlist
             .iter()
-            .filter_map(|w| quotes.get(&w.code).cloned())
+            .map(|w| {
+                if let Some(q) = quotes.get(&w.code) {
+                    q.clone()
+                } else {
+                    Quote {
+                        code: w.code.clone(),
+                        name: w.name.clone().unwrap_or_else(|| w.code.clone()),
+                        price: 0.0,
+                        pre_close: 0.0,
+                        open: 0.0,
+                        high: 0.0,
+                        low: 0.0,
+                        volume: 0.0,
+                        change: 0.0,
+                        change_pct: 0.0,
+                        date: String::new(),
+                        time: String::new(),
+                    }
+                }
+            })
             .collect();
 
         Snapshot { config, quotes: ordered, trends: trends.clone(), trend_signals, status, dock }

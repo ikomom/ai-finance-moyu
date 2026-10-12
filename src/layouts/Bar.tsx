@@ -1,5 +1,6 @@
-import { For, Show } from 'solid-js'
+import { For, onMount, Show } from 'solid-js'
 
+import { setTrendTargets } from '../tauri'
 import {
   fmtMoney,
   fmtPct,
@@ -16,6 +17,10 @@ import {
  * Single horizontal line, sleek frosted-glass pill, horizontal scroll on wheel.
  */
 export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
+  onMount(() => {
+    setTrendTargets([])
+  })
+
   const itemFor = (code: string) =>
     props.snapshot.config.watchlist.find((w) => w.code === code)
 
@@ -77,8 +82,12 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
                 </Show>
                 <div class="bar-item" title={tooltip()}>
                   <span class="name">{q.name}</span>
-                  <span class={`price ${trendClass(q.changePct)}`}>{fmtPrice(q.price)}</span>
-                  <span class={`pct ${trendClass(q.changePct)}`}>{fmtPct(q.changePct)}</span>
+                  <span class={`price ${q.price > 0 ? trendClass(q.changePct) : 'flat'}`}>
+                    {q.price > 0 ? fmtPrice(q.price) : '--'}
+                  </span>
+                  <span class={`pct ${q.price > 0 ? trendClass(q.changePct) : 'flat'}`}>
+                    {q.price > 0 ? fmtPct(q.changePct) : '--'}
+                  </span>
                   <Show when={todayMoney() != null}>
                     <span class={`money ${trendClass(todayMoney()!)}`}>
                       {fmtMoney(todayMoney()!)}

@@ -4,12 +4,14 @@
 //! Writes go through a temp file + rename so a crash mid-poll can never leave a
 //! truncated config behind.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::crossing::{PriceLine, WatchSpec};
+use crate::quote::{Quote, Trend};
 
 /// Which of the three layouts the window is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -209,6 +211,31 @@ fn default_true() -> bool {
     true
 }
 
+/// Configurable switches for intraday real-time anomaly alerts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AnomalyAlertConfig {
+    /// 急速拉升与急速跳水 (短线 1~2 分钟涨跌速突破)
+    pub rapid_change: bool,
+    /// 突破日内新高与跌破日内新低
+    pub intraday_extremes: bool,
+    /// 盘口异动放量
+    pub volume_burst: bool,
+    /// 接近涨跌停与涨停炸板
+    pub limit_board: bool,
+}
+
+impl Default for AnomalyAlertConfig {
+    fn default() -> Self {
+        Self {
+            rapid_change: true,
+            intraday_extremes: true,
+            volume_burst: true,
+            limit_board: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
@@ -235,6 +262,9 @@ pub struct Config {
     /// Local volume-price structure & VWAP analysis.
     #[serde(default = "default_true")]
     pub trend_engine: bool,
+    /// Intraday real-time anomaly alerts.
+    #[serde(default)]
+    pub anomaly_alerts: AnomalyAlertConfig,
 }
 
 impl Default for Config {
@@ -260,6 +290,7 @@ impl Default for Config {
             window: WindowGeom { x: 1400, y: 120, width: 320.0, height: 170.0 },
             visibility_mode: VisibilityMode::default(),
             trend_engine: true,
+            anomaly_alerts: AnomalyAlertConfig::default(),
         }
     }
 }
@@ -351,6 +382,43 @@ pub fn save(app: &AppHandle, cfg: &Config) -> Result<(), String> {
     std::fs::write(&tmp, json).map_err(|e| format!("写入临时配置失败: {e}"))?;
     std::fs::rename(&tmp, &path).map_err(|e| format!("替换配置文件失败: {e}"))?;
     Ok(())
+}
+
+/// Local cache of quotes and trends saved to disk, so opening the app
+/// offline or outside market hours still instantly displays the last known data.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct QuotesCache {
+    pub quotes: Vec<Quote>,
+    pub trends: HashMap<String, Trend>,
+}
+
+pub fn cache_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(config_dir(app)?.join("cache.json"))
+}
+
+pub fn load_cache(app: &AppHandle) -> QuotesCache {
+    let Ok(path) = cache_path(app) else {
+        return QuotesCache::default();
+    };
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return QuotesCache::default();
+    };
+    serde_json::from_str(&text).unwrap_or_default()
+}
+
+pub fn save_cache(app: &AppHandle, cache: &QuotesCache) {
+    if let Ok(path) = cache_path(app) {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string(cache) {
+            let tmp = path.with_extension("json.tmp");
+            if std::fs::write(&tmp, json).is_ok() {
+                let _ = std::fs::rename(&tmp, &path);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

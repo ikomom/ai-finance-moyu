@@ -23,6 +23,14 @@ use crate::state::{AppState, PollStatus};
 /// Event carrying a fresh [`crate::state::Snapshot`] to the frontend.
 pub const EVENT_SNAPSHOT: &str = "snapshot";
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertNotification {
+    pub code: String,
+    pub name: String,
+    pub message: String,
+}
+
 /// Re-check cadence when the feed is stale (holiday/weekend). Cheap, but short
 /// enough that the first minutes of a new session aren't missed.
 const STALE_RECHECK: Duration = Duration::from_secs(20);
@@ -37,27 +45,31 @@ pub async fn run(app: AppHandle) {
     let mut last_trend: Option<Instant> = Some(Instant::now());
 
     loop {
-        let (session, poll_ms, trend_ms, feed_is_today) = {
+        let (session, poll_ms, trend_ms, feed_is_today, need_retry) = {
             let state = app.state::<AppState>();
             let now = Local::now().naive_local();
             let session = market::session_at(now);
             let cfg = state.config.lock().unwrap();
             let st = state.status.lock().unwrap();
-            (session, cfg.poll_quotes_ms, cfg.poll_trend_ms, st.trading_today)
+            let quotes = state.quotes.lock().unwrap();
+            let need_retry = quotes.is_empty() || st.error.is_some();
+            (session, cfg.poll_quotes_ms, cfg.poll_trend_ms, st.trading_today, need_retry)
         };
 
-        if session.is_live() {
+        if session.is_live() || need_retry {
             let _ = poll_quotes(&app).await;
 
             let due = last_trend
                 .map_or(true, |t| t.elapsed() >= Duration::from_millis(trend_ms));
-            if due {
+            if due || need_retry {
                 let _ = poll_trends(&app).await;
                 last_trend = Some(Instant::now());
             }
         }
 
-        let wait = if !session.is_live() {
+        let wait = if need_retry {
+            Duration::from_secs(10)
+        } else if !session.is_live() {
             IDLE_TICK
         } else if feed_is_today {
             Duration::from_millis(poll_ms)
@@ -99,7 +111,7 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         }
     };
 
-    let (events, trend_engine_enabled) = {
+    let (notifications, trend_engine_enabled) = {
         let state = app.state::<AppState>();
         let cfg = state.config.lock().unwrap();
 
@@ -109,23 +121,38 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let mut events = Vec::new();
         for q in &quotes {
             if let Some(item) = cfg.watchlist.iter().find(|w| w.code == q.code) {
-                events.extend(tracker.update(&item.spec(cfg.alert_pct), q.price, q.change_pct));
+                events.extend(tracker.update_quote(
+                    &item.spec(cfg.alert_pct),
+                    q,
+                    &cfg.anomaly_alerts,
+                ));
             }
         }
 
         // Forget securities the user removed so they re-arm if re-added.
         tracker.retain(&codes);
 
-        if cfg.notifications {
-            let names: std::collections::HashMap<&str, &str> =
-                quotes.iter().map(|q| (q.code.as_str(), q.name.as_str())).collect();
-            for ev in &events {
+        let names: std::collections::HashMap<&str, &str> =
+            quotes.iter().map(|q| (q.code.as_str(), q.name.as_str())).collect();
+        let notifications: Vec<AlertNotification> = events
+            .iter()
+            .map(|ev| {
                 let name = names.get(ev.code()).copied().unwrap_or(ev.code());
+                AlertNotification {
+                    code: ev.code().to_string(),
+                    name: name.to_string(),
+                    message: ev.message(name),
+                }
+            })
+            .collect();
+
+        if cfg.notifications {
+            for notif in &notifications {
                 let _ = app
                     .notification()
                     .builder()
                     .title("股市异动")
-                    .body(ev.message(name))
+                    .body(&notif.message)
                     .show();
             }
         }
@@ -135,13 +162,18 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
             store.insert(q.code.clone(), q.clone());
         }
 
-        (events, cfg.trend_engine)
+        let cache = crate::config::QuotesCache {
+            quotes: store.values().cloned().collect(),
+            trends: state.trends.lock().unwrap().clone(),
+        };
+        crate::config::save_cache(app, &cache);
+
+        (notifications, cfg.trend_engine)
     };
 
-    // Let the widget flash its border on a crossing. The OS notification is
-    // already sent above; this is the in-window cue.
-    if !events.is_empty() {
-        let _ = app.emit("alert", &events);
+    // Let the widget flash its border and show in-app toast on crossing.
+    if !notifications.is_empty() {
+        let _ = app.emit("alert", &notifications);
     }
 
     {
@@ -155,42 +187,87 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
 }
 
 /// One request per security. Errors on an individual code don't abort the rest.
-async fn poll_trends(app: &AppHandle) -> Result<(), String> {
+///
+/// Implements on-demand loading and a bounded concurrency throttle pool:
+/// - Only polls active trend targets requested by the current layout:
+///   - Mini layout: only the single selected stock
+///   - List layout: rows in visible viewport + buffer rows
+///   - Bar layout: none (empty targets)
+/// - Uses a concurrency throttle pool (max 3 concurrent requests) instead of sequential
+///   blocking or unbounded flooding, preventing CDN rate limits and high latency.
+pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
     let (codes, source) = {
         let state = app.state::<AppState>();
         let cfg = state.config.lock().unwrap();
-        (cfg.codes(), cfg.data_source)
+        let targets = state.active_trend_targets.lock().unwrap().clone();
+        let watchlist_codes = cfg.codes();
+        let final_codes = match targets {
+            Some(t) => {
+                let set: std::collections::HashSet<_> = watchlist_codes.into_iter().collect();
+                t.into_iter().filter(|c| set.contains(c)).collect::<Vec<_>>()
+            }
+            None => {
+                match cfg.layout {
+                    crate::config::Layout::Bar => Vec::new(),
+                    crate::config::Layout::Mini => {
+                        watchlist_codes.into_iter().take(1).collect()
+                    }
+                    crate::config::Layout::List => {
+                        watchlist_codes.into_iter().take(12).collect()
+                    }
+                }
+            }
+        };
+        (final_codes, cfg.data_source)
     };
 
-    for code in codes {
-        // Sina's intraday series carries no previous close, so hand it the one
-        // from the quote we already hold.
-        let pre_close = {
-            let state = app.state::<AppState>();
-            // Named binding, not a tail expression: the guard must drop before
-            // the `State` borrow it came from.
-            let quotes = state.quotes.lock().unwrap();
-            quotes.get(&code).map(|q| q.pre_close).unwrap_or(0.0)
-        };
+    if codes.is_empty() {
+        return Ok(());
+    }
 
-        let fetched = {
-            let state = app.state::<AppState>();
-            state.fetcher.fetch_trend(source, &code, pre_close).await
-        };
-        match fetched {
-            Ok(trend) => {
+    const MAX_CONCURRENT_TREND_FETCHES: usize = 3;
+    let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_TREND_FETCHES));
+    let mut handles = Vec::with_capacity(codes.len());
+
+    for code in codes {
+        let sem = semaphore.clone();
+        let app_handle = app.clone();
+        let code_clone = code.clone();
+        handles.push(tokio::spawn(async move {
+            let _permit = sem.acquire().await;
+            let pre_close = {
+                let state = app_handle.state::<AppState>();
+                let quotes = state.quotes.lock().unwrap();
+                quotes.get(&code_clone).map(|q| q.pre_close).unwrap_or(0.0)
+            };
+            let state = app_handle.state::<AppState>();
+            let fetched = state.fetcher.fetch_trend(source, &code_clone, pre_close).await;
+            (code_clone, fetched)
+        }));
+    }
+
+    for handle in handles {
+        match handle.await {
+            Ok((code, Ok(trend))) => {
                 let state = app.state::<AppState>();
-                state.trends.lock().unwrap().insert(code.clone(), trend);
+                state.trends.lock().unwrap().insert(code, trend);
+            }
+            Ok((code, Err(e))) => {
+                eprintln!("分时拉取失败 {code}: {e}");
             }
             Err(e) => {
-                // A single bad code shouldn't blank the others.
-                eprintln!("分时拉取失败 {code}: {e}");
+                eprintln!("分时拉取任务异常: {e}");
             }
         }
     }
 
     {
         let state = app.state::<AppState>();
+        let quotes: Vec<Quote> = state.quotes.lock().unwrap().values().cloned().collect();
+        let trends = state.trends.lock().unwrap().clone();
+        let cache = crate::config::QuotesCache { quotes, trends };
+        crate::config::save_cache(app, &cache);
+
         let enabled = state.config.lock().unwrap().trend_engine;
         update_trend_signals(&state, enabled);
     }

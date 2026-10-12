@@ -654,6 +654,31 @@ async fn search_securities(query: String) -> Result<Vec<search::SearchResult>, S
     client.search(&query).await
 }
 
+#[tauri::command]
+async fn set_trend_targets(app: AppHandle, targets: Vec<String>) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let needs_fetch = {
+        let mut guard = state.active_trend_targets.lock().unwrap();
+        let changed = guard.as_ref() != Some(&targets);
+        *guard = Some(targets.clone());
+        if changed && !targets.is_empty() {
+            let trends = state.trends.lock().unwrap();
+            targets.iter().any(|c| !trends.contains_key(c))
+        } else {
+            false
+        }
+    };
+
+    if needs_fetch {
+        // Trigger an immediate background poll for the newly requested trend targets
+        tauri::async_runtime::spawn(async move {
+            let _ = poller::poll_trends(&app).await;
+        });
+    }
+
+    Ok(())
+}
+
 // ------------------------------------------------------------------- setup
 
 /// Register the global shortcuts named in the config.
@@ -825,9 +850,10 @@ pub fn run() {
             }
 
             let fetcher = Fetcher::new().map_err(|e| e.to_string())?;
+            let cache = config::load_cache(app.handle());
             let rows = cfg.watchlist.len();
             let layout = cfg.layout;
-            app.manage(AppState::new(cfg, fetcher));
+            app.manage(AppState::new(cfg, fetcher, cache));
 
             tray::build(app)?;
 
@@ -920,6 +946,7 @@ pub fn run() {
             set_visibility_mode,
             show_context_menu,
             search_securities,
+            set_trend_targets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -5,6 +5,7 @@ import { Grip } from '../components/Grip'
 import { StatusLine } from '../components/StatusLine'
 import { TrendBadge } from '../components/TrendBadge'
 import { selectedIndex, setSelected, snapshot } from '../store'
+import { setTrendTargets } from '../tauri'
 import {
   fmtHHMM,
   fmtMoney,
@@ -68,6 +69,13 @@ export function Mini(props: { flash: boolean }) {
     requestAnimationFrame(() => {
       scrollToActiveTab(idx, true)
     })
+  })
+
+  createEffect(() => {
+    const cur = item()
+    if (cur?.code) {
+      setTrendTargets([cur.code])
+    }
   })
 
   const handleWheel = (e: WheelEvent) => {
@@ -171,11 +179,11 @@ export function Mini(props: { flash: boolean }) {
               </div>
 
               <div class="mini-price-row">
-                <span class={`big-price ${trendClass(activePct())}`}>
-                  {fmtPrice(activePrice())}
+                <span class={`big-price ${q().price > 0 ? trendClass(activePct()) : 'flat'}`}>
+                  {q().price > 0 ? fmtPrice(activePrice()) : '--'}
                 </span>
-                <span class={`big-pct ${trendClass(activePct())}`}>
-                  {fmtPct(activePct())}
+                <span class={`big-pct ${q().price > 0 ? trendClass(activePct()) : 'flat'}`}>
+                  {q().price > 0 ? fmtPct(activePct()) : '--'}
                 </span>
                 <Show when={hoveredPoint()}>
                   {(hp) => (

@@ -52,9 +52,13 @@ export async function initStore(): Promise<string | null> {
   }
 
   await listen<Snapshot>('snapshot', (e) => setSnapshot(e.payload))
-  // Rust raises this when a threshold is crossed; the OS notification is sent
-  // from Rust, so this is only the in-window cue.
-  await listen('alert', () => setAlertTick((n) => n + 1))
+  await listen<Array<{ code: string; name: string; message: string }>>('alert', (e) => {
+    setAlertTick((n) => n + 1)
+    const first = e.payload?.[0]
+    if (first?.message) {
+      showToast(first.message)
+    }
+  })
 
   return null
 }

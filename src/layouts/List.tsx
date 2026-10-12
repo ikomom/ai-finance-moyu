@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 
 import { Grip } from '../components/Grip'
@@ -6,6 +6,7 @@ import { Sparkline } from '../components/Sparkline'
 import { StatusLine } from '../components/StatusLine'
 import { TrendBadge } from '../components/TrendBadge'
 import { selectedIndex, setSelected, snapshot } from '../store'
+import { setTrendTargets } from '../tauri'
 import {
   fmtMoney,
   fmtPct,
@@ -23,6 +24,90 @@ import {
  */
 export function List(props: { flash: boolean }) {
   const s = () => snapshot()!
+  let tableBodyRef: HTMLDivElement | undefined
+  let lastReportedTargets = ''
+  let scrollTimer: number | null = null
+
+  const BUFFER_ROWS = 4
+  const ESTIMATED_ROW_HEIGHT = 28
+
+  const updateVisibleTargets = () => {
+    const quotesList = s()?.quotes ?? []
+    if (quotesList.length === 0) {
+      if (lastReportedTargets !== '') {
+        lastReportedTargets = ''
+        setTrendTargets([])
+      }
+      return
+    }
+
+    if (quotesList.length <= 15) {
+      const codes = quotesList.map((q) => q.code)
+      const key = codes.join(',')
+      if (key !== lastReportedTargets) {
+        lastReportedTargets = key
+        setTrendTargets(codes)
+      }
+      return
+    }
+
+    if (!tableBodyRef) {
+      const initialCodes = quotesList.slice(0, 15).map((q) => q.code)
+      const key = initialCodes.join(',')
+      if (key !== lastReportedTargets) {
+        lastReportedTargets = key
+        setTrendTargets(initialCodes)
+      }
+      return
+    }
+
+    const scrollTop = tableBodyRef.scrollTop
+    const clientHeight = tableBodyRef.clientHeight || 200
+    const rowHeight = tableBodyRef.firstElementChild?.clientHeight || ESTIMATED_ROW_HEIGHT
+
+    const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - BUFFER_ROWS)
+    const endIdx = Math.min(
+      quotesList.length,
+      Math.ceil((scrollTop + clientHeight) / rowHeight) + BUFFER_ROWS
+    )
+
+    const targetCodes = quotesList.slice(startIdx, endIdx).map((q) => q.code)
+    const key = targetCodes.join(',')
+    if (key !== lastReportedTargets) {
+      lastReportedTargets = key
+      setTrendTargets(targetCodes)
+    }
+  }
+
+  const handleScroll = () => {
+    if (scrollTimer !== null) return
+    scrollTimer = window.setTimeout(() => {
+      scrollTimer = null
+      updateVisibleTargets()
+    }, 100)
+  }
+
+  onMount(() => {
+    updateVisibleTargets()
+    if (tableBodyRef) {
+      const observer = new ResizeObserver(() => {
+        updateVisibleTargets()
+      })
+      observer.observe(tableBodyRef)
+      onCleanup(() => observer.disconnect())
+    }
+    onCleanup(() => {
+      if (scrollTimer !== null) {
+        window.clearTimeout(scrollTimer)
+        scrollTimer = null
+      }
+    })
+  })
+
+  createEffect(() => {
+    s()?.quotes.length
+    requestAnimationFrame(updateVisibleTargets)
+  })
 
   const itemFor = (code: string): WatchItem | undefined =>
     s()?.config.watchlist.find((w) => w.code === code)
@@ -89,7 +174,7 @@ export function List(props: { flash: boolean }) {
           <span class="col-pnl">盈亏</span>
         </div>
 
-        <div class="table-body">
+        <div class="table-body" ref={tableBodyRef} onScroll={handleScroll}>
           <Show
             when={(s()?.quotes.length ?? 0) > 0}
             fallback={<div class="row empty-row">暂无自选股 · 右键添加</div>}
@@ -121,12 +206,14 @@ export function List(props: { flash: boolean }) {
                     </div>
 
                     <div class="col-price cell-price">
-                      <span class={trendClass(q.changePct)}>{fmtPrice(q.price)}</span>
+                      <span class={q.price > 0 ? trendClass(q.changePct) : 'flat'}>
+                        {q.price > 0 ? fmtPrice(q.price) : '--'}
+                      </span>
                     </div>
 
                     <div class="col-pct cell-pct">
-                      <span class={`badge-pct ${trendClass(q.changePct)}`}>
-                        {fmtPct(q.changePct)}
+                      <span class={`badge-pct ${q.price > 0 ? trendClass(q.changePct) : 'flat'}`}>
+                        {q.price > 0 ? fmtPct(q.changePct) : '--'}
                       </span>
                     </div>
 

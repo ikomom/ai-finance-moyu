@@ -20,6 +20,12 @@ const [form, setForm] = createStore<Config>({
   notifications: true,
   autostart: false,
   trendEngine: true,
+  anomalyAlerts: {
+    rapidChange: true,
+    intradayExtremes: true,
+    volumeBurst: true,
+    limitBoard: true,
+  },
   hotkeys: {
     toggle: 'ctrl+alt+h',
     layoutBar: 'ctrl+alt+1',
@@ -115,6 +121,12 @@ export function Settings() {
       setSources(await invoke<Array<[DataSource, string]>>('data_sources'))
       setForm({
         ...snapshot.config,
+        anomalyAlerts: snapshot.config.anomalyAlerts ?? {
+          rapidChange: true,
+          intradayExtremes: true,
+          volumeBurst: true,
+          limitBoard: true,
+        },
         watchlist: snapshot.config.watchlist.map((w) => ({
           ...w,
           name: w.name || snapshot.quotes.find((q) => q.code.toLowerCase() === w.code.toLowerCase())?.name || null,
@@ -446,6 +458,46 @@ export function Settings() {
                       />
                       <span>触发到价或大幅波动时弹出系统气泡通知（未勾选则仅边框柔和闪烁）</span>
                     </label>
+                  </div>
+
+                  <div class="card">
+                    <div class="card-title-row">
+                      <h2>盘口即时异动告警 (Real-time Anomaly)</h2>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+                      <label class="check">
+                        <input
+                          type="checkbox"
+                          checked={form.anomalyAlerts?.rapidChange ?? true}
+                          onChange={(e) => setForm('anomalyAlerts', 'rapidChange', e.currentTarget.checked)}
+                        />
+                        <span>🚀 急速拉升 / 急速跳水提醒（短线 1~2 分钟涨跌速超过 ±1.5%）</span>
+                      </label>
+                      <label class="check">
+                        <input
+                          type="checkbox"
+                          checked={form.anomalyAlerts?.intradayExtremes ?? true}
+                          onChange={(e) => setForm('anomalyAlerts', 'intradayExtremes', e.currentTarget.checked)}
+                        />
+                        <span>📈 突破日内新高 / 跌破新低提醒（盘中刷新日内极值）</span>
+                      </label>
+                      <label class="check">
+                        <input
+                          type="checkbox"
+                          checked={form.anomalyAlerts?.volumeBurst ?? true}
+                          onChange={(e) => setForm('anomalyAlerts', 'volumeBurst', e.currentTarget.checked)}
+                        />
+                        <span>💥 盘口异动放量提醒（短线成交量激增 3 倍以上）</span>
+                      </label>
+                      <label class="check">
+                        <input
+                          type="checkbox"
+                          checked={form.anomalyAlerts?.limitBoard ?? true}
+                          onChange={(e) => setForm('anomalyAlerts', 'limitBoard', e.currentTarget.checked)}
+                        />
+                        <span>🔴 接近涨跌停 / 涨停炸板提醒（逼近涨停或封板后开板）</span>
+                      </label>
+                    </div>
                   </div>
 
                   <div class="card">

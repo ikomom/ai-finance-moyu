@@ -111,6 +111,14 @@ export interface Config {
   window: WindowGeom
   visibilityMode: VisibilityMode
   trendEngine: boolean
+  anomalyAlerts?: AnomalyAlertConfig
+}
+
+export interface AnomalyAlertConfig {
+  rapidChange: boolean
+  intradayExtremes: boolean
+  volumeBurst: boolean
+  limitBoard: boolean
 }
 
 export interface Quote {
@@ -186,19 +194,19 @@ export function fmtSigned(v: number, digits = 2): string {
 
 /** 浮盈 relative to an entry price. */
 export function profitPct(price: number, costPrice: number): number {
-  if (!costPrice) return 0
+  if (!costPrice || price <= 0) return 0
   return ((price - costPrice) / costPrice) * 100
 }
 
 /** 浮动盈亏金额 (元). */
 export function profitAmount(price: number, costPrice?: number | null, shares?: number | null): number | null {
-  if (costPrice == null || shares == null || shares <= 0) return null
+  if (costPrice == null || shares == null || shares <= 0 || price <= 0) return null
   return (price - costPrice) * shares
 }
 
 /** 今日盈亏金额 (元). */
 export function todayProfitAmount(price: number, preClose: number, shares?: number | null): number | null {
-  if (shares == null || shares <= 0 || !preClose) return null
+  if (shares == null || shares <= 0 || !preClose || price <= 0) return null
   return (price - preClose) * shares
 }
 
