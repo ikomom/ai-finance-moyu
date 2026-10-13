@@ -31,6 +31,7 @@ const [form, setForm] = createStore<Config>({
     layoutBar: 'ctrl+alt+1',
     layoutMini: 'ctrl+alt+2',
     layoutList: 'ctrl+alt+3',
+    layoutMarket: 'ctrl+alt+4',
   },
   window: { x: 0, y: 0, width: 320, height: 170 },
 })
@@ -77,6 +78,13 @@ const LAYOUTS: Array<{ value: Layout; name: string; badge: string; desc: string;
     desc: '高密度金融数据 + 全标的实时走势 Sparkline + 盈亏汇总',
     icon: '📋',
   },
+  {
+    value: 'market',
+    name: '大盘全景',
+    badge: '市场温度',
+    desc: '三大指数 + 涨跌分布多空温度计 + 两市成交量 + 领涨板块',
+    icon: '🧭',
+  },
 ]
 
 const VISIBILITIES: Array<{ value: VisibilityMode; name: string; desc: string; icon: string }> = [
@@ -112,6 +120,7 @@ const HOTKEY_FIELDS = [
   ['layoutBar', '快捷切换到数字条', '快速切到 32px 极简单行胶囊'],
   ['layoutMini', '快捷切换到迷你图', '快速查看当前选中的标的分时大图'],
   ['layoutList', '快捷切换到列表', '快速展开全量自选列表与走势 Sparkline'],
+  ['layoutMarket', '快捷切换到大盘全景', '一键查看三大指数、涨跌家数与热门板块'],
 ] as const
 
 export function Settings() {
@@ -121,12 +130,17 @@ export function Settings() {
       setSources(await invoke<Array<[DataSource, string]>>('data_sources'))
       setForm({
         ...snapshot.config,
+        hotkeys: {
+          ...snapshot.config.hotkeys,
+          layoutMarket: snapshot.config.hotkeys.layoutMarket ?? 'ctrl+alt+4',
+        },
         anomalyAlerts: snapshot.config.anomalyAlerts ?? {
           rapidChange: true,
           intradayExtremes: true,
           volumeBurst: true,
           limitBoard: true,
         },
+        iwencaiApiKey: snapshot.config.iwencaiApiKey ?? '',
         watchlist: snapshot.config.watchlist.map((w) => ({
           ...w,
           name: w.name || snapshot.quotes.find((q) => q.code.toLowerCase() === w.code.toLowerCase())?.name || null,
@@ -278,6 +292,26 @@ export function Settings() {
                           </div>
                         )}
                       </For>
+                    </div>
+                  </div>
+
+                  <div class="card">
+                    <div class="card-title-row">
+                      <h2>同花顺问财 API 配置</h2>
+                      <span class="card-badge">大盘全景增强</span>
+                    </div>
+                    <p class="hint">
+                      用于大盘全景界面的全市场精确涨跌家数与两市成交额环比分析（未配置时自动探测本地环境或使用基线缓存）。
+                    </p>
+                    <div class="field">
+                      <label for="iwencai-key">问财 API Key (IWENCAI_API_KEY)</label>
+                      <input
+                        id="iwencai-key"
+                        type="password"
+                        placeholder="sk-proj-00-..."
+                        value={form.iwencaiApiKey ?? ''}
+                        onInput={(e) => setForm('iwencaiApiKey', e.currentTarget.value.trim() || undefined)}
+                      />
                     </div>
                   </div>
 

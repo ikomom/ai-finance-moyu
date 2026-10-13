@@ -34,6 +34,8 @@ export interface DrawOptions {
   lastPrice?: number
   compact?: boolean
   hoverSlot?: number | null
+  orbHigh?: number | null
+  orbLow?: number | null
 }
 
 export function isValidAvg(avgPrice: number, preClose: number): boolean {
@@ -49,14 +51,19 @@ export function isValidAvg(avgPrice: number, preClose: number): boolean {
  * afternoon picks up at slot 121 with 13:01. Anything outside the session
  * clamps to an end so a stray pre-open print can't stretch the axis.
  */
+const AFTERNOON_START = 13 * 60 // 13:00
+
 export function slotOf(hhmm: number): number {
   const h = Math.floor(hhmm / 100)
   const m = hhmm % 100
   const min = h * 60 + m
   if (min <= MORNING_END) {
-    return clamp(min - MORNING_START, 0, SLOTS)
+    return clamp(min - MORNING_START, 0, 120)
   }
-  return clamp(min - 660, 0, SLOTS)
+  if (min < AFTERNOON_START) {
+    return 120
+  }
+  return clamp(min - 660, 120, SLOTS)
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -119,12 +126,18 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     // that sit inside the range (cost, user levels) from being clipped away.
     maxDev = Math.max(maxDev, preClose * 0.002)
     for (const pl of opts.priceLines ?? []) {
-      if (pl.price >= preClose - maxDev && pl.price <= preClose + maxDev) {
+      if (pl.price > 0 && Math.abs(pl.price - preClose) <= maxDev * 1.5) {
         maxDev = Math.max(maxDev, Math.abs(pl.price - preClose))
       }
     }
-    if (opts.costPrice && Math.abs(opts.costPrice - preClose) <= maxDev * 1.5) {
+    if (opts.costPrice && opts.costPrice > 0 && Math.abs(opts.costPrice - preClose) <= maxDev * 1.5) {
       maxDev = Math.max(maxDev, Math.abs(opts.costPrice - preClose))
+    }
+    if (opts.orbHigh && opts.orbHigh > 0 && Math.abs(opts.orbHigh - preClose) <= maxDev * 1.5) {
+      maxDev = Math.max(maxDev, Math.abs(opts.orbHigh - preClose))
+    }
+    if (opts.orbLow && opts.orbLow > 0 && Math.abs(opts.orbLow - preClose) <= maxDev * 1.5) {
+      maxDev = Math.max(maxDev, Math.abs(opts.orbLow - preClose))
     }
   } else {
     maxDev = Math.max(maxDev, 1)
@@ -312,7 +325,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   }
 
   drawHorizontalLevel(ctx, {
-    price: opts.costPrice ?? null,
+    price: opts.costPrice && opts.costPrice > 0 ? opts.costPrice : null,
     yMin,
     yTop,
     yOf,
@@ -322,7 +335,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     plotH,
     color: COST_LINE,
     dash: [5, 2, 1, 2],
-    label: opts.costPrice ? '成本' : undefined,
+    label: opts.costPrice && opts.costPrice > 0 ? '成本' : undefined,
   })
 
   for (const pl of opts.priceLines ?? []) {
@@ -338,6 +351,39 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       color: LINE_COLOR,
       dash: [2, 3],
       label: pl.label ?? undefined,
+    })
+  }
+
+  // Opening Range Breakout (ORB) boundaries after 09:45
+  const hasPastOrb = points.length > 0 && points[points.length - 1].time > 945
+  if (hasPastOrb && opts.orbHigh && opts.orbHigh > 0) {
+    drawHorizontalLevel(ctx, {
+      price: opts.orbHigh,
+      yMin,
+      yTop,
+      yOf,
+      plotL,
+      plotW,
+      plotT,
+      plotH,
+      color: 'rgba(248, 113, 113, 0.45)', // subtle red dashed line for H15
+      dash: [3, 2],
+      label: 'H15',
+    })
+  }
+  if (hasPastOrb && opts.orbLow && opts.orbLow > 0) {
+    drawHorizontalLevel(ctx, {
+      price: opts.orbLow,
+      yMin,
+      yTop,
+      yOf,
+      plotL,
+      plotW,
+      plotT,
+      plotH,
+      color: 'rgba(74, 222, 128, 0.45)', // subtle green dashed line for L15
+      dash: [3, 2],
+      label: 'L15',
     })
   }
 }

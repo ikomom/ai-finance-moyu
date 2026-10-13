@@ -1,6 +1,8 @@
+pub mod auction_engine;
 mod config;
 mod crossing;
 mod market;
+pub mod market_overview;
 mod poller;
 mod quote;
 mod search;
@@ -28,7 +30,7 @@ const DOCK_HANDLE_THICKNESS: f64 = 10.0;
 
 /// Natural size for a layout, used until the user resizes that layout.
 ///
-/// The bar layout is a horizontal pill, mini is a card chart, list is a compact table.
+/// The bar layout is a horizontal pill, mini is a card chart, list is a compact table, market is a panorama card.
 fn natural_size(layout: Layout, rows: usize) -> (f64, f64) {
     match layout {
         Layout::Bar => {
@@ -40,6 +42,7 @@ fn natural_size(layout: Layout, rows: usize) -> (f64, f64) {
             let h = ((rows.max(1) as f64) * 30.0 + 72.0).clamp(140.0, 260.0);
             (360.0, h)
         }
+        Layout::Market => (345.0, 275.0),
     }
 }
 
@@ -56,6 +59,7 @@ fn size_for(layout: Layout, rows: usize, sizes: &config::LayoutSizes) -> (f64, f
         }
         Layout::Mini => sizes.get(Layout::Mini).unwrap_or_else(|| natural_size(Layout::Mini, rows)),
         Layout::List => sizes.get(Layout::List).unwrap_or_else(|| natural_size(Layout::List, rows)),
+        Layout::Market => sizes.get(Layout::Market).unwrap_or_else(|| natural_size(Layout::Market, rows)),
     }
 }
 
@@ -147,6 +151,13 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
     };
     let _ = config::save(app, &snapshot);
 
+    if layout == Layout::Market {
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = poller::poll_market_overview(&handle).await;
+        });
+    }
+
     // The programmatic resize below would otherwise be recorded as a user-chosen
     // size, pinning a layout that should keep auto-sizing.
     suppress_resize(app, Duration::from_millis(700));
@@ -229,6 +240,7 @@ fn on_resized(app: &AppHandle, size: tauri::PhysicalSize<u32>, scale: f64) {
                     Layout::Bar => (900.0, 32.0),
                     Layout::Mini => (500.0, 320.0),
                     Layout::List => (700.0, 900.0),
+                    Layout::Market => (500.0, 450.0),
                 };
                 if w <= max_w && h <= max_h {
                     cfg.layout_sizes.set(layout, w, h);
@@ -697,6 +709,7 @@ fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
     let bar = parse("layoutBar", &keys.layout_bar)?;
     let mini = parse("layoutMini", &keys.layout_mini)?;
     let list = parse("layoutList", &keys.layout_list)?;
+    let market = parse("layoutMarket", &keys.layout_market)?;
 
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
@@ -712,6 +725,8 @@ fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
                     apply_layout(app, Layout::Mini);
                 } else if shortcut == &list {
                     apply_layout(app, Layout::List);
+                } else if shortcut == &market {
+                    apply_layout(app, Layout::Market);
                 }
             })
             .build(),
@@ -729,6 +744,7 @@ fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
         ("数字条", keys.layout_bar.as_str(), bar),
         ("迷你图", keys.layout_mini.as_str(), mini),
         ("列表", keys.layout_list.as_str(), list),
+        ("大盘全景", keys.layout_market.as_str(), market),
     ] {
         if let Err(e) = shortcuts.register(shortcut) {
             eprintln!("快捷键 {name}（{chord}）注册失败，可能已被别的程序占用: {e}");

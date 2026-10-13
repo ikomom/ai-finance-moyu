@@ -7,16 +7,20 @@ use chrono::{Datelike, NaiveDateTime, Timelike, Weekday};
 pub enum Session {
     /// Before 09:15 — nothing happening yet.
     PreOpen,
-    /// 09:15–09:25 集合竞价. The open price is being discovered, quotes move.
-    CallAuction,
-    /// 09:25–09:30 静默期, between the auction and continuous trading.
+    /// 09:15–09:19 开盘集合竞价（可报单、可撤单）.
+    CallAuctionCancelable,
+    /// 09:20–09:24 开盘集合竞价（可报单、不可撤单）.
+    CallAuctionLocked,
+    /// 09:25–09:29 静默期, between the auction and continuous trading.
     PreTrade,
     /// 09:30–11:30 morning continuous trading.
     Morning,
     /// 11:30–13:00 lunch break.
     LunchBreak,
-    /// 13:00–15:00 afternoon continuous trading.
+    /// 13:00–14:56 afternoon continuous trading.
     Afternoon,
+    /// 14:57–15:00 尾盘集合竞价（不可撤单）.
+    ClosingAuction,
     /// After 15:00, or any time on a weekend.
     Closed,
 }
@@ -26,7 +30,19 @@ impl Session {
     pub fn is_live(self) -> bool {
         matches!(
             self,
-            Session::CallAuction | Session::Morning | Session::Afternoon
+            Session::CallAuctionCancelable
+                | Session::CallAuctionLocked
+                | Session::Morning
+                | Session::Afternoon
+                | Session::ClosingAuction
+        )
+    }
+
+    /// Whether this session is within morning call auction (09:15–09:24).
+    pub fn is_morning_auction(self) -> bool {
+        matches!(
+            self,
+            Session::CallAuctionCancelable | Session::CallAuctionLocked
         )
     }
 }
@@ -113,13 +129,45 @@ pub fn session_at(dt: NaiveDateTime) -> Session {
     }
     let m = dt.hour() * 60 + dt.minute();
     match m {
-        0..=554 => Session::PreOpen,          // ..09:14
-        555..=564 => Session::CallAuction,    // 09:15–09:24
-        565..=569 => Session::PreTrade,       // 09:25–09:29
-        570..=690 => Session::Morning,        // 09:30–11:30 inclusive
-        691..=779 => Session::LunchBreak,     // 11:31–12:59
-        780..=900 => Session::Afternoon,      // 13:00–15:00 inclusive
-        _ => Session::Closed,                 // 15:01..
+        0..=554 => Session::PreOpen,                // ..09:14
+        555..=559 => Session::CallAuctionCancelable,// 09:15–09:19 (可撤单)
+        560..=564 => Session::CallAuctionLocked,    // 09:20–09:24 (不可撤单)
+        565..=569 => Session::PreTrade,             // 09:25–09:29
+        570..=690 => Session::Morning,              // 09:30–11:30 inclusive
+        691..=779 => Session::LunchBreak,           // 11:31–12:59
+        780..=896 => Session::Afternoon,            // 13:00–14:56 inclusive
+        897..=900 => Session::ClosingAuction,       // 14:57–15:00 尾盘竞价
+        _ => Session::Closed,                       // 15:01..
+    }
+}
+
+/// Check whether a normalized security code represents a macro market index
+/// (e.g. sh000001 上证指数, sz399001 深证成指, sz399006 创业板指, bj899050 北证50).
+pub fn is_index(code: &str) -> bool {
+    let s = code.trim().to_ascii_lowercase();
+    s.starts_with("sh000") || s.starts_with("sz399") || s.starts_with("bj899")
+}
+
+/// Calculate the number of continuous trading minutes that have elapsed today (1.0 to 240.0).
+pub fn elapsed_trading_minutes(now: NaiveDateTime) -> f64 {
+    let t = now.time();
+    let (h, m) = (t.hour(), t.minute());
+    let current_mins = h * 60 + m;
+    let m_open = 9 * 60 + 30; // 570 (09:30)
+    let m_noon = 11 * 60 + 30; // 690 (11:30)
+    let a_open = 13 * 60; // 780 (13:00)
+    let a_close = 15 * 60; // 900 (15:00)
+
+    if current_mins <= m_open {
+        1.0
+    } else if current_mins <= m_noon {
+        ((current_mins - m_open) as f64).max(1.0)
+    } else if current_mins <= a_open {
+        120.0
+    } else if current_mins <= a_close {
+        120.0 + ((current_mins - a_open) as f64).max(0.0)
+    } else {
+        240.0
     }
 }
 
@@ -170,8 +218,10 @@ mod tests {
     fn session_boundaries_weekday() {
         // 2026-10-08 is a Thursday.
         assert_eq!(session_at(dt(2026, 10, 8, 9, 0)), Session::PreOpen);
-        assert_eq!(session_at(dt(2026, 10, 8, 9, 15)), Session::CallAuction);
-        assert_eq!(session_at(dt(2026, 10, 8, 9, 24)), Session::CallAuction);
+        assert_eq!(session_at(dt(2026, 10, 8, 9, 15)), Session::CallAuctionCancelable);
+        assert_eq!(session_at(dt(2026, 10, 8, 9, 19)), Session::CallAuctionCancelable);
+        assert_eq!(session_at(dt(2026, 10, 8, 9, 20)), Session::CallAuctionLocked);
+        assert_eq!(session_at(dt(2026, 10, 8, 9, 24)), Session::CallAuctionLocked);
         assert_eq!(session_at(dt(2026, 10, 8, 9, 25)), Session::PreTrade);
         assert_eq!(session_at(dt(2026, 10, 8, 9, 29)), Session::PreTrade);
         assert_eq!(session_at(dt(2026, 10, 8, 9, 30)), Session::Morning);
@@ -179,7 +229,9 @@ mod tests {
         assert_eq!(session_at(dt(2026, 10, 8, 11, 31)), Session::LunchBreak);
         assert_eq!(session_at(dt(2026, 10, 8, 12, 59)), Session::LunchBreak);
         assert_eq!(session_at(dt(2026, 10, 8, 13, 0)), Session::Afternoon);
-        assert_eq!(session_at(dt(2026, 10, 8, 15, 0)), Session::Afternoon);
+        assert_eq!(session_at(dt(2026, 10, 8, 14, 56)), Session::Afternoon);
+        assert_eq!(session_at(dt(2026, 10, 8, 14, 57)), Session::ClosingAuction);
+        assert_eq!(session_at(dt(2026, 10, 8, 15, 0)), Session::ClosingAuction);
         assert_eq!(session_at(dt(2026, 10, 8, 15, 1)), Session::Closed);
         assert_eq!(session_at(dt(2026, 10, 8, 23, 59)), Session::Closed);
     }
@@ -193,9 +245,11 @@ mod tests {
 
     #[test]
     fn is_live_matches_polling_windows() {
-        assert!(Session::CallAuction.is_live());
+        assert!(Session::CallAuctionCancelable.is_live());
+        assert!(Session::CallAuctionLocked.is_live());
         assert!(Session::Morning.is_live());
         assert!(Session::Afternoon.is_live());
+        assert!(Session::ClosingAuction.is_live());
         assert!(!Session::PreOpen.is_live());
         assert!(!Session::PreTrade.is_live());
         assert!(!Session::LunchBreak.is_live());

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::crossing::CrossingTracker;
+use crate::market_overview::{MarketFetcher, MarketOverview};
 use crate::quote::{Fetcher, Quote, Trend};
 use crate::trend_engine::TrendSignal;
 
@@ -55,8 +56,10 @@ pub struct Snapshot {
     pub quotes: Vec<Quote>,
     pub trends: HashMap<String, Trend>,
     pub trend_signals: HashMap<String, TrendSignal>,
+    pub auctions: HashMap<String, crate::auction_engine::AuctionData>,
     pub status: PollStatus,
     pub dock: DockState,
+    pub market_overview: Option<MarketOverview>,
 }
 
 pub struct AppState {
@@ -83,6 +86,9 @@ pub struct AppState {
     pub dock_state: Mutex<DockState>,
     /// Codes requested by active layout for intraday trend polling (on-demand loading).
     pub active_trend_targets: Mutex<Option<Vec<String>>>,
+    pub market_fetcher: MarketFetcher,
+    pub market_overview: Mutex<Option<MarketOverview>>,
+    pub auction_tracker: Mutex<crate::auction_engine::AuctionTracker>,
 }
 
 impl AppState {
@@ -110,6 +116,9 @@ impl AppState {
             move_gen: AtomicU64::new(0),
             dock_state: Mutex::new(DockState::default()),
             active_trend_targets: Mutex::new(None),
+            market_fetcher: MarketFetcher::default(),
+            market_overview: Mutex::new(None),
+            auction_tracker: Mutex::new(crate::auction_engine::AuctionTracker::new()),
         }
     }
 
@@ -117,12 +126,14 @@ impl AppState {
     /// If a quote has not yet arrived or network is disconnected, fallback to
     /// cached/placeholder item so watchlist items NEVER vanish from the UI.
     pub fn snapshot(&self) -> Snapshot {
-        let config = self.config.lock().unwrap().clone();
-        let quotes = self.quotes.lock().unwrap();
-        let trends = self.trends.lock().unwrap();
-        let trend_signals = self.trend_signals.lock().unwrap().clone();
-        let status = self.status.lock().unwrap().clone();
-        let dock = *self.dock_state.lock().unwrap();
+        let config = self.config.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let quotes = self.quotes.lock().unwrap_or_else(|e| e.into_inner());
+        let trends = self.trends.lock().unwrap_or_else(|e| e.into_inner());
+        let trend_signals = self.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let auctions = self.auction_tracker.lock().unwrap_or_else(|e| e.into_inner()).data.clone();
+        let status = self.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let dock = *self.dock_state.lock().unwrap_or_else(|e| e.into_inner());
+        let market_overview = self.market_overview.lock().unwrap_or_else(|e| e.into_inner()).clone();
 
         let ordered = config
             .watchlist
@@ -134,21 +145,21 @@ impl AppState {
                     Quote {
                         code: w.code.clone(),
                         name: w.name.clone().unwrap_or_else(|| w.code.clone()),
-                        price: 0.0,
-                        pre_close: 0.0,
-                        open: 0.0,
-                        high: 0.0,
-                        low: 0.0,
-                        volume: 0.0,
-                        change: 0.0,
-                        change_pct: 0.0,
-                        date: String::new(),
-                        time: String::new(),
+                        ..Default::default()
                     }
                 }
             })
             .collect();
 
-        Snapshot { config, quotes: ordered, trends: trends.clone(), trend_signals, status, dock }
+        Snapshot {
+            config,
+            quotes: ordered,
+            trends: trends.clone(),
+            trend_signals,
+            auctions,
+            status,
+            dock,
+            market_overview,
+        }
     }
 }

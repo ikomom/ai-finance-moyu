@@ -5,6 +5,7 @@ import { ContextMenu, closeMenu, isContextMenuOpen } from './components/ContextM
 import { Toast } from './components/Toast'
 import { Bar } from './layouts/Bar'
 import { List } from './layouts/List'
+import { Market } from './layouts/Market'
 import { Mini } from './layouts/Mini'
 import { alertTick, initStore, snapshot } from './store'
 import { logToBackend } from './tauri'
@@ -176,6 +177,9 @@ export function Widget() {
                   </Match>
                   <Match when={s().config.layout === 'list'}>
                     <List flash={flash()} />
+                  </Match>
+                  <Match when={s().config.layout === 'market'}>
+                    <Market flash={flash()} />
                   </Match>
                   <Match when={true}>
                     <Mini flash={flash()} />

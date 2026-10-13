@@ -408,6 +408,7 @@ h2 {
 }
 
 .field input[type="text"],
+.field input[type="password"],
 .field input[type="number"],
 .field select,
 select {

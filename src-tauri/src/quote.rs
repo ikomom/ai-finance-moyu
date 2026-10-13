@@ -45,6 +45,53 @@ pub struct Quote {
     pub date: String,
     /// Provider's own timestamp, e.g. `20261008104145` or `13:40:00`.
     pub time: String,
+    /// 五档买盘: `[(price, volume_hands), ...]`, 1 到 5 档
+    #[serde(default)]
+    pub bids: Vec<(f64, f64)>,
+    /// 五档卖盘: `[(price, volume_hands), ...]`, 1 到 5 档
+    #[serde(default)]
+    pub asks: Vec<(f64, f64)>,
+    /// 外盘 (主动买量，手)
+    #[serde(default)]
+    pub outer_vol: f64,
+    /// 内盘 (主动卖量，手)
+    #[serde(default)]
+    pub inner_vol: f64,
+    /// 盘口买卖失衡度 `[-1.0, 1.0]`
+    #[serde(default)]
+    pub bid_ask_imbalance: f64,
+    /// 主动买盘占比 `[0.0, 1.0]` (外盘 / (外盘 + 内盘))
+    #[serde(default = "default_half")]
+    pub active_buy_ratio: f64,
+}
+
+fn default_half() -> f64 {
+    0.5
+}
+
+impl Default for Quote {
+    fn default() -> Self {
+        Self {
+            code: String::new(),
+            name: String::new(),
+            price: 0.0,
+            pre_close: 0.0,
+            open: 0.0,
+            high: 0.0,
+            low: 0.0,
+            volume: 0.0,
+            change: 0.0,
+            change_pct: 0.0,
+            date: String::new(),
+            time: String::new(),
+            bids: Vec::new(),
+            asks: Vec::new(),
+            outer_vol: 0.0,
+            inner_vol: 0.0,
+            bid_ask_imbalance: 0.0,
+            active_buy_ratio: 0.5,
+        }
+    }
 }
 
 /// One minute of the intraday series. Normalized so the two providers produce
@@ -174,6 +221,67 @@ pub mod tencent {
         let time = f[30].trim().to_string();
         let date = if time.len() >= 8 { time[..8].to_string() } else { String::new() };
 
+        let mut volume = num(f[6]);
+        // During call auction (09:15-09:24), executed cumulative volume is 0 until 09:25 open match.
+        // Buy 1 volume (f[10]) and Sell 1 volume (f[20]) carry the matching / order intent lots.
+        if volume <= 0.0 && f.len() > 20 {
+            let b1_v = num(f[10]);
+            let a1_v = num(f[20]);
+            let intent_vol = b1_v.max(a1_v);
+            if intent_vol > 0.0 {
+                volume = intent_vol;
+            }
+        }
+
+        let outer_vol = if f.len() > 7 { num(f[7]) } else { 0.0 };
+        let inner_vol = if f.len() > 8 { num(f[8]) } else { 0.0 };
+
+        let mut bids = Vec::with_capacity(5);
+        if f.len() > 18 {
+            let b_tuples = [
+                (num(f[9]), num(f[10])),
+                (num(f[11]), num(f[12])),
+                (num(f[13]), num(f[14])),
+                (num(f[15]), num(f[16])),
+                (num(f[17]), num(f[18])),
+            ];
+            for b in b_tuples {
+                if b.0 > 0.0 || b.1 > 0.0 {
+                    bids.push(b);
+                }
+            }
+        }
+
+        let mut asks = Vec::with_capacity(5);
+        if f.len() > 28 {
+            let a_tuples = [
+                (num(f[19]), num(f[20])),
+                (num(f[21]), num(f[22])),
+                (num(f[23]), num(f[24])),
+                (num(f[25]), num(f[26])),
+                (num(f[27]), num(f[28])),
+            ];
+            for a in a_tuples {
+                if a.0 > 0.0 || a.1 > 0.0 {
+                    asks.push(a);
+                }
+            }
+        }
+
+        let sum_bid: f64 = bids.iter().map(|b| b.1).sum();
+        let sum_ask: f64 = asks.iter().map(|a| a.1).sum();
+        let bid_ask_imbalance = if sum_bid + sum_ask > 0.0 {
+            ((sum_bid - sum_ask) / (sum_bid + sum_ask) * 1000.0).round() / 1000.0
+        } else {
+            0.0
+        };
+
+        let active_buy_ratio = if outer_vol + inner_vol > 0.0 {
+            ((outer_vol / (outer_vol + inner_vol)) * 1000.0).round() / 1000.0
+        } else {
+            0.5
+        };
+
         Some(Quote {
             code,
             name: f[1].trim().to_string(),
@@ -181,13 +289,19 @@ pub mod tencent {
             pre_close: num(f[4]),
             open: num(f[5]),
             // Tencent already reports 手.
-            volume: num(f[6]),
+            volume,
             change: num(f[31]),
             change_pct: num(f[32]),
             high: num(f[33]),
             low: num(f[34]),
             date,
             time,
+            bids,
+            asks,
+            outer_vol,
+            inner_vol,
+            bid_ask_imbalance,
+            active_buy_ratio,
         })
     }
 
@@ -343,6 +457,63 @@ pub mod sina {
         let change = price - pre_close;
         let change_pct = if pre_close > 0.0 { change / pre_close * 100.0 } else { 0.0 };
 
+        // Shares -> 手.
+        let mut volume = num(f[8]) / 100.0;
+        // During call auction (09:15-09:24), executed cumulative volume is 0 until 09:25 open match.
+        // Buy 1 volume (f[10]) and Sell 1 volume (f[20]) carry the matching / order intent lots.
+        if volume <= 0.0 && f.len() > 20 {
+            let b1_v = num(f[10]) / 100.0;
+            let a1_v = num(f[20]) / 100.0;
+            let intent_vol = b1_v.max(a1_v);
+            if intent_vol > 0.0 {
+                volume = intent_vol;
+            }
+        }
+
+        let mut bids = Vec::with_capacity(5);
+        if f.len() > 19 {
+            let b_tuples = [
+                (num(f[11]), num(f[10]) / 100.0),
+                (num(f[13]), num(f[12]) / 100.0),
+                (num(f[15]), num(f[14]) / 100.0),
+                (num(f[17]), num(f[16]) / 100.0),
+                (num(f[19]), num(f[18]) / 100.0),
+            ];
+            for b in b_tuples {
+                if b.0 > 0.0 || b.1 > 0.0 {
+                    bids.push(b);
+                }
+            }
+        }
+
+        let mut asks = Vec::with_capacity(5);
+        if f.len() > 29 {
+            let a_tuples = [
+                (num(f[21]), num(f[20]) / 100.0),
+                (num(f[23]), num(f[22]) / 100.0),
+                (num(f[25]), num(f[24]) / 100.0),
+                (num(f[27]), num(f[26]) / 100.0),
+                (num(f[29]), num(f[28]) / 100.0),
+            ];
+            for a in a_tuples {
+                if a.0 > 0.0 || a.1 > 0.0 {
+                    asks.push(a);
+                }
+            }
+        }
+
+        let sum_bid: f64 = bids.iter().map(|b| b.1).sum();
+        let sum_ask: f64 = asks.iter().map(|a| a.1).sum();
+        let bid_ask_imbalance = if sum_bid + sum_ask > 0.0 {
+            ((sum_bid - sum_ask) / (sum_bid + sum_ask) * 1000.0).round() / 1000.0
+        } else {
+            0.0
+        };
+
+        let outer_vol = 0.0;
+        let inner_vol = 0.0;
+        let active_buy_ratio = 0.5;
+
         Some(Quote {
             code,
             name: f[0].trim().to_string(),
@@ -351,13 +522,18 @@ pub mod sina {
             open: num(f[1]),
             high: num(f[4]),
             low: num(f[5]),
-            // Shares -> 手.
-            volume: num(f[8]) / 100.0,
+            volume,
             change,
             change_pct,
             // `2026-10-08` -> `20261008`.
             date: f[30].trim().replace('-', ""),
             time: f[31].trim().to_string(),
+            bids,
+            asks,
+            outer_vol,
+            inner_vol,
+            bid_ask_imbalance,
+            active_buy_ratio,
         })
     }
 
@@ -495,6 +671,7 @@ pub struct Fetcher {
 impl Fetcher {
     pub fn new() -> Result<Self, FetchError> {
         let client = reqwest::Client::builder()
+            .no_proxy()
             .timeout(Duration::from_secs(8))
             .connect_timeout(Duration::from_secs(5))
             .user_agent(USER_AGENT)
@@ -721,6 +898,14 @@ mod tests {
         assert_eq!(p.change_pct, 1.05);
         assert_eq!(p.time, "20261008104145");
         assert_eq!(p.date, "20261008");
+        assert_eq!(p.outer_vol, 200763.0);
+        assert_eq!(p.inner_vol, 170143.0);
+        assert_eq!(p.bids.len(), 5);
+        assert_eq!(p.asks.len(), 5);
+        assert_eq!(p.bids[0], (9.58, 838.0));
+        assert_eq!(p.asks[0], (9.59, 12062.0));
+        assert!((p.bid_ask_imbalance - (-0.5226)).abs() < 0.001);
+        assert!((p.active_buy_ratio - 0.5413).abs() < 0.001);
     }
 
     #[test]
@@ -850,6 +1035,11 @@ mod tests {
         assert_eq!(p.low, 9.410);
         assert_eq!(p.time, "13:40:00");
         assert_eq!(p.date, "20261008", "Sina's YYYY-MM-DD must become YYYYMMDD");
+        assert_eq!(p.bids.len(), 5);
+        assert_eq!(p.asks.len(), 5);
+        assert_eq!(p.bids[0], (9.690, 7430.0));
+        assert_eq!(p.asks[0], (9.700, 21.0));
+        assert!((p.bid_ask_imbalance - (-0.5230)).abs() < 0.001);
     }
 
     /// Sina reports volume in **shares**; the rest of the app speaks 手, so the

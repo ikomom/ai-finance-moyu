@@ -218,9 +218,13 @@ struct QuoteSample {
 struct SecurityIntradayState {
     samples: Vec<QuoteSample>,
     session_high: Option<f64>,
+    alert_high_anchor: Option<f64>,
     session_low: Option<f64>,
+    alert_low_anchor: Option<f64>,
     had_hit_limit_up: bool,
     initialized: bool,
+    last_surge_price: Option<f64>,
+    last_drop_price: Option<f64>,
 }
 
 /// Remembers where each security sat relative to its thresholds last tick.
@@ -341,7 +345,7 @@ impl CrossingTracker {
             let slot = self
                 .line_above
                 .entry(spec.code.clone())
-                .or_insert_with(|| vec![price >= spec.price_lines[0].price; spec.price_lines.len()]);
+                .or_insert_with(|| spec.price_lines.iter().map(|l| price >= l.price).collect());
 
             // A spec that changed shape (lines added/removed) invalidates the
             // remembered state; reseed rather than mis-index.
@@ -350,10 +354,10 @@ impl CrossingTracker {
                 return events;
             }
 
-            for (i, line) in spec.price_lines.iter().enumerate() {
+            for (_i, line) in spec.price_lines.iter().enumerate() {
                 let now_above = price >= line.price;
-                let was_above = slot[i];
-                slot[i] = now_above;
+                let was_above = slot[_i];
+                slot[_i] = now_above;
 
                 if now_above == was_above {
                     continue;
@@ -363,7 +367,7 @@ impl CrossingTracker {
                     LineDirection::Below => !now_above,
                 };
                 if fired {
-                    let key = format!("{}:line:{}:{:?}", spec.code, i, line.direction);
+                    let key = format!("{}:line:{:.2}:{:?}", spec.code, line.price, line.direction);
                     if Self::check_cooldown(&mut self.last_fired, self.cooldown, &key, now) {
                         events.push(CrossingEvent::PriceLine {
                             code: spec.code.clone(),
@@ -395,6 +399,20 @@ impl CrossingTracker {
         anomaly_cfg: &crate::config::AnomalyAlertConfig,
         now: Instant,
     ) -> Vec<CrossingEvent> {
+        // Mute all popups and toast alert notifications for market indices (sh000*, sz399*, bj899*)
+        // Only explicitly user-configured PriceLines (if any) are evaluated for indices.
+        if crate::auction_engine::is_index_symbol(&quote.code) {
+            if spec.price_lines.is_empty() || quote.price <= 0.0 {
+                return Vec::new();
+            }
+            let dummy_spec = WatchSpec {
+                code: spec.code.clone(),
+                alert_pct: None,
+                price_lines: spec.price_lines.clone(),
+            };
+            return self.update_at(&dummy_spec, quote.price, quote.change_pct, now);
+        }
+
         let mut events = self.update_at(spec, quote.price, quote.change_pct, now);
 
         if quote.price <= 0.0 {
@@ -405,23 +423,19 @@ impl CrossingTracker {
 
         if !state.initialized {
             state.initialized = true;
-            if quote.high > 0.0 {
-                state.session_high = Some(quote.high);
-            } else {
-                state.session_high = Some(quote.price);
-            }
-            if quote.low > 0.0 {
-                state.session_low = Some(quote.low);
-            } else {
-                state.session_low = Some(quote.price);
-            }
+            let initial_high = if quote.high > 0.0 { quote.high } else { quote.price };
+            let initial_low = if quote.low > 0.0 { quote.low } else { quote.price };
+            state.session_high = Some(initial_high);
+            state.session_low = Some(initial_low);
+            state.alert_high_anchor = Some(initial_high);
+            state.alert_low_anchor = Some(initial_low);
             state.samples.push(QuoteSample {
                 time: now,
                 price: quote.price,
                 volume: quote.volume,
             });
             let is_gem_or_star = quote.code.starts_with("sz30") || quote.code.starts_with("sh68");
-            let is_bse = quote.code.starts_with("bj8");
+            let is_bse = quote.code.starts_with("bj8") || quote.code.starts_with("bj43") || quote.code.starts_with("bj92");
             let is_st = quote.name.contains("ST");
             let up_limit = if is_bse {
                 28.5
@@ -446,16 +460,41 @@ impl CrossingTracker {
         });
         state.samples.retain(|s| now.saturating_duration_since(s.time).as_secs() <= 120);
 
-        // 1. 急速拉升与急速跳水 (Rapid surge & drop within 120s)
+        // 1. 急速拉升与急速跳水 (Rapid surge & drop within 120s: 量价共振，波段式触发无需死板冷却)
         if anomaly_cfg.rapid_change && state.samples.len() >= 2 {
+            let oldest = state.samples.first().unwrap();
+            let delta_v = (quote.volume - oldest.volume).max(0.0);
+            let dt_secs = now.saturating_duration_since(oldest.time).as_secs().max(5);
+            let rate_1min = delta_v / (dt_secs as f64) * 60.0;
+            let baseline_avg = (quote.volume / 120.0).max(100.0);
+            let has_volume_expansion = delta_v >= 100.0 && rate_1min >= baseline_avg * 1.5;
+
             let min_p = state.samples.iter().map(|s| s.price).fold(f64::INFINITY, f64::min);
             let max_p = state.samples.iter().map(|s| s.price).fold(0.0, f64::max);
+            let prev_tick_price = state.samples[state.samples.len() - 2].price;
 
-            if min_p > 0.0 {
+            // Re-arm wave triggers on significant pullbacks / rebounds
+            if let Some(prev_p) = state.last_surge_price {
+                if quote.price <= prev_p * 0.990 {
+                    state.last_surge_price = None;
+                }
+            }
+            if let Some(prev_p) = state.last_drop_price {
+                if quote.price >= prev_p * 1.010 {
+                    state.last_drop_price = None;
+                }
+            }
+
+            if has_volume_expansion && min_p > 0.0 {
                 let surge_pct = (quote.price - min_p) / min_p * 100.0;
-                if surge_pct >= 1.5 {
-                    let key = format!("{}:rapid_surge", spec.code);
-                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                if surge_pct >= 1.5 && quote.price >= prev_tick_price {
+                    // 波段式防重：同一波同一价位不重复触发；突破新台阶(>= +0.8%)可立即触发新一波
+                    let wave_allowed = match state.last_surge_price {
+                        None => true,
+                        Some(prev_p) => quote.price >= prev_p * 1.008,
+                    };
+                    if wave_allowed {
+                        state.last_surge_price = Some(quote.price);
                         events.push(CrossingEvent::RapidChange {
                             code: spec.code.clone(),
                             pct_delta: (surge_pct * 100.0).round() / 100.0,
@@ -466,11 +505,16 @@ impl CrossingTracker {
                 }
             }
 
-            if max_p > 0.0 {
+            if has_volume_expansion && max_p > 0.0 {
                 let drop_pct = (max_p - quote.price) / max_p * 100.0;
-                if drop_pct >= 1.5 {
-                    let key = format!("{}:rapid_drop", spec.code);
-                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                if drop_pct >= 1.5 && quote.price <= prev_tick_price {
+                    // 波段式防重：同一波跳水不重复触发；进一步破位(<= -0.8%)可立即触发新一波
+                    let wave_allowed = match state.last_drop_price {
+                        None => true,
+                        Some(prev_p) => quote.price <= prev_p * 0.992,
+                    };
+                    if wave_allowed {
+                        state.last_drop_price = Some(quote.price);
                         events.push(CrossingEvent::RapidChange {
                             code: spec.code.clone(),
                             pct_delta: (drop_pct * 100.0).round() / 100.0,
@@ -482,12 +526,23 @@ impl CrossingTracker {
             }
         }
 
-        // 2. 突破日内新高与跌破日内新低 (Intraday new high / low)
+        // 2. 突破日内新高与跌破日内新低 (Intraday new high / low: 突破>=0.8%且涨跌幅明显，独立冷却10分钟)
         if anomaly_cfg.intraday_extremes {
-            if let Some(prev_high) = state.session_high {
-                if quote.price > prev_high && quote.change_pct > 0.0 {
+            // Track true session high and low continuously
+            if quote.price > 0.0 {
+                state.session_high = Some(state.session_high.map_or(quote.price, |h| h.max(quote.price)));
+                state.session_low = Some(state.session_low.map_or(quote.price, |l| l.min(quote.price)));
+            }
+
+            if let Some(anchor) = state.alert_high_anchor {
+                let breakout_pct = if anchor > 0.0 {
+                    (quote.price - anchor) / anchor * 100.0
+                } else {
+                    0.0
+                };
+                if breakout_pct >= 0.8 && quote.change_pct >= 1.5 {
                     let key = format!("{}:new_high", spec.code);
-                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(600), &key, now) {
                         events.push(CrossingEvent::IntradayExtreme {
                             code: spec.code.clone(),
                             is_new_high: true,
@@ -495,16 +550,21 @@ impl CrossingTracker {
                             change_pct: quote.change_pct,
                         });
                     }
-                    state.session_high = Some(quote.price);
+                    state.alert_high_anchor = Some(quote.price);
                 }
             } else {
-                state.session_high = Some(quote.price);
+                state.alert_high_anchor = Some(quote.price);
             }
 
-            if let Some(prev_low) = state.session_low {
-                if quote.price < prev_low && quote.change_pct < 0.0 {
+            if let Some(anchor) = state.alert_low_anchor {
+                let breakdown_pct = if anchor > 0.0 {
+                    (anchor - quote.price) / anchor * 100.0
+                } else {
+                    0.0
+                };
+                if breakdown_pct >= 0.8 && quote.change_pct <= -1.5 {
                     let key = format!("{}:new_low", spec.code);
-                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(600), &key, now) {
                         events.push(CrossingEvent::IntradayExtreme {
                             code: spec.code.clone(),
                             is_new_high: false,
@@ -512,24 +572,38 @@ impl CrossingTracker {
                             change_pct: quote.change_pct,
                         });
                     }
-                    state.session_low = Some(quote.price);
+                    state.alert_low_anchor = Some(quote.price);
                 }
             } else {
-                state.session_low = Some(quote.price);
+                state.alert_low_anchor = Some(quote.price);
             }
         }
 
-        // 3. 盘口异动放量 (Volume burst)
+        // 3. 盘口异动放量 (Volume burst: 真实开盘均量基准 + 跨度 >= 20s 过滤秒级扰动 + 价格方向配合)
         if anomaly_cfg.volume_burst && state.samples.len() >= 2 {
-            if let Some(oldest_60s) = state.samples.iter().find(|s| now.saturating_duration_since(s.time).as_secs() <= 60) {
-                let delta_v = quote.volume - oldest_60s.volume;
-                let dt_secs = now.saturating_duration_since(oldest_60s.time).as_secs().max(5);
+            // Find sample from at least 20 seconds ago to avoid extrapolating 3-second tick noise
+            if let Some(oldest_sample) = state.samples.iter().find(|s| now.saturating_duration_since(s.time).as_secs() >= 20) {
+                let delta_v = quote.volume - oldest_sample.volume;
+                let dt_secs = now.saturating_duration_since(oldest_sample.time).as_secs();
                 let rate_1min = delta_v / (dt_secs as f64) * 60.0;
-                let baseline_avg = (quote.volume / 120.0).max(200.0);
-                if rate_1min >= 600.0 && rate_1min >= 3.0 * baseline_avg {
+
+                // Real average minute volume: quote.volume / elapsed_minutes
+                let local_now = chrono::Local::now().naive_local();
+                let elapsed = crate::market::elapsed_trading_minutes(local_now);
+                let baseline_avg = (quote.volume / elapsed).max(200.0);
+
+                // Price motion check: price must have at least 0.3% movement to count as a directional volume burst
+                let price_motion = if oldest_sample.price > 0.0 {
+                    (quote.price - oldest_sample.price).abs() / oldest_sample.price * 100.0
+                } else {
+                    0.0
+                };
+
+                // Substantial volume threshold: delta_v >= 300 hands, rate >= 3x real baseline, and price moved
+                if delta_v >= 300.0 && rate_1min >= 3.0 * baseline_avg && price_motion >= 0.3 {
                     let mult = (rate_1min / baseline_avg).max(2.0);
                     let key = format!("{}:vol_burst", spec.code);
-                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(240), &key, now) {
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(600), &key, now) {
                         events.push(CrossingEvent::VolumeBurst {
                             code: spec.code.clone(),
                             volume_hands: delta_v,
@@ -542,9 +616,10 @@ impl CrossingTracker {
         }
 
         // 4. 接近涨跌停与涨停炸板 (Limit board & Broken limit)
-        if anomaly_cfg.limit_board {
+        let is_ipo_unrestricted = quote.name.starts_with('N') || quote.name.starts_with('C');
+        if anomaly_cfg.limit_board && !is_ipo_unrestricted {
             let is_gem_or_star = quote.code.starts_with("sz30") || quote.code.starts_with("sh68");
-            let is_bse = quote.code.starts_with("bj8");
+            let is_bse = quote.code.starts_with("bj8") || quote.code.starts_with("bj43") || quote.code.starts_with("bj92");
             let is_st = quote.name.contains("ST");
             let up_limit = if is_bse {
                 28.5
@@ -870,6 +945,7 @@ mod tests {
             change_pct: pct,
             date: "20261012".to_string(),
             time: "10:00:00".to_string(),
+            ..Default::default()
         }
     }
 
@@ -936,4 +1012,144 @@ mod tests {
         let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(10));
         assert!(evs2.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::BrokenLimitUp, .. })));
     }
+
+    #[test]
+    fn index_symbols_produce_no_anomaly_alerts() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = WatchSpec { code: "sh000001".into(), alert_pct: Some(1.0), price_lines: vec![] };
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        let q0 = mock_quote("sh000001", 3300.0, 0.0, 10000.0);
+        assert!(t.update_quote_at(&s, &q0, &cfg, t0).is_empty());
+
+        // Huge surge on index -> must still be completely muted!
+        let q1 = mock_quote("sh000001", 3400.0, 3.03, 20000.0);
+        let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(10));
+        assert!(evs.is_empty(), "Index quotes must never produce anomaly popups");
+    }
+
+    #[test]
+    fn new_high_requires_0_8_pct_breakout_and_filters_micro_movements() {
+        let mut t = CrossingTracker::new(); // default cooldown
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        // Seed with high at 10.0
+        let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
+        t.update_quote_at(&s, &q0, &cfg, t0);
+
+        // Price rises by 1 cent (10.01 = +0.1% breakout, change_pct 0.1%) -> micro movement, NO new high alert!
+        let q1 = mock_quote("sh600000", 10.01, 0.1, 1005.0);
+        let evs1 = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(5));
+        assert!(!evs1.iter().any(|e| matches!(e, CrossingEvent::IntradayExtreme { is_new_high: true, .. })), "1 cent micro-movement should NOT fire new high");
+
+        // Price breaks out by +2.0% (10.20 >= 10.0 * 1.008, change_pct 2.0% >= 1.5%) -> FIRES!
+        let q2 = mock_quote("sh600000", 10.20, 2.0, 1500.0);
+        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(10));
+        assert!(evs2.iter().any(|e| matches!(e, CrossingEvent::IntradayExtreme { is_new_high: true, .. })));
+
+        // Price rises another 0.8% at t = 30s (< 600s cooldown) -> suppressed by 10-minute cooldown!
+        let q3 = mock_quote("sh600000", 10.30, 3.0, 1800.0);
+        let evs3 = t.update_quote_at(&s, &q3, &cfg, t0 + Duration::from_secs(30));
+        assert!(!evs3.iter().any(|e| matches!(e, CrossingEvent::IntradayExtreme { is_new_high: true, .. })), "Subsequent breakout within 10 minutes should be suppressed");
+    }
+
+    #[test]
+    fn price_lines_initialized_individually_and_not_copied_from_first_line() {
+        let mut t = CrossingTracker::without_cooldown();
+        // Line 0 is at 5.0 (direction Below). Line 1 is at 15.0 (direction Below).
+        // Current price is 10.0.
+        // Previously, slot[1] was incorrectly set to `10.0 >= 5.0` (true)!
+        // If price moves to 12.0, slot[1] is still below 15.0. It should NOT fire!
+        let s = spec(
+            None,
+            vec![line(5.0, LineDirection::Below), line(15.0, LineDirection::Below)],
+        );
+        // Seed tracker with initial price 10.0.
+        // Line 0: 10.0 >= 5.0 (above)
+        // Line 1: 10.0 < 15.0 (below)
+        assert!(t.update(&s, 10.0, 0.0).is_empty());
+
+        // Price rises to 12.0.
+        // Line 1 is still below 15.0 (was below, now below). Should NOT fire!
+        assert!(t.update(&s, 12.0, 0.0).is_empty());
+
+        // Price falls from 16.0 to 14.0 -> Line 1 crosses below 15.0 -> fires!
+        t.update(&s, 16.0, 0.0);
+        let evs = t.update(&s, 14.0, 0.0);
+        assert_eq!(evs.len(), 1);
+        assert!(matches!(evs[0], CrossingEvent::PriceLine { price: 14.0, .. }));
+    }
+
+    #[test]
+    fn rapid_surge_pullback_does_not_fire_on_falling_ticks() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        // Seed at 10.00
+        let q0 = mock_quote("sh600000", 10.00, 0.0, 1000.0);
+        t.update_quote_at(&s, &q0, &cfg, t0);
+
+        // Surges to 10.20 (+2.0%) with volume -> fires rapid surge!
+        let q1 = mock_quote("sh600000", 10.20, 2.0, 1500.0);
+        let evs1 = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(10));
+        assert!(evs1.iter().any(|e| matches!(e, CrossingEvent::RapidChange { is_surge: true, .. })));
+
+        // Price falls back to 10.08 (-1.2% pullback from 10.20 peak).
+        // Falling tick must NEVER fire a surge alert!
+        let q2 = mock_quote("sh600000", 10.08, 0.8, 1600.0);
+        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(20));
+        assert!(
+            !evs2.iter().any(|e| matches!(e, CrossingEvent::RapidChange { is_surge: true, .. })),
+            "Pullback on falling tick must NOT fire rapid surge!"
+        );
+    }
+
+    #[test]
+    fn index_with_explicit_price_line_alerts_properly() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = WatchSpec {
+            code: "sh000001".into(),
+            alert_pct: Some(1.0), // alert_pct is ignored for indices
+            price_lines: vec![line(3300.0, LineDirection::Above)],
+        };
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        // Seed below 3300
+        let q0 = mock_quote("sh000001", 3250.0, 0.0, 10000.0);
+        assert!(t.update_quote_at(&s, &q0, &cfg, t0).is_empty());
+
+        // Crosses above 3300 -> explicit price line fires!
+        let q1 = mock_quote("sh000001", 3310.0, 1.8, 20000.0);
+        let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(10));
+        assert_eq!(evs.len(), 1);
+        assert!(matches!(evs[0], CrossingEvent::PriceLine { price: 3310.0, .. }));
+    }
+
+    #[test]
+    fn ipo_unrestricted_stocks_skip_limit_board_alerts() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        let mut q0 = mock_quote("sz301600", 20.0, 0.0, 1000.0);
+        q0.name = "N强达".to_string(); // Day 1 IPO stock
+        t.update_quote_at(&s, &q0, &cfg, t0);
+
+        // Stock climbs +35% (unrestricted)
+        let mut q1 = mock_quote("sz301600", 27.0, 35.0, 5000.0);
+        q1.name = "N强达".to_string();
+        let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(10));
+        assert!(
+            !evs.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { .. })),
+            "IPO stock should not trigger limit board alerts"
+        );
+    }
 }
+

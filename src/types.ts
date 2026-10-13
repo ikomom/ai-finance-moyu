@@ -27,7 +27,7 @@ export interface SearchResult {
   category: string
 }
 
-export type Layout = 'bar' | 'mini' | 'list'
+export type Layout = 'bar' | 'mini' | 'list' | 'market'
 
 /** Which upstream provider to fetch from. */
 export type DataSource = 'tencent' | 'sina'
@@ -50,6 +50,7 @@ export interface LayoutSizes {
   bar?: [number, number]
   mini?: [number, number]
   list?: [number, number]
+  market?: [number, number]
 }
 
 export interface WindowGeom {
@@ -71,6 +72,56 @@ export interface Hotkeys {
   layoutBar: string
   layoutMini: string
   layoutList: string
+  layoutMarket: string
+}
+
+export interface MarketIndex {
+  code: string
+  name: string
+  price: number
+  change: number
+  changePct: number
+  turnover: number
+  upCount: number
+  downCount: number
+  flatCount: number
+}
+
+export interface SectorItem {
+  code: string
+  name: string
+  changePct: number
+  upCount: number
+  downCount: number
+  leadStockName: string
+  leadStockCode?: string
+  leadStockZdf?: number
+}
+
+export interface SectorLinkage {
+  sectorCode: string
+  sectorName: string
+  sectorChangePct: number
+  deltaRSector: number
+  deltaRMarket: number
+  leaderCode: string
+  leaderName: string
+  leaderChangePct: number
+  role: string
+  diagnosis: string
+}
+
+export interface MarketOverview {
+  indices: MarketIndex[]
+  upCount: number
+  downCount: number
+  flatCount: number
+  totalTurnover: number
+  turnoverChangePct?: number | null
+  turnoverChangeAmount?: number | null
+  northNetFlow?: number | null
+  topSectors: SectorItem[]
+  updatedAt: string
 }
 
 export type TrendState =
@@ -85,6 +136,14 @@ export type TrendState =
   | 'bottomRebound'
   | 'consolidation'
   | 'neutral'
+  | 'springRebound'
+  | 'aggressiveBuying'
+  | 'panicDumping'
+  | 'illiquidDrift'
+  | 'independentAlpha'
+  | 'soloPlunge'
+  | 'orbBreakoutUp'
+  | 'orbBreakdownDown'
 
 export interface TrendSignal {
   state: TrendState
@@ -94,6 +153,9 @@ export interface TrendSignal {
   biasPct: number
   summary: string
   updatedAt: number
+  orbHigh?: number | null
+  orbLow?: number | null
+  sectorLinkage?: SectorLinkage | null
 }
 
 export interface Config {
@@ -112,6 +174,7 @@ export interface Config {
   visibilityMode: VisibilityMode
   trendEngine: boolean
   anomalyAlerts?: AnomalyAlertConfig
+  iwencaiApiKey?: string
 }
 
 export interface AnomalyAlertConfig {
@@ -134,6 +197,12 @@ export interface Quote {
   changePct: number
   date: string
   time: string
+  bids?: [number, number][]
+  asks?: [number, number][]
+  outerVol?: number
+  innerVol?: number
+  bidAskImbalance?: number
+  activeBuyRatio?: number
 }
 
 export interface TrendPoint {
@@ -152,6 +221,31 @@ export interface Trend {
   points: TrendPoint[]
 }
 
+export type AuctionTag = 'normal' | 'bull_trap' | 'bear_trap' | 'snatching' | 'dumping'
+
+export interface AuctionPoint {
+  /** 24h format HHMM, e.g. 915, 918, 920. */
+  time: number
+  price: number
+  volume: number
+}
+
+export interface AuctionDiagnosis {
+  tag: AuctionTag
+  label: string
+  detail: string
+  earlyPeakPct: number
+  lockedPct: number
+  volumeDropPct?: number | null
+}
+
+export interface AuctionData {
+  code: string
+  date: string
+  points: AuctionPoint[]
+  diagnosis?: AuctionDiagnosis | null
+}
+
 export interface PollStatus {
   lastUpdate?: string | null
   error?: string | null
@@ -165,8 +259,10 @@ export interface Snapshot {
   quotes: Quote[]
   trends: Record<string, Trend>
   trendSignals: Record<string, TrendSignal>
+  auctions: Record<string, AuctionData>
   status: PollStatus
   dock: DockState
+  marketOverview?: MarketOverview | null
 }
 
 /** A股 convention: red is up, green is down — inverted from Western markets. */
@@ -193,8 +289,8 @@ export function fmtSigned(v: number, digits = 2): string {
 }
 
 /** 浮盈 relative to an entry price. */
-export function profitPct(price: number, costPrice: number): number {
-  if (!costPrice || price <= 0) return 0
+export function profitPct(price: number, costPrice: number): number | null {
+  if (costPrice <= 0 || price <= 0) return null
   return ((price - costPrice) / costPrice) * 100
 }
 
@@ -240,4 +336,9 @@ export function trendClass(changePct: number): string {
   if (changePct > 0) return 'up'
   if (changePct < 0) return 'down'
   return 'flat'
+}
+
+/** Check if symbol represents an index (no individual call auction or VWAP) */
+export function isIndexCode(code: string): boolean {
+  return code.startsWith('sh000') || code.startsWith('sz399') || code.startsWith('bj899')
 }

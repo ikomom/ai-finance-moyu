@@ -124,11 +124,13 @@ export function List(props: { flash: boolean }) {
       const it = itemFor(q.code)
       if (it?.shares && it.shares > 0) {
         hasShares = true
-        if (q.preClose > 0) {
-          totalToday += (q.price - q.preClose) * it.shares
-        }
-        if (it.costPrice && it.costPrice > 0) {
-          totalFloating += (q.price - it.costPrice) * it.shares
+        if (q.price > 0) {
+          if (q.preClose > 0) {
+            totalToday += (q.price - q.preClose) * it.shares
+          }
+          if (it.costPrice != null) {
+            totalFloating += (q.price - it.costPrice) * it.shares
+          }
         }
       }
     }
@@ -200,7 +202,7 @@ export function List(props: { flash: boolean }) {
                       <div class="code-and-signal">
                         <span class="code-text">{q.code.replace(/^(sh|sz|bj)/, '')}</span>
                         <Show when={s().config.trendEngine && s().trendSignals?.[q.code]}>
-                          <TrendBadge signal={s().trendSignals[q.code]} compact />
+                          <TrendBadge signal={s().trendSignals[q.code]} quote={q} compact />
                         </Show>
                       </div>
                     </div>
@@ -233,11 +235,16 @@ export function List(props: { flash: boolean }) {
                             when={cost()}
                             fallback={<span class="pnl-dash">-</span>}
                           >
-                            {(c) => (
-                              <span class={`pnl-val ${trendClass(profitPct(q.price, c()))}`}>
-                                {fmtPct(profitPct(q.price, c()))}
-                              </span>
-                            )}
+                            {(c) => {
+                              const p = profitPct(q.price, c())
+                              return p !== null ? (
+                                <span class={`pnl-val ${trendClass(p)}`}>
+                                  {fmtPct(p)}
+                                </span>
+                              ) : (
+                                <span class="pnl-val flat">--</span>
+                              )
+                            }}
                           </Show>
                         }
                       >

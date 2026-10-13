@@ -43,9 +43,11 @@ pub async fn run(app: AppHandle) {
     let _ = poll_quotes(&app).await;
     let _ = poll_trends(&app).await;
     let mut last_trend: Option<Instant> = Some(Instant::now());
+    let _ = poll_market_overview(&app).await;
+    let mut last_market: Option<Instant> = Some(Instant::now());
 
     loop {
-        let (session, poll_ms, trend_ms, feed_is_today, need_retry) = {
+        let (session, poll_ms, trend_ms, feed_is_today, need_retry, is_market, need_market_init) = {
             let state = app.state::<AppState>();
             let now = Local::now().naive_local();
             let session = market::session_at(now);
@@ -53,8 +55,23 @@ pub async fn run(app: AppHandle) {
             let st = state.status.lock().unwrap();
             let quotes = state.quotes.lock().unwrap();
             let need_retry = quotes.is_empty() || st.error.is_some();
-            (session, cfg.poll_quotes_ms, cfg.poll_trend_ms, st.trading_today, need_retry)
+            let is_market = cfg.layout == crate::config::Layout::Market;
+            let need_market_init = state.market_overview.lock().unwrap().is_none();
+            (session, cfg.poll_quotes_ms, cfg.poll_trend_ms, st.trading_today, need_retry, is_market, need_market_init)
         };
+
+        let market_interval = if is_market {
+            Duration::from_secs(5)
+        } else {
+            Duration::from_secs(20)
+        };
+        let market_due = need_market_init
+            || ((session.is_live() || need_retry)
+                && last_market.map_or(true, |t| t.elapsed() >= market_interval));
+        if market_due {
+            let _ = poll_market_overview(&app).await;
+            last_market = Some(Instant::now());
+        }
 
         if session.is_live() || need_retry {
             let _ = poll_quotes(&app).await;
@@ -83,8 +100,26 @@ pub async fn run(app: AppHandle) {
 /// Fetch everything once, on demand — used by the tray's 立即刷新 and by the
 /// frontend after the user edits the watchlist.
 pub async fn poll_once(app: &AppHandle) -> Result<(), String> {
+    let _ = poll_market_overview(app).await;
     poll_quotes(app).await?;
     poll_trends(app).await
+}
+
+/// Fetch real-time market panorama & breadth data when in Market layout.
+pub async fn poll_market_overview(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let api_key = state.config.lock().unwrap().iwencai_api_key.clone();
+    match state.market_fetcher.fetch_overview(api_key.as_deref()).await {
+        Ok(overview) => {
+            *state.market_overview.lock().unwrap() = Some(overview);
+            emit_snapshot(app);
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("拉取大盘全景数据失败: {e}");
+            Err(e)
+        }
+    }
 }
 
 /// One batch request for every code on the watchlist.
@@ -115,16 +150,36 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let state = app.state::<AppState>();
         let cfg = state.config.lock().unwrap();
 
+        let now = chrono::Local::now().naive_local();
+        let session = crate::market::session_at(now);
+        let in_auction_or_pretrade = session.is_morning_auction() || session == crate::market::Session::PreTrade;
+
         // Evaluate crossings against the *previous* tick before we replace the
         // stored quotes, otherwise every poll would look like a fresh seed.
         let mut tracker = state.tracker.lock().unwrap();
         let mut events = Vec::new();
+
+        // During 09:15-09:30 call auction and pre-trade silence:
+        // Do not evaluate anomaly triggers (rapid_change, intraday_extremes, etc.)
+        // to prevent false alarms caused by virtual matching orders and cancellations.
+        let empty_anomalies = crate::config::AnomalyAlertConfig {
+            rapid_change: false,
+            intraday_extremes: false,
+            volume_burst: false,
+            limit_board: false,
+        };
+        let anomaly_cfg = if in_auction_or_pretrade {
+            &empty_anomalies
+        } else {
+            &cfg.anomaly_alerts
+        };
+
         for q in &quotes {
             if let Some(item) = cfg.watchlist.iter().find(|w| w.code == q.code) {
                 events.extend(tracker.update_quote(
                     &item.spec(cfg.alert_pct),
                     q,
-                    &cfg.anomaly_alerts,
+                    anomaly_cfg,
                 ));
             }
         }
@@ -134,19 +189,25 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
 
         let names: std::collections::HashMap<&str, &str> =
             quotes.iter().map(|q| (q.code.as_str(), q.name.as_str())).collect();
-        let notifications: Vec<AlertNotification> = events
-            .iter()
-            .map(|ev| {
-                let name = names.get(ev.code()).copied().unwrap_or(ev.code());
-                AlertNotification {
-                    code: ev.code().to_string(),
-                    name: name.to_string(),
-                    message: ev.message(name),
-                }
-            })
-            .collect();
 
-        if cfg.notifications {
+        // Silence all notifications (desktop OS and in-app toasts) during call auction and pre-trade
+        let notifications: Vec<AlertNotification> = if in_auction_or_pretrade {
+            Vec::new()
+        } else {
+            events
+                .iter()
+                .map(|ev| {
+                    let name = names.get(ev.code()).copied().unwrap_or(ev.code());
+                    AlertNotification {
+                        code: ev.code().to_string(),
+                        name: name.to_string(),
+                        message: ev.message(name),
+                    }
+                })
+                .collect()
+        };
+
+        if cfg.notifications && !notifications.is_empty() {
             for notif in &notifications {
                 let _ = app
                     .notification()
@@ -179,6 +240,15 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
     {
         let state = app.state::<AppState>();
         update_trend_signals(&state, trend_engine_enabled);
+
+        let now = chrono::Local::now().naive_local();
+        let session = crate::market::session_at(now);
+        if session.is_morning_auction() || session == crate::market::Session::PreTrade {
+            let mut auction_tracker = state.auction_tracker.lock().unwrap();
+            for q in &quotes {
+                auction_tracker.update_quote(session, q);
+            }
+        }
     }
 
     record_success(app, &quotes);
@@ -208,7 +278,7 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
             }
             None => {
                 match cfg.layout {
-                    crate::config::Layout::Bar => Vec::new(),
+                    crate::config::Layout::Bar | crate::config::Layout::Market => Vec::new(),
                     crate::config::Layout::Mini => {
                         watchlist_codes.into_iter().take(1).collect()
                     }
@@ -284,11 +354,36 @@ fn update_trend_signals(state: &AppState, enabled: bool) {
 
     let quotes = state.quotes.lock().unwrap();
     let trends = state.trends.lock().unwrap();
+    let overview_guard = state.market_overview.lock().unwrap();
     let mut signals = state.trend_signals.lock().unwrap();
+
+    let (market_pct, sectors) = match overview_guard.as_ref() {
+        Some(ov) => {
+            let m_pct = ov
+                .indices
+                .iter()
+                .find(|idx| idx.code == "000001" || idx.code == "sh000001")
+                .map(|idx| idx.change_pct)
+                .unwrap_or(0.0);
+            (m_pct, ov.top_sectors.as_slice())
+        }
+        None => (0.0, [].as_slice()),
+    };
 
     for (code, q) in quotes.iter() {
         let t = trends.get(code);
-        if let Some(sig) = crate::trend_engine::analyze_trend(q, t) {
+        let linkage = if crate::market::is_index(&q.code) {
+            None
+        } else {
+            crate::market_overview::match_stock_sector(
+                &q.code,
+                &q.name,
+                q.change_pct,
+                sectors,
+                market_pct,
+            )
+        };
+        if let Some(sig) = crate::trend_engine::analyze_trend(q, t, linkage) {
             signals.insert(code.clone(), sig);
         }
     }

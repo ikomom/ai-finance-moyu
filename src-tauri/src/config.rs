@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager};
 use crate::crossing::{PriceLine, WatchSpec};
 use crate::quote::{Quote, Trend};
 
-/// Which of the three layouts the window is showing.
+/// Which of the four layouts the window is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Layout {
@@ -24,6 +24,8 @@ pub enum Layout {
     Mini,
     /// Full watchlist with an expandable chart.
     List,
+    /// Macro market overview & sector sentiment.
+    Market,
 }
 
 /// Which upstream quote provider to use.
@@ -90,12 +92,14 @@ pub struct LayoutSizes {
     pub mini: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub list: Option<[f64; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub market: Option<[f64; 2]>,
 }
 
 /// True when no layout has a user-set size, so the whole map can be left out of
 /// the config file rather than serializing as an empty object.
 fn sizes_are_empty(s: &LayoutSizes) -> bool {
-    s.bar.is_none() && s.mini.is_none() && s.list.is_none()
+    s.bar.is_none() && s.mini.is_none() && s.list.is_none() && s.market.is_none()
 }
 
 impl LayoutSizes {
@@ -104,6 +108,7 @@ impl LayoutSizes {
             Layout::Bar => self.bar,
             Layout::Mini => self.mini,
             Layout::List => self.list,
+            Layout::Market => self.market,
         };
         v.map(|[w, h]| (w, h))
     }
@@ -114,6 +119,7 @@ impl LayoutSizes {
             Layout::Bar => self.bar = v,
             Layout::Mini => self.mini = v,
             Layout::List => self.list = v,
+            Layout::Market => self.market = v,
         }
     }
 
@@ -123,6 +129,7 @@ impl LayoutSizes {
             Layout::Bar => self.bar = None,
             Layout::Mini => self.mini = None,
             Layout::List => self.list = None,
+            Layout::Market => self.market = None,
         }
     }
 }
@@ -185,6 +192,7 @@ pub struct Hotkeys {
     pub layout_bar: String,
     pub layout_mini: String,
     pub layout_list: String,
+    pub layout_market: String,
 }
 
 impl Default for Hotkeys {
@@ -194,6 +202,7 @@ impl Default for Hotkeys {
             layout_bar: "ctrl+alt+1".into(),
             layout_mini: "ctrl+alt+2".into(),
             layout_list: "ctrl+alt+3".into(),
+            layout_market: "ctrl+alt+4".into(),
         }
     }
 }
@@ -265,6 +274,9 @@ pub struct Config {
     /// Intraday real-time anomaly alerts.
     #[serde(default)]
     pub anomaly_alerts: AnomalyAlertConfig,
+    /// Optional iWencai OpenAPI Key for whole-market breadth and analytics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub iwencai_api_key: Option<String>,
 }
 
 impl Default for Config {
@@ -291,6 +303,7 @@ impl Default for Config {
             visibility_mode: VisibilityMode::default(),
             trend_engine: true,
             anomaly_alerts: AnomalyAlertConfig::default(),
+            iwencai_api_key: None,
         }
     }
 }
@@ -298,6 +311,15 @@ impl Default for Config {
 impl Config {
     /// Clamp values a hand-edited file could have put out of range.
     pub fn sanitize(&mut self) {
+        if let Some(key) = &mut self.iwencai_api_key {
+            let trimmed = key.trim();
+            if trimmed.is_empty() {
+                self.iwencai_api_key = None;
+            } else {
+                *key = trimmed.to_string();
+            }
+        }
+
         self.opacity = self.opacity.clamp(0.2, 1.0);
         self.alert_pct = self.alert_pct.clamp(0.1, 50.0);
         // Never poll faster than 1s; that would just get us rate-limited.
@@ -307,7 +329,7 @@ impl Config {
         self.window.height = self.window.height.clamp(28.0, 1200.0);
 
         // A hand-edited, snapped or corrupted size must not make the widget unusable.
-        for layout in [Layout::Bar, Layout::Mini, Layout::List] {
+        for layout in [Layout::Bar, Layout::Mini, Layout::List, Layout::Market] {
             if let Some((w, h)) = self.layout_sizes.get(layout) {
                 if layout == Layout::Bar {
                     if w < 140.0 || w > 900.0 || !w.is_finite() {
@@ -322,6 +344,7 @@ impl Config {
                     Layout::Bar => (900.0, 32.0),
                     Layout::Mini => (500.0, 320.0),
                     Layout::List => (700.0, 900.0),
+                    Layout::Market => (500.0, 450.0),
                 };
                 if !w.is_finite() || !h.is_finite() || w < 140.0 || h < 24.0 || w > max_w || h > max_h {
                     self.layout_sizes.clear(layout);
@@ -508,6 +531,7 @@ mod tests {
         assert_eq!(serde_json::to_string(&Layout::Bar).unwrap(), "\"bar\"");
         assert_eq!(serde_json::to_string(&Layout::Mini).unwrap(), "\"mini\"");
         assert_eq!(serde_json::to_string(&Layout::List).unwrap(), "\"list\"");
+        assert_eq!(serde_json::to_string(&Layout::Market).unwrap(), "\"market\"");
     }
 
     #[test]
@@ -533,14 +557,14 @@ mod tests {
     #[test]
     fn default_hotkeys_avoid_the_ime_switch_modifier() {
         let h = Hotkeys::default();
-        for chord in [&h.toggle, &h.layout_bar, &h.layout_mini, &h.layout_list] {
+        for chord in [&h.toggle, &h.layout_bar, &h.layout_mini, &h.layout_list, &h.layout_market] {
             let lower = chord.to_ascii_lowercase();
             assert!(lower.contains("ctrl"), "{chord} should use Ctrl");
             assert!(lower.contains("alt"), "{chord} should use Alt");
             assert!(!lower.contains("shift"), "{chord} must not use Ctrl+Shift (IME switch)");
         }
         // And they must not collide with each other.
-        let mut all = vec![&h.toggle, &h.layout_bar, &h.layout_mini, &h.layout_list];
+        let mut all = vec![&h.toggle, &h.layout_bar, &h.layout_mini, &h.layout_list, &h.layout_market];
         let n = all.len();
         all.sort();
         all.dedup();

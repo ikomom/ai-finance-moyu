@@ -18,6 +18,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
     let bar = MenuItemBuilder::with_id("layout:bar", "布局 · 数字条").build(app)?;
     let mini = MenuItemBuilder::with_id("layout:mini", "布局 · 迷你图").build(app)?;
     let list = MenuItemBuilder::with_id("layout:list", "布局 · 列表").build(app)?;
+    let market = MenuItemBuilder::with_id("layout:market", "布局 · 大盘全景").build(app)?;
     let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
 
     let mode_sub = SubmenuBuilder::new(app, "显隐模式")
@@ -39,7 +40,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
 
     let menu = MenuBuilder::new(app)
         .items(&[
-            &toggle, &refresh, &sep1, &bar, &mini, &list, &sep2, &mode_sub, &sep_mode, &settings, &sep_settings,
+            &toggle, &refresh, &sep1, &bar, &mini, &list, &market, &sep2, &mode_sub, &sep_mode, &settings, &sep_settings,
             &autostart, &sep3, &quit,
         ])
         .build()?;
@@ -96,6 +97,7 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
             let layout = match other.trim_start_matches("layout:") {
                 "bar" => crate::config::Layout::Bar,
                 "list" => crate::config::Layout::List,
+                "market" => crate::config::Layout::Market,
                 _ => crate::config::Layout::Mini,
             };
             crate::apply_layout(app, layout);
@@ -144,6 +146,9 @@ pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::
     let list = CheckMenuItemBuilder::with_id("layout:list", "列表")
         .checked(current_layout == crate::config::Layout::List)
         .build(app)?;
+    let market = CheckMenuItemBuilder::with_id("layout:market", "大盘全景")
+        .checked(current_layout == crate::config::Layout::Market)
+        .build(app)?;
     let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
 
     let mode_sub = SubmenuBuilder::new(app, "显隐模式")
@@ -173,7 +178,7 @@ pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::
 
     let menu = MenuBuilder::new(app)
         .items(&[
-            &refresh, &sep1, &bar, &mini, &list, &sep2, &mode_sub, &sep_mode,
+            &refresh, &sep1, &bar, &mini, &list, &market, &sep2, &mode_sub, &sep_mode,
             &opacity_sub, &sep_opacity, &settings, &sep_settings, &autostart, &sep3, &quit,
         ])
         .build()?;

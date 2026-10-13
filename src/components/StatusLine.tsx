@@ -4,11 +4,14 @@ import type { PollStatus } from '../types'
 
 const SESSION_LABEL: Record<string, string> = {
   PreOpen: '未开盘',
+  CallAuctionCancelable: '竞价 · 可撤',
+  CallAuctionLocked: '竞价 · 锁定',
   CallAuction: '集合竞价',
   PreTrade: '待开盘',
   Morning: '上午盘',
   LunchBreak: '午间休市',
   Afternoon: '下午盘',
+  ClosingAuction: '尾盘竞价',
   Closed: '已收盘',
 }
 
@@ -16,7 +19,14 @@ const SESSION_LABEL: Record<string, string> = {
 export function StatusLine(props: { status: PollStatus }) {
   const live = () =>
     props.status.tradingToday &&
-    ['Morning', 'Afternoon', 'CallAuction'].includes(props.status.session)
+    [
+      'Morning',
+      'Afternoon',
+      'CallAuctionCancelable',
+      'CallAuctionLocked',
+      'CallAuction',
+      'ClosingAuction',
+    ].includes(props.status.session)
 
   // A feed date that isn't today means the market is closed (weekend/holiday),
   // and what's on screen is the most recent session.

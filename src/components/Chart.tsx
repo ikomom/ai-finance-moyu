@@ -22,6 +22,8 @@ export function Chart(props: ChartProps) {
       lastPrice: props.lastPrice,
       compact: props.compact,
       hoverSlot: hoverSlot(),
+      orbHigh: props.orbHigh,
+      orbLow: props.orbLow,
     })
 
   onMount(() => {
