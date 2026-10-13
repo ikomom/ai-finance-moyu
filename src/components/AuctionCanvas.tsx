@@ -101,14 +101,6 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
     ctx.fillStyle = 'rgba(59, 130, 246, 0.035)'
     ctx.fillRect(dividerX, plotT, plotL + plotW - dividerX, priceH)
 
-    // Phase Zone Header Labels
-    ctx.textAlign = 'left'
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.55)'
-    ctx.fillText('09:15-09:20 允许撤单', plotL + 3, plotT - 6)
-
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.55)'
-    ctx.fillText('09:20-09:25 真实申报', dividerX + 3, plotT - 6)
-
     // 2. Grid & Borders
     ctx.strokeStyle = GRID
     ctx.lineWidth = 1
@@ -137,14 +129,7 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
     ctx.stroke()
     ctx.restore()
 
-    // 5. Empty State Watermark
-    if (points.length === 0) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)'
-      ctx.textAlign = 'center'
-      ctx.fillText('集合竞价监控中 · 等待 09:15 申报数据', plotL + plotW / 2, preCloseY)
-    }
-
-    // 6. Volume histogram in bottom section
+    // 5. Volume histogram in bottom section
     for (const p of points) {
       const slot = slotOfAuctionTime(p.time)
       const x = xOfSlot(slot)
@@ -157,13 +142,10 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
       ctx.globalAlpha = 1.0
     }
 
-    // Volume section label
-    ctx.textAlign = 'left'
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'
     if (maxVol > 10) {
-      ctx.fillText(`意向量 ${fmtVol(maxVol)}手`, plotL + 3, volT + 6)
-    } else {
-      ctx.fillText('意向申报量待撮合', plotL + 3, volT + 6)
+      ctx.textAlign = 'left'
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'
+      ctx.fillText(`${fmtVol(maxVol)}手`, plotL + 3, volT + 6)
     }
 
     // 7. Price trajectory and points
@@ -304,13 +286,14 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
       ctx.fillText('0.00%', plotL + plotW + 3, preCloseY)
     }
 
-    // Bottom timeline labels: 09:15, 09:20 撤单截止, 09:25 撮合定格
+    // Bottom timeline labels: 09:15, 09:20, 09:25
     ctx.textAlign = 'center'
+    ctx.fillStyle = AXIS_TEXT
     ctx.fillText('09:15', plotL + 8, volT + volH + 7)
     ctx.fillStyle = 'rgba(245, 158, 11, 0.85)'
-    ctx.fillText('09:20 撤单截止', dividerX, volT + volH + 7)
+    ctx.fillText('09:20', dividerX, volT + volH + 7)
     ctx.fillStyle = AXIS_TEXT
-    ctx.fillText('09:25 撮合', plotL + plotW - 10, volT + volH + 7)
+    ctx.fillText('09:25', plotL + plotW - 10, volT + volH + 7)
   }
 
   onMount(() => {

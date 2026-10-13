@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
 
+import { AuctionBadge } from '../components/AuctionBadge'
 import { AuctionCanvas } from '../components/AuctionCanvas'
 import { Chart } from '../components/Chart'
 import { Grip } from '../components/Grip'
@@ -211,7 +212,6 @@ export function Mini(props: { flash: boolean }) {
                 <div class="meta-left">
                   <span class="name">{q().name}</span>
                   <span class="code">{q().code.replace(/^(sh|sz|bj)/, '')}</span>
-                  {/* Single Badge Rule: in auction mode, render only auction diagnosis; in trend mode, render TrendBadge */}
                   <Show
                     when={activeMode() === 'auction' && !isIndex()}
                     fallback={
@@ -220,19 +220,7 @@ export function Mini(props: { flash: boolean }) {
                       </Show>
                     }
                   >
-                    <Show when={auction()?.diagnosis && auction()!.diagnosis!.tag !== 'normal'}>
-                      {(() => {
-                        const diag = auction()!.diagnosis!
-                        return (
-                          <span
-                            class={`auction-diagnosis-badge ${diag.tag}`}
-                            title={diag.detail}
-                          >
-                            {diag.label}
-                          </span>
-                        )
-                      })()}
-                    </Show>
+                    <AuctionBadge auction={auction()} quote={q()} />
                   </Show>
                 </div>
                 <div class="meta-right">

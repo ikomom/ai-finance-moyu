@@ -922,6 +922,7 @@ button.primary:hover {
 }
 .param-pill .pill-val.bull { color: #f87171; }
 .param-pill .pill-val.bear { color: #4ade80; }
+.param-pill .pill-val.warn { color: #fbbf24; }
 .param-pill .pill-val.neutral { color: #e5e7eb; }
 .param-pill .pill-val.orb-range { color: #93c5fd; }
 .param-pill .pill-val.sector-name,

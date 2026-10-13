@@ -119,6 +119,60 @@ impl AuctionTracker {
 
         entry.diagnosis = evaluate_auction(quote.pre_close, &entry.points);
     }
+
+    /// If app starts after morning call auction (or runs in continuous trading), backfill a baseline 09:25 match anchor
+    /// from the quote's open price so the user still gets open gap diagnosis and match anchor line.
+    pub fn ensure_cold_start_entry(&mut self, quote: &Quote) {
+        if is_index_symbol(&quote.code) || quote.open <= 0.0 || quote.pre_close <= 0.0 {
+            return;
+        }
+        self.check_date_or_reset(&quote.date);
+        let entry = self.data.entry(quote.code.clone()).or_insert_with(|| {
+            let open_pct = ((quote.open - quote.pre_close) / quote.pre_close * 100.0 * 100.0).round() / 100.0;
+            let (label, detail) = if open_pct > 0.0 {
+                (
+                    format!("高开 {:+.2}%", open_pct),
+                    format!("09:25 开盘撮合成交价 {:.2} 元，较昨收高开 {:+.2}%。如需监控 09:15-09:25 撤单异动流，请在早盘竞价时段保持软件在线采集。", quote.open, open_pct),
+                )
+            } else if open_pct < 0.0 {
+                (
+                    format!("低开 {:+.2}%", open_pct),
+                    format!("09:25 开盘撮合成交价 {:.2} 元，较昨收低开 {:+.2}%。如需监控 09:15-09:25 撤单异动流，请在早盘竞价时段保持软件在线采集。", quote.open, open_pct),
+                )
+            } else {
+                (
+                    "平开撮合 0.00%".to_string(),
+                    format!("09:25 开盘撮合成交价 {:.2} 元，与昨收持平。如需监控 09:15-09:25 撤单异动流，请在早盘竞价时段保持软件在线采集。", quote.open),
+                )
+            };
+
+            AuctionData {
+                code: quote.code.clone(),
+                date: quote.date.clone(),
+                points: vec![AuctionPoint {
+                    time: 925,
+                    price: quote.open,
+                    volume: quote.volume,
+                }],
+                diagnosis: Some(AuctionDiagnosis {
+                    tag: AuctionTag::Normal,
+                    label,
+                    detail,
+                    early_peak_pct: open_pct,
+                    locked_pct: open_pct,
+                    volume_drop_pct: None,
+                }),
+            }
+        });
+
+        if entry.points.is_empty() {
+            entry.points.push(AuctionPoint {
+                time: 925,
+                price: quote.open,
+                volume: quote.volume,
+            });
+        }
+    }
 }
 
 /// Check if a symbol represents an index (no individual call auction order matching)

@@ -243,10 +243,14 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
 
         let now = chrono::Local::now().naive_local();
         let session = crate::market::session_at(now);
+        let mut auction_tracker = state.auction_tracker.lock().unwrap_or_else(|e| e.into_inner());
         if session.is_morning_auction() || session == crate::market::Session::PreTrade {
-            let mut auction_tracker = state.auction_tracker.lock().unwrap();
             for q in &quotes {
                 auction_tracker.update_quote(session, q);
+            }
+        } else {
+            for q in &quotes {
+                auction_tracker.ensure_cold_start_entry(q);
             }
         }
     }
