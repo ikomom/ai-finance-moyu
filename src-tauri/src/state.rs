@@ -89,6 +89,8 @@ pub struct AppState {
     pub market_fetcher: MarketFetcher,
     pub market_overview: Mutex<Option<MarketOverview>>,
     pub auction_tracker: Mutex<crate::auction_engine::AuctionTracker>,
+    /// Timestamp of the last user-driven window resize.
+    pub last_resized_at: Mutex<Option<Instant>>,
 }
 
 impl AppState {
@@ -119,6 +121,7 @@ impl AppState {
             market_fetcher: MarketFetcher::default(),
             market_overview: Mutex::new(None),
             auction_tracker: Mutex::new(crate::auction_engine::AuctionTracker::new()),
+            last_resized_at: Mutex::new(None),
         }
     }
 

@@ -646,6 +646,18 @@ body {
   border-right: 1.5px solid #fff;
   border-bottom: 1.5px solid #fff;
 }
+.grip.grip-left {
+  right: auto;
+  left: 1px;
+  cursor: nesw-resize;
+}
+.grip.grip-left::after {
+  right: auto;
+  left: 2px;
+  border-right: none;
+  border-left: 1.5px solid #fff;
+  border-bottom: 1.5px solid #fff;
+}
 .card:hover .grip {
   opacity: 0.65;
 }

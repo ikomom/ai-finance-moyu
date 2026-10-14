@@ -24,7 +24,7 @@ const DISPLAY: &str = "main";
 const SETTINGS: &str = "settings";
 
 /// Distance from screen edge to snap and enable dock collapse (in logical px).
-const DOCK_SNAP_THRESHOLD: f64 = 60.0;
+const DOCK_SNAP_THRESHOLD: f64 = 15.0;
 /// Visible sliver width/thickness when collapsed (in logical px).
 const DOCK_HANDLE_THICKNESS: f64 = 10.0;
 
@@ -239,6 +239,8 @@ fn on_resized(app: &AppHandle, size: tauri::PhysicalSize<u32>, scale: f64) {
         }
     }
 
+    *state.last_resized_at.lock().unwrap() = Some(Instant::now());
+
     let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
     // Ignore degenerate sizes or OS snap blowout.
     if w < 140.0 || h < 24.0 || w > 750.0 || h > 950.0 {
@@ -440,6 +442,51 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
     suppress_resize(app, Duration::from_millis(500));
 
     if collapse {
+        // Guard 1: Post-resize grace period (2 seconds)
+        if let Some(t) = *state.last_resized_at.lock().unwrap() {
+            if t.elapsed() < Duration::from_millis(2000) {
+                return Ok(());
+            }
+        }
+
+        // Guard 2: On Windows, check physical mouse button & cursor position near resize border
+        #[cfg(windows)]
+        {
+            use windows_sys::Win32::Foundation::{POINT, RECT};
+            use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+            use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowRect};
+
+            // If mouse button is held down (user dragging to resize or move), do not collapse!
+            unsafe {
+                if (GetAsyncKeyState(VK_LBUTTON as i32) as u16 & 0x8000) != 0 {
+                    return Ok(());
+                }
+            }
+
+            // If cursor is on the window or in the resize border band (within 12px), do not collapse!
+            if let Ok(hwnd) = win.hwnd() {
+                unsafe {
+                    let mut pt = POINT { x: 0, y: 0 };
+                    let mut rect = RECT {
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                    };
+                    if GetCursorPos(&mut pt) != 0 && GetWindowRect(hwnd.0, &mut rect) != 0 {
+                        let margin = 12;
+                        if pt.x >= rect.left - margin
+                            && pt.x <= rect.right + margin
+                            && pt.y >= rect.top - margin
+                            && pt.y <= rect.bottom + margin
+                        {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+
         let (cw, ch, cx, cy) = match current_dock.edge {
             DockEdge::Right => (
                 DOCK_HANDLE_THICKNESS,

@@ -15,6 +15,7 @@ export function Widget() {
   const [error, setError] = createSignal<string | null>(null)
   const [flash, setFlash] = createSignal(false)
   let leaveTimer: number | null = null
+  let lastResizeAt = 0
 
   const clearLeaveTimer = () => {
     if (leaveTimer !== null) {
@@ -38,19 +39,26 @@ export function Widget() {
     }
   }
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (e: MouseEvent) => {
     clearLeaveTimer()
+    // Do not collapse if mouse button is held down (dragging or resizing)
+    if (e.buttons > 0) return
     if (isContextMenuOpen()) return
+    // Guard against collapsing immediately after resize
+    if (Date.now() - lastResizeAt < 2000) return
+
     const mode = visibilityMode()
     const edge = dockEdge()
     if (edge === 'none') return
 
     if (mode === 'hover' && !isCollapsed()) {
       leaveTimer = window.setTimeout(() => {
+        if (Date.now() - lastResizeAt < 2000) return
         void invoke('set_dock_collapsed', { collapsed: true })
-      }, 300)
+      }, 500)
     } else if (mode === 'dblclick' && !isCollapsed()) {
       leaveTimer = window.setTimeout(() => {
+        if (Date.now() - lastResizeAt < 2000) return
         void invoke('set_dock_collapsed', { collapsed: true })
       }, 2000)
     }
@@ -157,9 +165,11 @@ export function Widget() {
     document.addEventListener('mouseup', handleMouseSideButtons)
     document.addEventListener('auxclick', preventDefaultSideButtons)
 
-    // The window is user-resizable; the chart handles its own redraw, this just
-    // refreshes the diagnostics.
-    window.addEventListener('resize', () => report())
+    window.addEventListener('resize', () => {
+      lastResizeAt = Date.now()
+      clearLeaveTimer()
+      report()
+    })
 
     onCleanup(() => {
       document.removeEventListener('contextmenu', handleContextMenu)
