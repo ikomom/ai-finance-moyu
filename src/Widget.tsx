@@ -15,7 +15,6 @@ export function Widget() {
   const [error, setError] = createSignal<string | null>(null)
   const [flash, setFlash] = createSignal(false)
   let leaveTimer: number | null = null
-  let lastResizeAt = 0
 
   const clearLeaveTimer = () => {
     if (leaveTimer !== null) {
@@ -44,8 +43,6 @@ export function Widget() {
     // Do not collapse if mouse button is held down (dragging or resizing)
     if (e.buttons > 0) return
     if (isContextMenuOpen()) return
-    // Guard against collapsing immediately after resize
-    if (Date.now() - lastResizeAt < 2000) return
 
     const mode = visibilityMode()
     const edge = dockEdge()
@@ -53,12 +50,10 @@ export function Widget() {
 
     if (mode === 'hover' && !isCollapsed()) {
       leaveTimer = window.setTimeout(() => {
-        if (Date.now() - lastResizeAt < 2000) return
         void invoke('set_dock_collapsed', { collapsed: true })
       }, 350)
     } else if (mode === 'dblclick' && !isCollapsed()) {
       leaveTimer = window.setTimeout(() => {
-        if (Date.now() - lastResizeAt < 2000) return
         void invoke('set_dock_collapsed', { collapsed: true })
       }, 2000)
     }
@@ -166,7 +161,6 @@ export function Widget() {
     document.addEventListener('auxclick', preventDefaultSideButtons)
 
     window.addEventListener('resize', () => {
-      lastResizeAt = Date.now()
       clearLeaveTimer()
       report()
     })

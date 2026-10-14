@@ -239,8 +239,6 @@ fn on_resized(app: &AppHandle, size: tauri::PhysicalSize<u32>, scale: f64) {
         }
     }
 
-    *state.last_resized_at.lock().unwrap() = Some(Instant::now());
-
     let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
     // Ignore degenerate sizes or OS snap blowout.
     if w < 140.0 || h < 24.0 || w > 750.0 || h > 950.0 {
@@ -442,14 +440,7 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
     suppress_resize(app, Duration::from_millis(500));
 
     if collapse {
-        // Guard 1: Post-resize grace period (2 seconds)
-        if let Some(t) = *state.last_resized_at.lock().unwrap() {
-            if t.elapsed() < Duration::from_millis(2000) {
-                return Ok(());
-            }
-        }
-
-        // Guard 2: On Windows, check physical mouse button & cursor position near resize border
+        // On Windows, check physical mouse button & cursor position near resize border
         #[cfg(windows)]
         {
             use windows_sys::Win32::Foundation::POINT;
@@ -475,7 +466,8 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
                         let right = pos.x + size.width as i32 + margin;
                         let top = pos.y - margin;
                         let bottom = pos.y + size.height as i32 + margin;
-                        if pt.x >= left && pt.x <= right && pt.y >= top && pt.y <= bottom {
+                        let inside = pt.x >= left && pt.x <= right && pt.y >= top && pt.y <= bottom;
+                        if inside {
                             return Ok(());
                         }
                     }
