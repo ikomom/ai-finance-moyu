@@ -486,12 +486,21 @@ pub fn apply_visibility_mode(app: &AppHandle, mode: VisibilityMode) -> Result<()
     Ok(())
 }
 
-/// The 老板键 action.
+/// The 老板键 / 托盘图标唤出 action.
 pub fn toggle_window(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(DISPLAY) {
-        if win.is_visible().unwrap_or(false) {
+        let is_visible = win.is_visible().unwrap_or(false);
+        let is_collapsed = {
+            let state = app.state::<AppState>();
+            let c = state.dock_state.lock().unwrap().collapsed;
+            c
+        };
+
+        if is_visible && !is_collapsed {
+            // 窗口当前可见且处于完全展开状态 -> 老板键执行彻底隐藏
             let _ = win.hide();
         } else {
+            // 窗口处于隐藏状态或当前已贴边折叠 -> 强制展开并显示
             let _ = set_dock_collapsed_inner(app, false);
             let _ = win.show();
         }
@@ -689,6 +698,13 @@ async fn set_trend_targets(app: AppHandle, targets: Vec<String>) -> Result<(), S
     }
 
     Ok(())
+}
+
+#[tauri::command]
+async fn get_kline(app: AppHandle, code: String) -> Result<quote::KLineData, String> {
+    let state = app.state::<AppState>();
+    let norm_code = market::normalize_code(&code)?;
+    state.fetcher.fetch_kline(&norm_code).await.map_err(|e| e.to_string())
 }
 
 // ------------------------------------------------------------------- setup
@@ -963,6 +979,7 @@ pub fn run() {
             show_context_menu,
             search_securities,
             set_trend_targets,
+            get_kline,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

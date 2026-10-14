@@ -9,6 +9,83 @@ export interface PriceLine {
   direction: LineDirection
 }
 
+export type IndicatorPreset = 'ultra_short' | 'classic' | 'swing' | 'custom'
+export type StockIndicatorMode = 'inherit' | IndicatorPreset
+
+export interface IndicatorConfig {
+  preset: IndicatorPreset
+  ma: [number, number, number]
+  macd: [number, number, number]
+}
+
+export const INDICATOR_PRESETS: Record<
+  Exclude<IndicatorPreset, 'custom'>,
+  { ma: [number, number, number]; macd: [number, number, number]; label: string; shortLabel: string }
+> = {
+  ultra_short: {
+    label: '极速超短 (MA 3/5/10 · MACD 6/13/5)',
+    shortLabel: '极速超短',
+    ma: [3, 5, 10],
+    macd: [6, 13, 5],
+  },
+  classic: {
+    label: '经典短线 (MA 5/10/20 · MACD 12/26/9)',
+    shortLabel: '经典短线',
+    ma: [5, 10, 20],
+    macd: [12, 26, 9],
+  },
+  swing: {
+    label: '中线波段 (MA 10/30/60 · MACD 19/39/9)',
+    shortLabel: '中线波段',
+    ma: [10, 30, 60],
+    macd: [19, 39, 9],
+  },
+}
+
+export function resolveIndicatorParams(
+  item?: WatchItem | null,
+  global?: IndicatorConfig | null
+): { ma: [number, number, number]; macd: [number, number, number] } {
+  const effectiveGlobal: IndicatorConfig = global ?? {
+    preset: 'classic',
+    ma: [5, 10, 20],
+    macd: [12, 26, 9],
+  }
+
+  const mode = item?.indicatorMode ?? 'inherit'
+
+  if (mode === 'ultra_short') {
+    return { ma: INDICATOR_PRESETS.ultra_short.ma, macd: INDICATOR_PRESETS.ultra_short.macd }
+  }
+  if (mode === 'classic') {
+    return { ma: INDICATOR_PRESETS.classic.ma, macd: INDICATOR_PRESETS.classic.macd }
+  }
+  if (mode === 'swing') {
+    return { ma: INDICATOR_PRESETS.swing.ma, macd: INDICATOR_PRESETS.swing.macd }
+  }
+  if (mode === 'custom') {
+    return {
+      ma: item?.customMa ?? effectiveGlobal.ma ?? [5, 10, 20],
+      macd: item?.customMacd ?? effectiveGlobal.macd ?? [12, 26, 9],
+    }
+  }
+
+  // mode === 'inherit' -> check global preset
+  if (effectiveGlobal.preset === 'ultra_short') {
+    return { ma: INDICATOR_PRESETS.ultra_short.ma, macd: INDICATOR_PRESETS.ultra_short.macd }
+  }
+  if (effectiveGlobal.preset === 'swing') {
+    return { ma: INDICATOR_PRESETS.swing.ma, macd: INDICATOR_PRESETS.swing.macd }
+  }
+  if (effectiveGlobal.preset === 'custom') {
+    return {
+      ma: effectiveGlobal.ma ?? [5, 10, 20],
+      macd: effectiveGlobal.macd ?? [12, 26, 9],
+    }
+  }
+  return { ma: INDICATOR_PRESETS.classic.ma, macd: INDICATOR_PRESETS.classic.macd }
+}
+
 export interface WatchItem {
   /** Canonical prefixed code, e.g. `sh600000`. */
   code: string
@@ -18,6 +95,10 @@ export interface WatchItem {
   shares?: number | null
   alertPct?: number | null
   priceLines?: PriceLine[]
+  /** Indicator mode override: 'inherit' | 'ultra_short' | 'classic' | 'swing' | 'custom' */
+  indicatorMode?: StockIndicatorMode | null
+  customMa?: [number, number, number] | null
+  customMacd?: [number, number, number] | null
 }
 
 export interface SearchResult {
@@ -175,6 +256,7 @@ export interface Config {
   trendEngine: boolean
   anomalyAlerts?: AnomalyAlertConfig
   iwencaiApiKey?: string
+  indicatorConfig?: IndicatorConfig
 }
 
 export interface AnomalyAlertConfig {
@@ -246,6 +328,30 @@ export interface AuctionData {
   diagnosis?: AuctionDiagnosis | null
 }
 
+export interface KLineBar {
+  date: string
+  open: number
+  close: number
+  high: number
+  low: number
+  volume: number
+  ma5?: number | null
+  ma10?: number | null
+  ma20?: number | null
+  dif?: number | null
+  dea?: number | null
+  macd?: number | null
+}
+
+export type KLineSignal = 'bull_aligned' | 'above_ma20' | 'below_ma20' | 'bear_aligned' | 'neutral'
+
+export interface KLineData {
+  code: string
+  bars: KLineBar[]
+  maSignal: KLineSignal
+  maComment: string
+}
+
 export interface PollStatus {
   lastUpdate?: string | null
   error?: string | null
@@ -286,6 +392,12 @@ export function fmtPct(v: number): string {
 
 export function fmtSigned(v: number, digits = 2): string {
   return `${v >= 0 ? '+' : ''}${v.toFixed(digits)}`
+}
+
+export function fmtVol(v: number): string {
+  if (v >= 100000000) return `${(v / 100000000).toFixed(1)}亿`
+  if (v >= 10000) return `${(v / 10000).toFixed(1)}万`
+  return `${Math.round(v)}`
 }
 
 /** 浮盈 relative to an entry price. */

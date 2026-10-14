@@ -134,6 +134,28 @@ impl LayoutSizes {
     }
 }
 
+/// Indicator strategy configuration (MA periods & MACD parameters).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndicatorConfig {
+    /// Strategy preset: "ultra_short" | "classic" | "swing" | "custom"
+    pub preset: String,
+    /// Moving average periods, e.g. [5, 10, 20] or [3, 5, 10]
+    pub ma: [u32; 3],
+    /// MACD parameters: [fast, slow, signal], e.g. [12, 26, 9] or [6, 13, 5]
+    pub macd: [u32; 3],
+}
+
+impl Default for IndicatorConfig {
+    fn default() -> Self {
+        Self {
+            preset: "classic".into(),
+            ma: [5, 10, 20],
+            macd: [12, 26, 9],
+        }
+    }
+}
+
 /// One security on the watchlist.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -154,6 +176,13 @@ pub struct WatchItem {
     pub alert_pct: Option<f64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub price_lines: Vec<PriceLine>,
+    /// Per-security indicator strategy override: "inherit" | "ultra_short" | "classic" | "swing" | "custom"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub indicator_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_ma: Option<[u32; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_macd: Option<[u32; 3]>,
 }
 
 impl WatchItem {
@@ -165,6 +194,9 @@ impl WatchItem {
             shares: None,
             alert_pct: None,
             price_lines: Vec::new(),
+            indicator_mode: None,
+            custom_ma: None,
+            custom_macd: None,
         }
     }
 
@@ -277,6 +309,9 @@ pub struct Config {
     /// Optional iWencai OpenAPI Key for whole-market breadth and analytics.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iwencai_api_key: Option<String>,
+    /// Global indicator strategy configuration (MA & MACD parameters).
+    #[serde(default)]
+    pub indicator_config: IndicatorConfig,
 }
 
 impl Default for Config {
@@ -304,6 +339,7 @@ impl Default for Config {
             trend_engine: true,
             anomaly_alerts: AnomalyAlertConfig::default(),
             iwencai_api_key: None,
+            indicator_config: IndicatorConfig::default(),
         }
     }
 }
@@ -350,6 +386,42 @@ impl Config {
                     self.layout_sizes.clear(layout);
                 } else {
                     self.layout_sizes.set(layout, w, h);
+                }
+            }
+        }
+
+        // Indicator config sanitization
+        if !matches!(
+            self.indicator_config.preset.as_str(),
+            "ultra_short" | "classic" | "swing" | "custom"
+        ) {
+            self.indicator_config.preset = "classic".into();
+        }
+        for v in &mut self.indicator_config.ma {
+            *v = (*v).clamp(1, 250);
+        }
+        for v in &mut self.indicator_config.macd {
+            *v = (*v).clamp(1, 250);
+        }
+
+        // Per-item indicator mode sanitization
+        for item in &mut self.watchlist {
+            if let Some(mode) = &item.indicator_mode {
+                if !matches!(
+                    mode.as_str(),
+                    "inherit" | "ultra_short" | "classic" | "swing" | "custom"
+                ) {
+                    item.indicator_mode = None;
+                }
+            }
+            if let Some(ma) = &mut item.custom_ma {
+                for v in ma {
+                    *v = (*v).clamp(1, 250);
+                }
+            }
+            if let Some(macd) = &mut item.custom_macd {
+                for v in macd {
+                    *v = (*v).clamp(1, 250);
                 }
             }
         }
@@ -649,5 +721,26 @@ mod tests {
         assert_eq!(serde_json::to_string(&VisibilityMode::DblClick).unwrap(), "\"dblclick\"");
         let back: VisibilityMode = serde_json::from_str("\"dblclick\"").unwrap();
         assert_eq!(back, VisibilityMode::DblClick);
+    }
+
+    #[test]
+    fn indicator_config_defaults_and_sanitizes() {
+        let mut c = Config::default();
+        assert_eq!(c.indicator_config.preset, "classic");
+        assert_eq!(c.indicator_config.ma, [5, 10, 20]);
+        assert_eq!(c.indicator_config.macd, [12, 26, 9]);
+
+        // Hand-edited invalid preset and out-of-range params
+        c.indicator_config.preset = "invalid_preset".into();
+        c.indicator_config.ma = [0, 999, 10];
+        c.watchlist[0].indicator_mode = Some("unknown_mode".into());
+        c.watchlist[0].custom_ma = Some([0, 1000, 5]);
+
+        c.sanitize();
+
+        assert_eq!(c.indicator_config.preset, "classic");
+        assert_eq!(c.indicator_config.ma, [1, 250, 10]);
+        assert_eq!(c.watchlist[0].indicator_mode, None);
+        assert_eq!(c.watchlist[0].custom_ma, Some([1, 250, 5]));
     }
 }

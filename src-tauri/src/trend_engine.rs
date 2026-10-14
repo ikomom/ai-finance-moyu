@@ -87,10 +87,10 @@ impl TrendState {
     pub fn compact_label(self) -> &'static str {
         match self {
             TrendState::BreakoutPullback => "回踩",
-            TrendState::VolumeSurge => "放量",
+            TrendState::VolumeSurge => "放量涨",
             TrendState::SteadyBull => "多头",
             TrendState::TopDivergence => "背离",
-            TrendState::Breakdown => "破位",
+            TrendState::Breakdown => "放量跌",
             TrendState::VwapResistance => "承压",
             TrendState::VwapOverbought => "超买",
             TrendState::VwapOversold => "超跌",
@@ -784,7 +784,7 @@ mod tests {
         let sig = analyze_trend(&q, Some(&t), None).unwrap();
 
         assert_eq!(sig.state, TrendState::VolumeSurge);
-        assert_eq!(sig.compact_label, "放量");
+        assert_eq!(sig.compact_label, "放量涨");
         assert!(sig.score >= 60);
     }
 
@@ -824,7 +824,7 @@ mod tests {
         let sig = analyze_trend(&q, Some(&t), None).unwrap();
 
         assert_eq!(sig.state, TrendState::Breakdown);
-        assert_eq!(sig.compact_label, "破位");
+        assert_eq!(sig.compact_label, "放量跌");
         assert!(sig.score <= -60);
     }
 

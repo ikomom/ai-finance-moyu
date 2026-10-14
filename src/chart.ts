@@ -11,7 +11,7 @@
 //   * The 均价线 (average price) is mandatory, and the feed only gives
 //     cumulative volume/amount, so it is derived per point.
 
-import { AVG, DOWN, UP, type PriceLine, type Trend } from './types'
+import { AVG, DOWN, fmtVol, UP, type PriceLine, type Trend, type TrendPoint } from './types'
 
 const MORNING_START = 9 * 60 + 30 // 09:30
 const MORNING_END = 11 * 60 + 30 // 11:30
@@ -23,6 +23,52 @@ const PRE_CLOSE_LINE = 'rgba(255,255,255,0.28)'
 const COST_LINE = '#22d3ee'
 const LINE_COLOR = 'rgba(255,255,255,0.55)'
 const FONT = '9px ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+
+export interface MinuteMacd {
+  dif: number
+  dea: number
+  macd: number
+}
+
+export function computeMinuteMacd(
+  points: TrendPoint[],
+  params?: [number, number, number]
+): MinuteMacd[] {
+  const [fast, slow, signal] = params ?? [12, 26, 9]
+  const n = points.length
+  if (n === 0) return []
+  const res: MinuteMacd[] = new Array(n)
+
+  const kFast = 2 / (fast + 1)
+  const kSlow = 2 / (slow + 1)
+  const kSignal = 2 / (signal + 1)
+
+  let emaFast = points[0].price
+  let emaSlow = points[0].price
+  let dea = 0
+
+  for (let i = 0; i < n; i++) {
+    const p = points[i].price
+    if (i === 0) {
+      emaFast = p
+      emaSlow = p
+      dea = 0
+      res[i] = { dif: 0, dea: 0, macd: 0 }
+    } else {
+      emaFast = emaFast * (1 - kFast) + p * kFast
+      emaSlow = emaSlow * (1 - kSlow) + p * kSlow
+      const dif = emaFast - emaSlow
+      dea = dea * (1 - kSignal) + dif * kSignal
+      const macd = (dif - dea) * 2
+      res[i] = {
+        dif: Math.round(dif * 1000) / 1000,
+        dea: Math.round(dea * 1000) / 1000,
+        macd: Math.round(macd * 1000) / 1000,
+      }
+    }
+  }
+  return res
+}
 
 export interface DrawOptions {
   trend: Trend | undefined
@@ -36,6 +82,8 @@ export interface DrawOptions {
   hoverSlot?: number | null
   orbHigh?: number | null
   orbLow?: number | null
+  subchartMode?: 'vol' | 'macd'
+  macdParams?: [number, number, number]
 }
 
 export function isValidAvg(avgPrice: number, preClose: number): boolean {
@@ -100,6 +148,11 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const plotW = Math.max(1, cssW - pad.left - pad.right)
   const plotH = Math.max(1, cssH - pad.top - pad.bottom)
 
+  // Split plotH into price section (72%) and volume subchart (25%)
+  const priceH = Math.max(20, Math.round(plotH * 0.72))
+  const volGap = 4
+  const volT = plotT + priceH + volGap
+  const volH = Math.max(10, plotH - priceH - volGap)
 
   const points = opts.trend?.points ?? []
   const preClose = opts.preClose || opts.trend?.preClose || 0
@@ -148,23 +201,30 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const span = yTop - yMin || 1
 
   const xOf = (slot: number) => plotL + (slot / SLOTS) * plotW
-  const yOf = (price: number) => plotT + (1 - (price - yMin) / span) * plotH
+  const yOf = (price: number) => plotT + (1 - (price - yMin) / span) * priceH
 
   // --- grid ---------------------------------------------------------------
   ctx.strokeStyle = GRID
   ctx.lineWidth = 1
   for (let i = 0; i <= 4; i++) {
-    const y = Math.round(plotT + (i / 4) * plotH) + 0.5
+    const y = Math.round(plotT + (i / 4) * priceH) + 0.5
     ctx.beginPath()
     ctx.moveTo(plotL, y)
     ctx.lineTo(plotL + plotW, y)
     ctx.stroke()
   }
+
+  // Volume subchart top separator line
+  ctx.beginPath()
+  ctx.moveTo(plotL, Math.round(volT) - 0.5)
+  ctx.lineTo(plotL + plotW, Math.round(volT) - 0.5)
+  ctx.stroke()
+
   for (const slot of [0, 60, 120, 180, 240]) {
     const x = Math.round(xOf(slot)) + 0.5
     ctx.beginPath()
     ctx.moveTo(x, plotT)
-    ctx.lineTo(x, plotT + plotH)
+    ctx.lineTo(x, volT + volH)
     ctx.stroke()
   }
 
@@ -219,13 +279,13 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     } else {
       ctx.textAlign = 'center'
     }
-    ctx.fillText(label, x, plotT + plotH + 7)
+    ctx.fillText(label, x, volT + volH + 7)
   }
 
   if (points.length === 0) {
     ctx.textAlign = 'center'
     ctx.fillStyle = AXIS_TEXT
-    ctx.fillText('暂无分时数据', plotL + plotW / 2, plotT + plotH / 2)
+    ctx.fillText('暂无分时数据', plotL + plotW / 2, plotT + priceH / 2)
     return
   }
 
@@ -284,6 +344,203 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   ctx.arc(lastX, lastY, 2, 0, Math.PI * 2)
   ctx.fill()
 
+  // --- subchart: switchable VOL vs MACD ------------------------------------
+  const subMode = opts.subchartMode ?? 'vol'
+
+  if (subMode === 'vol') {
+    // --- pure minute volume subchart (high contrast & clear) ----------------
+    const minuteVols: number[] = new Array(points.length)
+    let maxVol = 0
+    for (let i = 0; i < points.length; i++) {
+      const v = i === 0 ? points[0].cumVolume : Math.max(0, points[i].cumVolume - points[i - 1].cumVolume)
+      minuteVols[i] = v
+      if (v > maxVol) maxVol = v
+    }
+
+    if (maxVol > 0) {
+      const sqrtMax = Math.sqrt(maxVol) || 1
+      const barW = Math.max(1, (plotW / SLOTS) * 0.82)
+      for (let i = 0; i < points.length; i++) {
+        const v = minuteVols[i]
+        if (v <= 0) continue
+        const slot = slotOf(points[i].time)
+        const cx = xOf(slot)
+        const barH = Math.max(1, (Math.sqrt(v) / sqrtMax) * volH)
+        const isUp = i === 0 ? points[0].price >= preClose : points[i].price >= points[i - 1].price
+        ctx.fillStyle = isUp ? 'rgba(239, 68, 68, 0.82)' : 'rgba(34, 197, 94, 0.82)'
+        ctx.fillRect(cx - barW / 2, volT + volH - barH, barW, barH)
+      }
+
+      // Active / Hovered Volume
+      let activeIdx = points.length - 1
+      if (opts.hoverSlot != null) {
+        let minDiff = 999
+        for (let i = 0; i < points.length; i++) {
+          const diff = Math.abs(slotOf(points[i].time) - opts.hoverSlot)
+          if (diff < minDiff) {
+            minDiff = diff
+            activeIdx = i
+          }
+        }
+      }
+      const vActive = minuteVols[activeIdx]
+
+      // Subchart top-left legend
+      ctx.font = FONT
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
+      ctx.fillText(`量:${fmtVol(vActive > 0 ? vActive : maxVol)}`, plotL + 2, volT + 1)
+
+      // Right-aligned max volume label
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'
+      ctx.textAlign = 'left'
+      ctx.fillText(`${fmtVol(maxVol)}`, plotL + plotW + 3, volT + 1)
+    }
+  } else {
+    // --- pure intraday MACD subchart -----------------------------
+    const minuteMacd = computeMinuteMacd(points, opts.macdParams)
+    if (minuteMacd.length > 0) {
+      let minM = 0
+      let maxM = 0
+      for (const m of minuteMacd) {
+        if (m.dif < minM) minM = m.dif
+        if (m.dif > maxM) maxM = m.dif
+        if (m.dea < minM) minM = m.dea
+        if (m.dea > maxM) maxM = m.dea
+        if (m.macd < minM) minM = m.macd
+        if (m.macd > maxM) maxM = m.macd
+      }
+      if (minM === 0 && maxM === 0) {
+        minM = -0.02
+        maxM = 0.02
+      }
+      const spanM = Math.max(0.0001, (maxM - minM) * 1.15)
+      const midM = (maxM + minM) / 2
+      const macdMin = midM - spanM / 2
+      const macdMax = midM + spanM / 2
+      const yOfMacd = (v: number) => volT + volH - ((v - macdMin) / (macdMax - macdMin)) * volH
+      const zeroY = Math.round(yOfMacd(0)) + 0.5
+
+      // Zero-axis dashed baseline
+      ctx.save()
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)'
+      ctx.setLineDash([2, 2])
+      ctx.beginPath()
+      ctx.moveTo(plotL, zeroY)
+      ctx.lineTo(plotL + plotW, zeroY)
+      ctx.stroke()
+      ctx.restore()
+
+      // MACD Histogram Bars
+      const histW = Math.max(1, (plotW / SLOTS) * 0.72)
+      for (let i = 0; i < points.length; i++) {
+        const m = minuteMacd[i].macd
+        const slot = slotOf(points[i].time)
+        const cx = xOf(slot)
+        const my = yOfMacd(m)
+        const barTop = Math.min(zeroY, my)
+        const barHeight = Math.max(1, Math.abs(my - zeroY))
+        ctx.fillStyle = m >= 0 ? 'rgba(239, 68, 68, 0.88)' : 'rgba(34, 197, 94, 0.88)'
+        ctx.fillRect(cx - histW / 2, barTop, histW, barHeight)
+      }
+
+      // DIF line (#38bdf8)
+      ctx.strokeStyle = '#38bdf8'
+      ctx.lineWidth = 1.1
+      ctx.beginPath()
+      points.forEach((p, i) => {
+        const cx = xOf(slotOf(p.time))
+        const cy = yOfMacd(minuteMacd[i].dif)
+        if (i === 0) ctx.moveTo(cx, cy)
+        else ctx.lineTo(cx, cy)
+      })
+      ctx.stroke()
+
+      // DEA line (#f59e0b)
+      ctx.strokeStyle = '#f59e0b'
+      ctx.lineWidth = 1.1
+      ctx.beginPath()
+      points.forEach((p, i) => {
+        const cx = xOf(slotOf(p.time))
+        const cy = yOfMacd(minuteMacd[i].dea)
+        if (i === 0) ctx.moveTo(cx, cy)
+        else ctx.lineTo(cx, cy)
+      })
+      ctx.stroke()
+
+      // Subchart Legend: Active / Hovered Point
+      let activeIdx = points.length - 1
+      if (opts.hoverSlot != null) {
+        let minDiff = 999
+        for (let i = 0; i < points.length; i++) {
+          const diff = Math.abs(slotOf(points[i].time) - opts.hoverSlot)
+          if (diff < minDiff) {
+            minDiff = diff
+            activeIdx = i
+          }
+        }
+      }
+      const mActive = minuteMacd[activeIdx]
+      const prevM = activeIdx > 0 ? minuteMacd[activeIdx - 1] : mActive
+
+      ctx.font = FONT
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      let subLx = plotL + 2
+      const subLy = volT + 1
+
+      if (mActive) {
+        ctx.fillStyle = '#38bdf8'
+        const difTxt = `DIF:${mActive.dif.toFixed(2)}`
+        ctx.fillText(difTxt, subLx, subLy)
+        subLx += ctx.measureText(difTxt).width + 6
+
+        ctx.fillStyle = '#f59e0b'
+        const deaTxt = `DEA:${mActive.dea.toFixed(2)}`
+        ctx.fillText(deaTxt, subLx, subLy)
+        subLx += ctx.measureText(deaTxt).width + 6
+
+        ctx.fillStyle = mActive.macd >= 0 ? UP : DOWN
+        const macdTxt = `MACD:${mActive.macd.toFixed(2)}`
+        ctx.fillText(macdTxt, subLx, subLy)
+        subLx += ctx.measureText(macdTxt).width + 6
+
+        // Dynamic Crossover and State Diagnosis
+        let diagText = ''
+        let diagColor = ''
+        if (prevM.dif <= prevM.dea && mActive.dif > mActive.dea) {
+          if (mActive.dif >= 0) {
+            diagText = '水上金叉'
+            diagColor = UP
+          } else {
+            diagText = '低位金叉'
+            diagColor = '#fb923c'
+          }
+        } else if (prevM.dif >= prevM.dea && mActive.dif < mActive.dea) {
+          if (mActive.dif >= 0) {
+            diagText = '高位死叉'
+            diagColor = '#a855f7'
+          } else {
+            diagText = '水下死叉'
+            diagColor = DOWN
+          }
+        } else if (mActive.dif >= mActive.dea) {
+          diagText = mActive.dif >= 0 ? '水上多头' : '水下反弹'
+          diagColor = mActive.dif >= 0 ? 'rgba(239, 68, 68, 0.85)' : 'rgba(251, 146, 60, 0.85)'
+        } else {
+          diagText = mActive.dif < 0 ? '水下空头' : '高位回调'
+          diagColor = mActive.dif < 0 ? 'rgba(34, 197, 94, 0.85)' : 'rgba(168, 85, 247, 0.85)'
+        }
+
+        if (diagText) {
+          ctx.fillStyle = diagColor
+          ctx.fillText(diagText, subLx, subLy)
+        }
+      }
+    }
+  }
+
   // --- crosshair on hover -------------------------------------------------
   if (opts.hoverSlot != null && points.length > 0) {
     const targetSlot = opts.hoverSlot
@@ -304,10 +561,10 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     ctx.strokeStyle = 'rgba(255,255,255,0.45)'
     ctx.lineWidth = 1
 
-    // Vertical line
+    // Vertical line through price and volume sub-charts
     ctx.beginPath()
     ctx.moveTo(hx, plotT)
-    ctx.lineTo(hx, plotT + plotH)
+    ctx.lineTo(hx, volT + volH)
     ctx.stroke()
 
     // Horizontal line
@@ -332,7 +589,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     plotL,
     plotW,
     plotT,
-    plotH,
+    plotH: priceH,
     color: COST_LINE,
     dash: [5, 2, 1, 2],
     label: opts.costPrice && opts.costPrice > 0 ? '成本' : undefined,
@@ -347,7 +604,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       plotL,
       plotW,
       plotT,
-      plotH,
+      plotH: priceH,
       color: LINE_COLOR,
       dash: [2, 3],
       label: pl.label ?? undefined,
@@ -365,7 +622,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       plotL,
       plotW,
       plotT,
-      plotH,
+      plotH: priceH,
       color: 'rgba(248, 113, 113, 0.45)', // subtle red dashed line for H15
       dash: [3, 2],
       label: 'H15',
@@ -380,7 +637,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       plotL,
       plotW,
       plotT,
-      plotH,
+      plotH: priceH,
       color: 'rgba(74, 222, 128, 0.45)', // subtle green dashed line for L15
       dash: [3, 2],
       label: 'L15',

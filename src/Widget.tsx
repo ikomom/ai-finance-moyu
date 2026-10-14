@@ -7,7 +7,7 @@ import { Bar } from './layouts/Bar'
 import { List } from './layouts/List'
 import { Market } from './layouts/Market'
 import { Mini } from './layouts/Mini'
-import { alertTick, initStore, snapshot } from './store'
+import { alertTick, initStore, navigateLayoutBack, navigateLayoutForward, snapshot } from './store'
 import { logToBackend } from './tauri'
 
 /** The display widget: layout routing, right-click menu and alert flash. */
@@ -108,9 +108,47 @@ export function Widget() {
         e.preventDefault()
       }
     })
+    // Mouse side buttons (shoulder keys: X1=Back / X2=Forward) navigation
+    const handleMouseSideButtons = (e: MouseEvent) => {
+      if (e.button === 3) {
+        // Button 3: Browser Back / X1 shoulder button -> Navigate back in layout history
+        e.preventDefault()
+        e.stopPropagation()
+        if (isCollapsed()) {
+          void invoke('set_dock_collapsed', { collapsed: false })
+        }
+        navigateLayoutBack()
+      } else if (e.button === 4) {
+        // Button 4: Browser Forward / X2 shoulder button -> Navigate forward in layout history
+        e.preventDefault()
+        e.stopPropagation()
+        if (isCollapsed()) {
+          void invoke('set_dock_collapsed', { collapsed: false })
+        }
+        navigateLayoutForward()
+      }
+    }
+
+    const preventDefaultSideButtons = (e: MouseEvent) => {
+      if (e.button === 3 || e.button === 4) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    }
+
+    document.addEventListener('mousedown', preventDefaultSideButtons)
+    document.addEventListener('mouseup', handleMouseSideButtons)
+    document.addEventListener('auxclick', preventDefaultSideButtons)
+
     // The window is user-resizable; the chart handles its own redraw, this just
     // refreshes the diagnostics.
     window.addEventListener('resize', () => report())
+
+    onCleanup(() => {
+      document.removeEventListener('mousedown', preventDefaultSideButtons)
+      document.removeEventListener('mouseup', handleMouseSideButtons)
+      document.removeEventListener('auxclick', preventDefaultSideButtons)
+    })
   })
 
   onCleanup(() => {

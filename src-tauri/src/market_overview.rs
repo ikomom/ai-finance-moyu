@@ -165,7 +165,7 @@ impl MarketFetcher {
                 (u, d, f, pct, amt)
             }
             Err(ref e) => {
-                println!("fetch_breadth error: {e}");
+                println!("fetch_breadth (自动回退基准缓存): {e}");
                 *self.cached_breadth.lock().unwrap()
             }
         };
@@ -359,7 +359,12 @@ impl MarketFetcher {
             .await
             .map_err(|e| format!("读取涨跌统计响应失败: {e}"))?;
 
-        let json: serde_json::Value = serde_json::from_str(&text)
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Err("问财接口返回空响应（服务端限流或网络抖动，已自动回退基准缓存）".to_string());
+        }
+
+        let json: serde_json::Value = serde_json::from_str(trimmed)
             .map_err(|e| format!("解析涨跌统计响应失败: {e}"))?;
 
         let datas = json

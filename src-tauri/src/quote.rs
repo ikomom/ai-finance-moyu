@@ -121,6 +121,38 @@ pub struct Trend {
     pub points: Vec<TrendPoint>,
 }
 
+/// Single trading day bar in a daily candlestick series.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KLineBar {
+    /// Date `YYYY-MM-DD` or `YYYYMMDD`.
+    pub date: String,
+    pub open: f64,
+    pub close: f64,
+    pub high: f64,
+    pub low: f64,
+    /// Trading volume in 手 (lots of 100 shares).
+    pub volume: f64,
+    pub ma5: Option<f64>,
+    pub ma10: Option<f64>,
+    pub ma20: Option<f64>,
+    pub dif: Option<f64>,
+    pub dea: Option<f64>,
+    pub macd: Option<f64>,
+}
+
+/// Normalized daily K-line series with moving averages and diagnostic state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KLineData {
+    pub code: String,
+    pub bars: Vec<KLineBar>,
+    /// Moving average state: "bull_aligned" | "above_ma20" | "below_ma20" | "bear_aligned" | "neutral"
+    pub ma_signal: String,
+    /// Detailed diagnostic comment
+    pub ma_comment: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FetchErrorKind {
     Network,
@@ -184,6 +216,8 @@ pub mod tencent {
     pub const QUOTE_ENDPOINT: &str = "https://qt.gtimg.cn/q=";
     pub const TREND_ENDPOINT: &str =
         "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=";
+    pub const KLINE_ENDPOINT: &str =
+        "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=";
 
     pub fn quote_url(codes: &[String]) -> String {
         format!("{QUOTE_ENDPOINT}{}", codes.join(","))
@@ -191,6 +225,10 @@ pub mod tencent {
 
     pub fn trend_url(code: &str) -> String {
         format!("{TREND_ENDPOINT}{code}")
+    }
+
+    pub fn kline_url(code: &str) -> String {
+        format!("{KLINE_ENDPOINT}{code},day,,,320,qfq")
     }
 
     /// Parse the `v_<code>="f0~f1~f2~...";` lines.
@@ -379,6 +417,66 @@ pub mod tencent {
         let time = time_raw.parse::<u32>().ok()?;
         Some(make_point(time, price, cum_volume, cum_amount))
     }
+
+    /// Parse the `appstock/app/fqkline/get` JSON envelope for daily candlestick series.
+    pub fn parse_kline(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, FetchError> {
+        let text = String::from_utf8_lossy(bytes);
+        let env: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| parse_err(format!("腾讯日K JSON 解析失败: {e}")))?;
+
+        if env.get("code").and_then(|c| c.as_i64()).unwrap_or(-1) != 0 {
+            return Err(parse_err("腾讯日K接口返回错误状态"));
+        }
+
+        let entry = env
+            .get("data")
+            .and_then(|d| d.get(code))
+            .ok_or_else(|| parse_err(format!("响应中缺少 {code} 的K线数据")))?;
+
+        // Try qfqday first (forward-adjusted for stocks), fall back to day (indices or unadjusted)
+        let rows = entry
+            .get("qfqday")
+            .or_else(|| entry.get("day"))
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| parse_err(format!("{code} 未返回日K线数组")))?;
+
+        let mut bars = Vec::with_capacity(rows.len());
+        for row in rows {
+            if let Some(arr) = row.as_array() {
+                if arr.len() >= 6 {
+                    let date = arr[0].as_str().unwrap_or_default().to_string();
+                    let open = arr[1].as_str().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+                    let close = arr[2].as_str().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+                    let high = arr[3].as_str().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+                    let low = arr[4].as_str().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+                    let volume = arr[5].as_str().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+
+                    if open > 0.0 && close > 0.0 && high > 0.0 && low > 0.0 {
+                        bars.push(KLineBar {
+                            date,
+                            open,
+                            close,
+                            high,
+                            low,
+                            volume,
+                            ma5: None,
+                            ma10: None,
+                            ma20: None,
+                            dif: None,
+                            dea: None,
+                            macd: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        if bars.is_empty() {
+            return Err(parse_err(format!("{code} 有效日K线数据为空")));
+        }
+
+        Ok(bars)
+    }
 }
 
 // ================================================================== Sina
@@ -388,6 +486,8 @@ pub mod sina {
 
     pub const QUOTE_ENDPOINT: &str = "https://hq.sinajs.cn/list=";
     pub const TREND_ENDPOINT: &str = "https://quotes.sina.cn/cn/api/json_v2.php/\
+                                      CN_MarketDataService.getKLineData";
+    pub const KLINE_ENDPOINT: &str = "https://quotes.sina.cn/cn/api/json_v2.php/\
                                       CN_MarketDataService.getKLineData";
     /// Sina rejects requests without a matching referer.
     pub const REFERER: &str = "https://finance.sina.com.cn";
@@ -401,6 +501,10 @@ pub mod sina {
 
     pub fn trend_url(code: &str) -> String {
         format!("{TREND_ENDPOINT}?symbol={code}&scale=1&ma=no&datalen={TREND_DATALEN}")
+    }
+
+    pub fn kline_url(code: &str) -> String {
+        format!("{KLINE_ENDPOINT}?symbol={code}&scale=240&ma=no&datalen=320")
     }
 
     /// Parse `var hq_str_sh600000="浦发银行,9.450,9.480,...";` lines.
@@ -636,6 +740,146 @@ pub mod sina {
         let m: u32 = parts.next()?.parse().ok()?;
         Some(h * 100 + m)
     }
+
+    /// Parse the Sina daily candlestick JSON array.
+    pub fn parse_kline(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, FetchError> {
+        let text = String::from_utf8_lossy(bytes);
+        let items: Vec<serde_json::Value> = serde_json::from_str(&text)
+            .map_err(|e| parse_err(format!("新浪日K JSON 解析失败: {e}")))?;
+
+        let mut bars = Vec::with_capacity(items.len());
+        for item in items {
+            let date = item.get("day").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+            let open = item.get("open").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            let close = item.get("close").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            let high = item.get("high").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            let low = item.get("low").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            // Sina volume is in shares -> 手
+            let volume = item.get("volume").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0) / 100.0;
+
+            if open > 0.0 && close > 0.0 && high > 0.0 && low > 0.0 {
+                bars.push(KLineBar {
+                    date,
+                    open,
+                    close,
+                    high,
+                    low,
+                    volume,
+                    ma5: None,
+                    ma10: None,
+                    ma20: None,
+                    dif: None,
+                    dea: None,
+                    macd: None,
+                });
+            }
+        }
+
+        if bars.is_empty() {
+            return Err(parse_err(format!("新浪 {code} 有效日K线数据为空")));
+        }
+
+        Ok(bars)
+    }
+}
+
+/// Calculate rolling MA5, MA10, MA20, and MACD(12, 26, 9), and synthesize diagnostics.
+pub fn compute_kline_indicators(code: &str, mut bars: Vec<KLineBar>) -> KLineData {
+    let n = bars.len();
+    for i in 0..n {
+        if i + 1 >= 5 {
+            let sum: f64 = bars[i + 1 - 5..=i].iter().map(|b| b.close).sum();
+            bars[i].ma5 = Some((sum / 5.0 * 100.0).round() / 100.0);
+        }
+        if i + 1 >= 10 {
+            let sum: f64 = bars[i + 1 - 10..=i].iter().map(|b| b.close).sum();
+            bars[i].ma10 = Some((sum / 10.0 * 100.0).round() / 100.0);
+        }
+        if i + 1 >= 20 {
+            let sum: f64 = bars[i + 1 - 20..=i].iter().map(|b| b.close).sum();
+            bars[i].ma20 = Some((sum / 20.0 * 100.0).round() / 100.0);
+        }
+    }
+
+    // MACD(12, 26, 9) standard exponential moving average recursion
+    if n > 0 {
+        let mut ema12 = bars[0].close;
+        let mut ema26 = bars[0].close;
+        let mut dea = 0.0;
+
+        for i in 0..n {
+            let c = bars[i].close;
+            if i == 0 {
+                ema12 = c;
+                ema26 = c;
+                dea = 0.0;
+                bars[i].dif = Some(0.0);
+                bars[i].dea = Some(0.0);
+                bars[i].macd = Some(0.0);
+            } else {
+                ema12 = ema12 * (11.0 / 13.0) + c * (2.0 / 13.0);
+                ema26 = ema26 * (25.0 / 27.0) + c * (2.0 / 27.0);
+                let dif = ema12 - ema26;
+                dea = dea * (8.0 / 10.0) + dif * (2.0 / 10.0);
+                let macd_hist = (dif - dea) * 2.0;
+
+                bars[i].dif = Some((dif * 1000.0).round() / 1000.0);
+                bars[i].dea = Some((dea * 1000.0).round() / 1000.0);
+                bars[i].macd = Some((macd_hist * 1000.0).round() / 1000.0);
+            }
+        }
+    }
+
+    let (ma_signal, ma_comment) = if let Some(last) = bars.last() {
+        match (last.ma5, last.ma10, last.ma20) {
+            (Some(m5), Some(m10), Some(m20)) => {
+                let c = last.close;
+                if m5 > m10 && m10 > m20 && c >= m5 {
+                    (
+                        "bull_aligned".to_string(),
+                        format!("日线呈多头排列 (MA5 {:.2} > MA10 {:.2} > MA20 {:.2})，均线支撑强劲，多方趋势向好", m5, m10, m20),
+                    )
+                } else if c >= m20 && m5 >= m20 {
+                    (
+                        "above_ma20".to_string(),
+                        format!("价格稳于生命线 MA20 ({:.2}) 上方，短线均线承托有效", m20),
+                    )
+                } else if m5 < m10 && m10 < m20 && c <= m5 {
+                    (
+                        "bear_aligned".to_string(),
+                        format!("日线呈空头排列 (MA5 {:.2} < MA10 {:.2} < MA20 {:.2})，空头承压，谨慎追高", m5, m10, m20),
+                    )
+                } else if c < m20 {
+                    (
+                        "below_ma20".to_string(),
+                        format!("价格受制于生命线 MA20 ({:.2})，短线承压偏弱蓄势", m20),
+                    )
+                } else {
+                    (
+                        "neutral".to_string(),
+                        format!("价格在均线密集区震荡整理 (MA5 {:.2}, MA20 {:.2})", m5, m20),
+                    )
+                }
+            }
+            (Some(m5), Some(m10), None) => {
+                if m5 >= m10 {
+                    ("above_ma20".to_string(), format!("MA5 ({:.2}) 金叉上穿 MA10 ({:.2})", m5, m10))
+                } else {
+                    ("below_ma20".to_string(), format!("MA5 ({:.2}) 承压于 MA10 ({:.2})", m5, m10))
+                }
+            }
+            _ => ("neutral".to_string(), "历史数据积累中，均线平稳观察".to_string()),
+        }
+    } else {
+        ("neutral".to_string(), "暂无历史 K 线数据".to_string())
+    };
+
+    KLineData {
+        code: code.to_string(),
+        bars,
+        ma_signal,
+        ma_comment,
+    }
 }
 
 /// Build a point, deriving 均价 from the cumulative totals.
@@ -848,6 +1092,26 @@ impl Fetcher {
             }
         }
         Err(last_err.unwrap_or_else(|| net_err("网络请求失败")))
+    }
+
+    /// Fetch daily candlestick series with forward adjustment (QFQ) and moving averages.
+    ///
+    /// Tries Tencent's forward-adjusted endpoint first, then falls back to Sina if unavailable.
+    pub async fn fetch_kline(&self, code: &str) -> Result<KLineData, FetchError> {
+        let tencent_url = tencent::kline_url(code);
+        match self.get_bytes(&tencent_url, None).await {
+            Ok(bytes) => {
+                if let Ok(bars) = tencent::parse_kline(code, &bytes) {
+                    return Ok(compute_kline_indicators(code, bars));
+                }
+            }
+            Err(_) => {}
+        }
+
+        let sina_url = sina::kline_url(code);
+        let bytes = self.get_bytes(&sina_url, Some(sina::REFERER)).await?;
+        let bars = sina::parse_kline(code, &bytes)?;
+        Ok(compute_kline_indicators(code, bars))
     }
 }
 
@@ -1227,6 +1491,79 @@ mod tests {
         assert_eq!(tencent_point.cum_volume, sina_point.cum_volume);
         assert_eq!(tencent_point.cum_amount, sina_point.cum_amount);
         assert!((tencent_point.avg_price - sina_point.avg_price).abs() < 1e-9);
+    }
+
+    #[test]
+    fn tencent_kline_parsing_and_qfq_support() {
+        let json = r#"{
+            "code": 0,
+            "data": {
+                "sh600519": {
+                    "qfqday": [
+                        ["2026-09-21", "1259.000", "1252.570", "1259.950", "1250.800", "25017.000"],
+                        ["2026-09-22", "1252.150", "1253.800", "1265.880", "1248.100", "24573.000"]
+                    ]
+                }
+            }
+        }"#;
+        let bars = tencent::parse_kline("sh600519", json.as_bytes()).unwrap();
+        assert_eq!(bars.len(), 2);
+        assert_eq!(bars[0].date, "2026-09-21");
+        assert_eq!(bars[0].open, 1259.0);
+        assert_eq!(bars[0].close, 1252.57);
+        assert_eq!(bars[0].high, 1259.95);
+        assert_eq!(bars[0].low, 1250.8);
+        assert_eq!(bars[0].volume, 25017.0);
+    }
+
+    #[test]
+    fn sina_kline_parsing_and_volume_conversion() {
+        let json = r#"[
+            {"day":"2026-09-21","open":"1259.000","high":"1259.950","low":"1250.800","close":"1252.570","volume":"2501700"},
+            {"day":"2026-09-22","open":"1252.150","high":"1265.880","low":"1248.100","close":"1253.800","volume":"2457300"}
+        ]"#;
+        let bars = sina::parse_kline("sh600519", json.as_bytes()).unwrap();
+        assert_eq!(bars.len(), 2);
+        assert_eq!(bars[0].date, "2026-09-21");
+        assert_eq!(bars[0].open, 1259.0);
+        assert_eq!(bars[0].volume, 25017.0); // 2501700 shares / 100 = 25017 手
+    }
+
+    #[test]
+    fn compute_kline_indicators_ma_and_signals() {
+        let mut bars = Vec::new();
+        for i in 1..=25 {
+            let p = 10.0 + (i as f64) * 0.5;
+            bars.push(KLineBar {
+                date: format!("2026-01-{:02}", i),
+                open: p - 0.2,
+                close: p,
+                high: p + 0.3,
+                low: p - 0.3,
+                volume: 1000.0,
+                ma5: None,
+                ma10: None,
+                ma20: None,
+                dif: None,
+                dea: None,
+                macd: None,
+            });
+        }
+        let kline = compute_kline_indicators("sh600000", bars);
+        assert_eq!(kline.bars.len(), 25);
+        let last = kline.bars.last().unwrap();
+        assert!(last.ma5.is_some());
+        assert!(last.ma10.is_some());
+        assert!(last.ma20.is_some());
+        assert!(last.dif.is_some());
+        assert!(last.dea.is_some());
+        assert!(last.macd.is_some());
+        assert!(last.dif.unwrap() > 0.0);
+        assert!(last.dea.unwrap() > 0.0);
+        assert!(last.ma5.unwrap() > last.ma10.unwrap());
+        assert!(last.ma10.unwrap() > last.ma20.unwrap());
+        assert_eq!(kline.ma_signal, "bull_aligned");
+        assert!(kline.ma_comment.contains("多头排列"));
     }
 }
 

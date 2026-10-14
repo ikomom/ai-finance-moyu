@@ -95,6 +95,15 @@ export function List(props: { flash: boolean }) {
       })
       observer.observe(tableBodyRef)
       onCleanup(() => observer.disconnect())
+
+      // Auto-scroll the active row into view when returning from Mini layout
+      requestAnimationFrame(() => {
+        if (!tableBodyRef) return
+        const activeEl = tableBodyRef.querySelector('.table-row.active') as HTMLElement | null
+        if (activeEl) {
+          activeEl.scrollIntoView({ block: 'nearest', behavior: 'auto' })
+        }
+      })
     }
     onCleanup(() => {
       if (scrollTimer !== null) {

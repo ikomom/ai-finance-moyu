@@ -1,7 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 
-import type { PriceLine, SearchResult, WatchItem } from '../types'
+import type { PriceLine, SearchResult, StockIndicatorMode, WatchItem } from '../types'
 
 export type SortCriterion = 'code-asc' | 'code-desc' | 'name' | 'holding' | 'reverse'
 
@@ -31,6 +31,36 @@ export function WatchEditor(props: Props) {
   const [highlightedIndex, setHighlightedIndex] = createSignal(0)
   const [draggedIdx, setDraggedIdx] = createSignal<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = createSignal<number | null>(null)
+  const [expandedMap, setExpandedMap] = createSignal<Record<string, boolean>>({})
+
+  const isExpanded = (code: string, idx: number) => Boolean(expandedMap()[code || String(idx)])
+  const toggleExpand = (code: string, idx: number) => {
+    const key = code || String(idx)
+    setExpandedMap((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const allExpanded = () =>
+    props.items.length > 0 && props.items.every((it, idx) => isExpanded(it.code, idx))
+
+  const toggleAll = () => {
+    const shouldOpen = !allExpanded()
+    const next: Record<string, boolean> = {}
+    if (shouldOpen) {
+      props.items.forEach((it, idx) => {
+        next[it.code || String(idx)] = true
+      })
+    }
+    setExpandedMap(next)
+  }
+
+  const indicatorPresetBadge = (mode?: StockIndicatorMode | null) => {
+    if (!mode || mode === 'inherit') return null
+    if (mode === 'ultra_short') return '极速超短'
+    if (mode === 'classic') return '经典短线'
+    if (mode === 'swing') return '中线波段'
+    if (mode === 'custom') return '自定义'
+    return null
+  }
 
   let searchBoxRef: HTMLDivElement | undefined
   let debounceTimer: number | undefined
@@ -275,45 +305,56 @@ export function WatchEditor(props: Props) {
         </Show>
       </div>
 
-      {/* Quick Sort Toolbar */}
-      <Show when={props.items.length > 1}>
+      {/* Quick Sort & Collapse Toolbar */}
+      <Show when={props.items.length > 0}>
         <div class="watchlist-toolbar">
           <div class="toolbar-left">
-            <span class="toolbar-label">快速排序：</span>
+            <Show when={props.items.length > 1}>
+              <span class="toolbar-label">快速排序：</span>
+              <button
+                type="button"
+                class="sort-chip"
+                title="有持仓股数的标的排在最前"
+                onClick={() => props.sort('holding')}
+              >
+                持仓优先
+              </button>
+              <button
+                type="button"
+                class="sort-chip"
+                title="按标的名称汉字拼音升序排列"
+                onClick={() => props.sort('name')}
+              >
+                名称 A-Z
+              </button>
+              <button
+                type="button"
+                class="sort-chip"
+                title="按标的代码升序排列"
+                onClick={() => props.sort('code-asc')}
+              >
+                代码 0-9
+              </button>
+              <button
+                type="button"
+                class="sort-chip"
+                title="将现有顺序倒序反转"
+                onClick={() => props.sort('reverse')}
+              >
+                倒序
+              </button>
+            </Show>
             <button
               type="button"
               class="sort-chip"
-              title="有持仓股数的标的排在最前"
-              onClick={() => props.sort('holding')}
+              style="margin-left: 2px; color: #93c5fd; border-color: rgba(75, 142, 247, 0.35);"
+              title="展开或收起全部自选卡片详细配置抽屉"
+              onClick={toggleAll}
             >
-              持仓优先
-            </button>
-            <button
-              type="button"
-              class="sort-chip"
-              title="按标的名称汉字拼音升序排列"
-              onClick={() => props.sort('name')}
-            >
-              名称 A-Z
-            </button>
-            <button
-              type="button"
-              class="sort-chip"
-              title="按标的代码升序排列"
-              onClick={() => props.sort('code-asc')}
-            >
-              代码 0-9
-            </button>
-            <button
-              type="button"
-              class="sort-chip"
-              title="将现有顺序倒序反转"
-              onClick={() => props.sort('reverse')}
-            >
-              倒序
+              {allExpanded() ? '全部收起 ▴' : '全部展开 ▾'}
             </button>
           </div>
-          <span class="toolbar-tip">按住卡片左侧 ⋮⋮ 拖拽，或用 ⤒ ▲ ▼ 精准调序</span>
+          <span class="toolbar-tip">按住卡片左侧 ⋮⋮ 拖拽排序，点击「详情 ▾」设置持仓与指标</span>
         </div>
       </Show>
 
@@ -326,6 +367,7 @@ export function WatchEditor(props: Props) {
               classList={{
                 'is-dragging': draggedIdx() === i(),
                 'drag-over': dragOverIdx() === i(),
+                'is-expanded': isExpanded(item.code, i()),
               }}
               onDragOver={(e) => {
                 e.preventDefault()
@@ -388,46 +430,53 @@ export function WatchEditor(props: Props) {
                   />
                 </div>
 
-                <span class="num">
-                  成本
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="元"
-                    value={item.costPrice ?? ''}
-                    onInput={(e) =>
-                      props.update(i(), { costPrice: numOrNull(e.currentTarget.value) })
-                    }
-                  />
-                </span>
-
-                <span class="num">
-                  持仓
-                  <input
-                    type="number"
-                    step="100"
-                    min="0"
-                    placeholder="股"
-                    value={item.shares ?? ''}
-                    onInput={(e) =>
-                      props.update(i(), { shares: numOrNull(e.currentTarget.value) })
-                    }
-                  />
-                </span>
-
-                <span class="num">
+                <span class="num alert-num" title="个股涨跌提醒阈值（百分比）">
                   ±%
                   <input
                     type="number"
                     step="0.5"
                     min="0"
+                    placeholder="全局"
                     value={item.alertPct ?? ''}
                     onInput={(e) =>
                       props.update(i(), { alertPct: numOrNull(e.currentTarget.value) })
                     }
                   />
                 </span>
+
+                {/* Summary badges when collapsed */}
+                <Show when={!isExpanded(item.code, i())}>
+                  <div class="watch-summary-badges">
+                    <Show when={item.costPrice != null || item.shares != null}>
+                      <span class="summary-badge holding">
+                        {item.costPrice != null ? `${item.costPrice}元` : ''}
+                        {item.costPrice != null && item.shares != null ? ' · ' : ''}
+                        {item.shares != null ? `${item.shares}股` : ''}
+                      </span>
+                    </Show>
+                    <Show when={indicatorPresetBadge(item.indicatorMode)}>
+                      <span class="summary-badge strategy">
+                        {indicatorPresetBadge(item.indicatorMode)}
+                      </span>
+                    </Show>
+                    <Show when={(item.priceLines?.length ?? 0) > 0}>
+                      <span class="summary-badge lines">
+                        {item.priceLines!.length}条预警
+                      </span>
+                    </Show>
+                  </div>
+                </Show>
+
+                {/* Collapse / Expand Toggle Button */}
+                <button
+                  type="button"
+                  class="collapse-toggle-btn"
+                  classList={{ open: isExpanded(item.code, i()) }}
+                  onClick={() => toggleExpand(item.code, i())}
+                  title={isExpanded(item.code, i()) ? '收起配置抽屉' : '展开持仓、均线与价位线参数'}
+                >
+                  {isExpanded(item.code, i()) ? '收起 ▴' : '详情 ▾'}
+                </button>
 
                 <div class="watch-actions">
                   <button
@@ -468,59 +517,245 @@ export function WatchEditor(props: Props) {
                 </div>
               </div>
 
-              <div class="lines">
-                <div class="lines-head">
-                  <span>价位线（到价时变色，可弹通知）</span>
-                  <button type="button" class="ghost" onClick={() => props.addLine(i())}>
-                    ＋ 加一条
-                  </button>
-                </div>
-                <For each={item.priceLines ?? []}>
-                  {(line, li) => (
-                    <div class="line-row">
-                      <input
-                        class="price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="价格"
-                        value={line.price}
-                        onInput={(e) =>
-                          props.updateLine(i(), li(), { price: Number(e.currentTarget.value) })
-                        }
-                      />
+              {/* Collapsible Drawer Panel */}
+              <Show when={isExpanded(item.code, i())}>
+                <div class="watch-drawer">
+                  {/* 1. 持仓与成本 */}
+                  <div class="drawer-section">
+                    <div class="drawer-section-title">持仓与成本</div>
+                    <div class="drawer-row">
+                      <span class="num">
+                        成本价
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="元"
+                          value={item.costPrice ?? ''}
+                          onInput={(e) =>
+                            props.update(i(), { costPrice: numOrNull(e.currentTarget.value) })
+                          }
+                        />
+                      </span>
+                      <span class="num">
+                        持仓股数
+                        <input
+                          type="number"
+                          step="100"
+                          min="0"
+                          placeholder="股"
+                          value={item.shares ?? ''}
+                          onInput={(e) =>
+                            props.update(i(), { shares: numOrNull(e.currentTarget.value) })
+                          }
+                        />
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. 指标策略覆盖 */}
+                  <div class="drawer-section">
+                    <div class="drawer-section-title">指标策略覆盖 (MA均线与MACD)</div>
+                    <div class="drawer-row">
+                      <label class="drawer-label">策略档位：</label>
                       <select
-                        value={line.direction}
-                        onChange={(e) =>
-                          props.updateLine(i(), li(), {
-                            direction: e.currentTarget.value as PriceLine['direction'],
-                          })
-                        }
+                        class="indicator-select"
+                        value={item.indicatorMode ?? 'inherit'}
+                        onChange={(e) => {
+                          const val = e.currentTarget.value as StockIndicatorMode
+                          props.update(i(), { indicatorMode: val === 'inherit' ? null : val })
+                        }}
                       >
-                        <option value="above">上穿</option>
-                        <option value="below">下穿</option>
+                        <option value="inherit">跟随全局设置 (默认)</option>
+                        <option value="ultra_short">极速超短 (MA 3/5/10 · MACD 6/13/5)</option>
+                        <option value="classic">经典短线 (MA 5/10/20 · MACD 12/26/9)</option>
+                        <option value="swing">中线波段 (MA 10/30/60 · MACD 19/39/9)</option>
+                        <option value="custom">自定义参数</option>
                       </select>
-                      <input
-                        class="label"
-                        type="text"
-                        placeholder="备注（可选）"
-                        value={line.label ?? ''}
-                        onInput={(e) =>
-                          props.updateLine(i(), li(), { label: e.currentTarget.value || null })
-                        }
-                      />
-                      <button
-                        type="button"
-                        class="icon"
-                        title="删除这条线"
-                        onClick={() => props.removeLine(i(), li())}
-                      >
-                        ✕
+                    </div>
+
+                    <Show when={item.indicatorMode === 'custom'}>
+                      <div class="custom-indicator-inputs">
+                        <div class="quick-fill-row" style="margin-bottom: 6px;">
+                          <span class="quick-fill-label">快捷填入档位：</span>
+                          <button
+                            type="button"
+                            class="quick-fill-chip"
+                            onClick={() => {
+                              props.update(i(), {
+                                customMa: [3, 5, 10],
+                                customMacd: [6, 13, 5],
+                              })
+                              props.onToast?.('已填入「极速超短」参数', 'ok')
+                            }}
+                          >
+                            ⚡ 极速超短 (3/5/10 · 6/13/5)
+                          </button>
+                          <button
+                            type="button"
+                            class="quick-fill-chip"
+                            onClick={() => {
+                              props.update(i(), {
+                                customMa: [5, 10, 20],
+                                customMacd: [12, 26, 9],
+                              })
+                              props.onToast?.('已填入「经典短线」参数', 'ok')
+                            }}
+                          >
+                            🎯 经典短线 (5/10/20 · 12/26/9)
+                          </button>
+                          <button
+                            type="button"
+                            class="quick-fill-chip"
+                            onClick={() => {
+                              props.update(i(), {
+                                customMa: [10, 30, 60],
+                                customMacd: [19, 39, 9],
+                              })
+                              props.onToast?.('已填入「中线波段」参数', 'ok')
+                            }}
+                          >
+                            🌊 中线波段 (10/30/60 · 19/39/9)
+                          </button>
+                        </div>
+                        <div class="custom-group">
+                          <span class="custom-title">MA 周期:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="250"
+                            value={item.customMa?.[0] ?? 5}
+                            onInput={(e) => {
+                              const v = Math.max(1, Math.min(250, Number(e.currentTarget.value) || 5))
+                              const ma = item.customMa ? [...item.customMa] : [5, 10, 20]
+                              ma[0] = v
+                              props.update(i(), { customMa: ma as [number, number, number] })
+                            }}
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            max="250"
+                            value={item.customMa?.[1] ?? 10}
+                            onInput={(e) => {
+                              const v = Math.max(1, Math.min(250, Number(e.currentTarget.value) || 10))
+                              const ma = item.customMa ? [...item.customMa] : [5, 10, 20]
+                              ma[1] = v
+                              props.update(i(), { customMa: ma as [number, number, number] })
+                            }}
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            max="250"
+                            value={item.customMa?.[2] ?? 20}
+                            onInput={(e) => {
+                              const v = Math.max(1, Math.min(250, Number(e.currentTarget.value) || 20))
+                              const ma = item.customMa ? [...item.customMa] : [5, 10, 20]
+                              ma[2] = v
+                              props.update(i(), { customMa: ma as [number, number, number] })
+                            }}
+                          />
+                        </div>
+                        <div class="custom-group">
+                          <span class="custom-title">MACD (快/慢/信号):</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="250"
+                            value={item.customMacd?.[0] ?? 12}
+                            onInput={(e) => {
+                              const v = Math.max(1, Math.min(250, Number(e.currentTarget.value) || 12))
+                              const macd = item.customMacd ? [...item.customMacd] : [12, 26, 9]
+                              macd[0] = v
+                              props.update(i(), { customMacd: macd as [number, number, number] })
+                            }}
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            max="250"
+                            value={item.customMacd?.[1] ?? 26}
+                            onInput={(e) => {
+                              const v = Math.max(1, Math.min(250, Number(e.currentTarget.value) || 26))
+                              const macd = item.customMacd ? [...item.customMacd] : [12, 26, 9]
+                              macd[1] = v
+                              props.update(i(), { customMacd: macd as [number, number, number] })
+                            }}
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            max="250"
+                            value={item.customMacd?.[2] ?? 9}
+                            onInput={(e) => {
+                              const v = Math.max(1, Math.min(250, Number(e.currentTarget.value) || 9))
+                              const macd = item.customMacd ? [...item.customMacd] : [12, 26, 9]
+                              macd[2] = v
+                              props.update(i(), { customMacd: macd as [number, number, number] })
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+
+                  {/* 3. 价位线 */}
+                  <div class="lines" style="margin-top: 0; padding-top: 0; border-top: none;">
+                    <div class="lines-head">
+                      <span>价位线（到价时变色，可弹通知）</span>
+                      <button type="button" class="ghost" onClick={() => props.addLine(i())}>
+                        ＋ 加一条
                       </button>
                     </div>
-                  )}
-                </For>
-              </div>
+                    <For each={item.priceLines ?? []}>
+                      {(line, li) => (
+                        <div class="line-row">
+                          <input
+                            class="price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="价格"
+                            value={line.price}
+                            onInput={(e) =>
+                              props.updateLine(i(), li(), { price: Number(e.currentTarget.value) })
+                            }
+                          />
+                          <select
+                            value={line.direction}
+                            onChange={(e) =>
+                              props.updateLine(i(), li(), {
+                                direction: e.currentTarget.value as PriceLine['direction'],
+                              })
+                            }
+                          >
+                            <option value="above">上穿</option>
+                            <option value="below">下穿</option>
+                          </select>
+                          <input
+                            class="label"
+                            type="text"
+                            placeholder="备注（可选）"
+                            value={line.label ?? ''}
+                            onInput={(e) =>
+                              props.updateLine(i(), li(), { label: e.currentTarget.value || null })
+                            }
+                          />
+                          <button
+                            type="button"
+                            class="icon"
+                            title="删除这条线"
+                            onClick={() => props.removeLine(i(), li())}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
             </div>
           )}
         </For>

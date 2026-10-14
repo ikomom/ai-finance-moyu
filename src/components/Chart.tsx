@@ -1,10 +1,12 @@
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
-
-import { drawTrend, slotOf, type DrawOptions } from '../chart'
+import { computeMinuteMacd, drawTrend, slotOf, type DrawOptions } from '../chart'
 import type { TrendPoint } from '../types'
 
 export interface ChartProps extends DrawOptions {
-  onHover?: (point: TrendPoint | null) => void
+  onHover?: (
+    point: TrendPoint | null,
+    extra?: { minVol: number; dif?: number; dea?: number; macd?: number } | null
+  ) => void
 }
 
 export function Chart(props: ChartProps) {
@@ -24,6 +26,8 @@ export function Chart(props: ChartProps) {
       hoverSlot: hoverSlot(),
       orbHigh: props.orbHigh,
       orbLow: props.orbLow,
+      subchartMode: props.subchartMode,
+      macdParams: props.macdParams,
     })
 
   onMount(() => {
@@ -41,26 +45,33 @@ export function Chart(props: ChartProps) {
   // Tracked: reading the props inside `draw` is what subscribes this effect.
   createEffect(draw)
 
-  const findClosestPoint = (slot: number | null): TrendPoint | null => {
+  const findClosestPoint = (
+    slot: number | null
+  ): { point: TrendPoint; minVol: number; dif?: number; dea?: number; macd?: number } | null => {
     if (slot == null || !props.trend?.points?.length) return null
     const points = props.trend.points
-    let closest = points[0]
+    let closestIdx = 0
     let minDiff = 999
-    for (const p of points) {
-      const diff = Math.abs(slotOf(p.time) - slot)
+    for (let i = 0; i < points.length; i++) {
+      const diff = Math.abs(slotOf(points[i].time) - slot)
       if (diff < minDiff) {
         minDiff = diff
-        closest = p
+        closestIdx = i
       }
     }
-    return closest
+    const pt = points[closestIdx]
+    const prev = closestIdx > 0 ? points[closestIdx - 1] : null
+    const minVol = prev ? Math.max(0, pt.cumVolume - prev.cumVolume) : pt.cumVolume
+    const macds = computeMinuteMacd(points, props.macdParams)
+    const m = macds[closestIdx]
+    return { point: pt, minVol, dif: m?.dif, dea: m?.dea, macd: m?.macd }
   }
 
   createEffect(() => {
     // Reset hover when trend / stock changes
     props.trend
     setHoverSlot(null)
-    props.onHover?.(null)
+    props.onHover?.(null, null)
   })
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -72,12 +83,13 @@ export function Chart(props: ChartProps) {
     const relX = e.clientX - rect.left - padL
     const slot = Math.min(240, Math.max(0, Math.round((relX / plotW) * 240)))
     setHoverSlot(slot)
-    props.onHover?.(findClosestPoint(slot))
+    const found = findClosestPoint(slot)
+    props.onHover?.(found?.point ?? null, found ? { minVol: found.minVol } : null)
   }
 
   const handleMouseLeave = () => {
     setHoverSlot(null)
-    props.onHover?.(null)
+    props.onHover?.(null, null)
   }
 
   return (

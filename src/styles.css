@@ -290,6 +290,13 @@ body {
   white-space: nowrap;
 }
 
+.mini-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
 .mode-pill-group {
   display: inline-flex;
   background: rgba(255, 255, 255, 0.08);

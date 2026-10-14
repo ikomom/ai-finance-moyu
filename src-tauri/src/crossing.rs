@@ -147,7 +147,15 @@ pub enum CrossingEvent {
     IntradayExtreme { code: String, is_new_high: bool, price: f64, change_pct: f64 },
     /// 盘口短时间异动放量
     #[serde(rename_all = "camelCase")]
-    VolumeBurst { code: String, volume_hands: f64, multiple: f64, price: f64 },
+    VolumeBurst {
+        code: String,
+        volume_hands: f64,
+        is_surge: bool,
+        delta_pct: f64,
+        change_pct: f64,
+        multiple: f64,
+        price: f64,
+    },
     /// 接近涨跌停或涨停炸板
     #[serde(rename_all = "camelCase")]
     LimitBoard { code: String, board_kind: LimitBoardKind, price: f64, change_pct: f64 },
@@ -193,8 +201,23 @@ impl CrossingEvent {
                     format!("{name} 📉 跌破日内新低！现价 {price:.2} ({change_pct:+.2}%)")
                 }
             }
-            CrossingEvent::VolumeBurst { multiple, price, .. } => {
-                format!("{name} 💥 盘口异动放量！成交量激增 {multiple:.1} 倍，现价 {price:.2}")
+            CrossingEvent::VolumeBurst {
+                is_surge,
+                delta_pct,
+                change_pct,
+                multiple,
+                price,
+                ..
+            } => {
+                if *is_surge {
+                    format!(
+                        "{name} 💥 盘口主买扫盘！放量推升 +{delta_pct:.2}% (日内 {change_pct:+.2}%)，成交激增 {multiple:.1}x，现价 {price:.2}"
+                    )
+                } else {
+                    format!(
+                        "{name} 💥 盘口主卖砸盘！放量打压 -{delta_pct:.2}% (日内 {change_pct:+.2}%)，成交激增 {multiple:.1}x，现价 {price:.2}"
+                    )
+                }
             }
             CrossingEvent::LimitBoard { board_kind, price, change_pct, .. } => {
                 match board_kind {
@@ -602,11 +625,15 @@ impl CrossingTracker {
                 // Substantial volume threshold: delta_v >= 300 hands, rate >= 3x real baseline, and price moved
                 if delta_v >= 300.0 && rate_1min >= 3.0 * baseline_avg && price_motion >= 0.3 {
                     let mult = (rate_1min / baseline_avg).max(2.0);
+                    let is_surge = quote.price >= oldest_sample.price;
                     let key = format!("{}:vol_burst", spec.code);
                     if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(600), &key, now) {
                         events.push(CrossingEvent::VolumeBurst {
                             code: spec.code.clone(),
                             volume_hands: delta_v,
+                            is_surge,
+                            delta_pct: (price_motion * 100.0).round() / 100.0,
+                            change_pct: quote.change_pct,
                             multiple: (mult * 10.0).round() / 10.0,
                             price: quote.price,
                         });
@@ -1149,6 +1176,71 @@ mod tests {
         assert!(
             !evs.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { .. })),
             "IPO stock should not trigger limit board alerts"
+        );
+    }
+
+    #[test]
+    fn volume_burst_distinguishes_buy_sweep_and_sell_dump_and_ignores_flat_ticks() {
+        let mut t_up = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        // 1. Upward buy sweep (主买扫盘)
+        let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
+        t_up.update_quote_at(&s, &q0, &cfg, t0);
+
+        let q1_up = mock_quote("sh600000", 10.10, 1.0, 50000.0);
+        let evs_up = t_up.update_quote_at(&s, &q1_up, &cfg, t0 + Duration::from_secs(25));
+        let burst_up = evs_up
+            .iter()
+            .find(|e| matches!(e, CrossingEvent::VolumeBurst { .. }))
+            .expect("Should trigger VolumeBurst on rapid volume surge with price upward push");
+
+        if let CrossingEvent::VolumeBurst { is_surge, delta_pct, change_pct, multiple, price, .. } = burst_up {
+            assert!(*is_surge, "Expected is_surge to be true for upward movement");
+            assert_eq!(*delta_pct, 1.0);
+            assert_eq!(*change_pct, 1.0);
+            assert_eq!(*price, 10.10);
+            assert!(*multiple >= 3.0);
+        } else {
+            panic!("Event was not VolumeBurst");
+        }
+        let msg_up = burst_up.message("测试股票");
+        assert!(msg_up.contains("💥 盘口主买扫盘！放量推升 +1.00% (日内 +1.00%)"), "Actual msg: {msg_up}");
+
+        // 2. Downward sell dump (主卖砸盘)
+        let mut t_down = CrossingTracker::without_cooldown();
+        t_down.update_quote_at(&s, &q0, &cfg, t0);
+
+        let q1_down = mock_quote("sh600000", 9.90, -1.0, 50000.0);
+        let evs_down = t_down.update_quote_at(&s, &q1_down, &cfg, t0 + Duration::from_secs(25));
+        let burst_down = evs_down
+            .iter()
+            .find(|e| matches!(e, CrossingEvent::VolumeBurst { .. }))
+            .expect("Should trigger VolumeBurst on rapid volume surge with price downward dump");
+
+        if let CrossingEvent::VolumeBurst { is_surge, delta_pct, change_pct, multiple, price, .. } = burst_down {
+            assert!(!*is_surge, "Expected is_surge to be false for downward movement");
+            assert_eq!(*delta_pct, 1.0);
+            assert_eq!(*change_pct, -1.0);
+            assert_eq!(*price, 9.90);
+            assert!(*multiple >= 3.0);
+        } else {
+            panic!("Event was not VolumeBurst");
+        }
+        let msg_down = burst_down.message("测试股票");
+        assert!(msg_down.contains("💥 盘口主卖砸盘！放量打压 -1.00% (日内 -1.00%)"), "Actual msg: {msg_down}");
+
+        // 3. Flat tick with massive volume (< 0.3% price motion -> cross-trading / flat, suppressed)
+        let mut t_flat = CrossingTracker::without_cooldown();
+        t_flat.update_quote_at(&s, &q0, &cfg, t0);
+
+        let q1_flat = mock_quote("sh600000", 10.01, 0.1, 50000.0); // +0.1% movement
+        let evs_flat = t_flat.update_quote_at(&s, &q1_flat, &cfg, t0 + Duration::from_secs(25));
+        assert!(
+            !evs_flat.iter().any(|e| matches!(e, CrossingEvent::VolumeBurst { .. })),
+            "Flat tick (< 0.3% price motion) should NOT fire VolumeBurst"
         );
     }
 }

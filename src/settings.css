@@ -934,6 +934,228 @@ select option {
   box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
+.watch-head .alert-num input {
+  width: 58px;
+  text-align: center;
+}
+
+.watch-summary-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.summary-badge {
+  font-size: 10.5px;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.summary-badge.holding {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.summary-badge.strategy {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: #c084fc;
+}
+
+.summary-badge.lines {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.collapse-toggle-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  user-select: none;
+}
+
+.collapse-toggle-btn:hover {
+  background: rgba(75, 142, 247, 0.15);
+  border-color: rgba(75, 142, 247, 0.35);
+  color: #93c5fd;
+}
+
+.collapse-toggle-btn.open {
+  background: rgba(75, 142, 247, 0.2);
+  border-color: rgba(75, 142, 247, 0.4);
+  color: #60a5fa;
+}
+
+.watch-drawer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: drawerFadeIn 0.2s ease-out;
+}
+
+@keyframes drawerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.drawer-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.drawer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.drawer-label {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.drawer-row .num {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.drawer-row .num input {
+  width: 85px;
+  background: #191d26;
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.indicator-select {
+  background: #191d26;
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.indicator-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.custom-indicator-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.custom-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.custom-group input {
+  width: 48px;
+  background: #191d26;
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.custom-group input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.quick-fill-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+.quick-fill-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.quick-fill-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 2.5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.quick-fill-chip:hover {
+  background: rgba(75, 142, 247, 0.18);
+  border-color: rgba(75, 142, 247, 0.4);
+  color: #93c5fd;
+}
+
+.quick-fill-chip:active {
+  transform: scale(0.97);
+}
+
 .watch-head .grow {
   margin-left: auto;
 }
