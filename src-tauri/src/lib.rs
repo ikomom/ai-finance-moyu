@@ -452,9 +452,9 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
         // Guard 2: On Windows, check physical mouse button & cursor position near resize border
         #[cfg(windows)]
         {
-            use windows_sys::Win32::Foundation::{POINT, RECT};
+            use windows_sys::Win32::Foundation::POINT;
             use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
-            use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetWindowRect};
+            use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
             // If mouse button is held down (user dragging to resize or move), do not collapse!
             unsafe {
@@ -463,23 +463,19 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
                 }
             }
 
-            // If cursor is on the window or in the resize border band (within 12px), do not collapse!
-            if let Ok(hwnd) = win.hwnd() {
+            // If cursor is on the window or precisely on the resize border (within 3px), do not collapse!
+            if let (Ok(pos), Ok(size)) = (win.outer_position(), win.inner_size()) {
                 unsafe {
                     let mut pt = POINT { x: 0, y: 0 };
-                    let mut rect = RECT {
-                        left: 0,
-                        top: 0,
-                        right: 0,
-                        bottom: 0,
-                    };
-                    if GetCursorPos(&mut pt) != 0 && GetWindowRect(hwnd.0, &mut rect) != 0 {
-                        let margin = 12;
-                        if pt.x >= rect.left - margin
-                            && pt.x <= rect.right + margin
-                            && pt.y >= rect.top - margin
-                            && pt.y <= rect.bottom + margin
-                        {
+                    if GetCursorPos(&mut pt) != 0 {
+                        // Tight 3px margin: only covers the actual resize border.
+                        // Moving 4px outside the visible card edge immediately allows collapse.
+                        let margin = 3;
+                        let left = pos.x - margin;
+                        let right = pos.x + size.width as i32 + margin;
+                        let top = pos.y - margin;
+                        let bottom = pos.y + size.height as i32 + margin;
+                        if pt.x >= left && pt.x <= right && pt.y >= top && pt.y <= bottom {
                             return Ok(());
                         }
                     }

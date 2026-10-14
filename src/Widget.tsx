@@ -55,7 +55,7 @@ export function Widget() {
       leaveTimer = window.setTimeout(() => {
         if (Date.now() - lastResizeAt < 2000) return
         void invoke('set_dock_collapsed', { collapsed: true })
-      }, 500)
+      }, 350)
     } else if (mode === 'dblclick' && !isCollapsed()) {
       leaveTimer = window.setTimeout(() => {
         if (Date.now() - lastResizeAt < 2000) return
