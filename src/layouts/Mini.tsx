@@ -8,7 +8,7 @@ import { KLineBadge } from '../components/KLineBadge'
 import { KlineCanvas } from '../components/KlineCanvas'
 import { StatusLine } from '../components/StatusLine'
 import { TrendBadge } from '../components/TrendBadge'
-import { selectedIndex, setSelected, snapshot } from '../store'
+import { miniModeOverride, selectedIndex, setMiniModeOverride, setSelected, snapshot } from '../store'
 import { fetchKLine, setTrendTargets } from '../tauri'
 import {
   fmtHHMM,
@@ -44,6 +44,13 @@ export function Mini(props: { flash: boolean }) {
   const [hoveredKBar, setHoveredKBar] = createSignal<KLineBar | null>(null)
   const [hoveredKExtra, setHoveredKExtra] = createSignal<{ ma5?: number | null; ma10?: number | null; ma20?: number | null; dif?: number | null; dea?: number | null; macd?: number | null; chgPct?: number | null } | null>(null)
   const [manualMode, setManualMode] = createSignal<'trend' | 'kline' | 'auction' | null>(null)
+  createEffect(() => {
+    const override = miniModeOverride()
+    if (override) {
+      setManualMode(override)
+      setMiniModeOverride(null)
+    }
+  })
   const [klineCache, setKlineCache] = createSignal<Record<string, KLineData>>({})
   const [klineLoading, setKlineLoading] = createSignal(false)
   const [subchartMode, setSubchartMode] = createSignal<'vol' | 'macd'>(

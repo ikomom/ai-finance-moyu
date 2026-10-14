@@ -23,6 +23,7 @@ tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-notification = "2"
+notify-rust = "4"
 
 # HTTP for quote fetching. `no_proxy()` on the client bypasses the machine's
 # HTTP_PROXY/HTTPS_PROXY env vars, which would otherwise tunnel domestic

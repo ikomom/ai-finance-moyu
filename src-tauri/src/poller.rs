@@ -14,7 +14,6 @@ use std::time::{Duration, Instant};
 
 use chrono::Local;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::market;
 use crate::quote::Quote;
@@ -209,12 +208,7 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
 
         if cfg.notifications && !notifications.is_empty() {
             for notif in &notifications {
-                let _ = app
-                    .notification()
-                    .builder()
-                    .title("股市异动")
-                    .body(&notif.message)
-                    .show();
+                spawn_system_notification(app, notif);
             }
         }
 
@@ -426,3 +420,38 @@ pub fn emit_snapshot(app: &AppHandle) {
     };
     let _ = app.emit(EVENT_SNAPSHOT, snapshot);
 }
+
+fn spawn_system_notification(app: &AppHandle, notif: &AlertNotification) {
+    let mut n = notify_rust::Notification::new();
+    n.summary("股市异动");
+    n.body(&notif.message);
+    n.auto_icon();
+
+    #[cfg(windows)]
+    {
+        if let Ok(exe) = tauri::utils::platform::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                let curr_dir = exe_dir.display().to_string();
+                let sep = std::path::MAIN_SEPARATOR;
+                if !(curr_dir.ends_with(&format!("{sep}target{sep}debug"))
+                    || curr_dir.ends_with(&format!("{sep}target{sep}release")))
+                {
+                    n.app_id("com.moyu.finance");
+                }
+            }
+        }
+    }
+
+    let code = notif.code.clone();
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Ok(handle) = n.show() {
+            let _ = handle.wait_for_response(move |resp: &notify_rust::NotificationResponse| {
+                if resp.is_default_action() || matches!(resp, notify_rust::NotificationResponse::Action(_)) {
+                    crate::navigate_to_stock_mini(&app_handle, &code);
+                }
+            });
+        }
+    });
+}
+

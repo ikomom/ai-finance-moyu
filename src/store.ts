@@ -12,13 +12,22 @@ import { demoSnapshot } from './demo'
 import { inTauri } from './tauri'
 import type { Layout, Snapshot } from './types'
 
+export interface ToastAlert {
+  message: string
+  code?: string
+  name?: string
+}
+
 const [snapshot, setSnapshot] = createSignal<Snapshot | null>(null)
 /** Which security the mini and list layouts detail. */
 const [selected, setSelected] = createSignal(0)
 /** Bumped when a threshold is crossed, so the card can flash. */
 const [alertTick, setAlertTick] = createSignal(0)
-/** Transient message shown at the bottom of the widget. */
-const [toastMsg, setToastMsg] = createSignal<string | null>(null)
+/** Transient structured message shown at the bottom of the widget. */
+const [toastAlert, setToastAlert] = createSignal<ToastAlert | null>(null)
+const toastMsg = () => toastAlert()?.message ?? null
+/** Force mini layout to switch subchart mode on navigation */
+const [miniModeOverride, setMiniModeOverride] = createSignal<'trend' | 'kline' | 'auction' | null>(null)
 
 // Navigation history stack for layout transitions (e.g. List <-> Mini via mouse shoulder buttons)
 const layoutBackStack: Layout[] = []
@@ -85,12 +94,52 @@ export function navigateLayoutForward(): void {
   }
 }
 
-export { alertTick, selected, setSelected, setSnapshot, snapshot, toastMsg }
+export {
+  alertTick,
+  miniModeOverride,
+  selected,
+  setMiniModeOverride,
+  setSelected,
+  setSnapshot,
+  snapshot,
+  toastAlert,
+  toastMsg,
+}
 
 /** Show a message briefly, then clear it (unless a newer one replaced it). */
-export function showToast(msg: string): void {
-  setToastMsg(msg)
-  window.setTimeout(() => setToastMsg((m) => (m === msg ? null : m)), 2600)
+export function showToast(msg: string, code?: string, name?: string): void {
+  setToastAlert({ message: msg, code, name })
+  window.setTimeout(() => setToastAlert((curr) => (curr?.message === msg ? null : curr)), 3200)
+}
+
+/** Clear active toast immediately. */
+export function clearToast(): void {
+  setToastAlert(null)
+}
+
+/**
+ * Navigate to a specific stock in Mini layout:
+ * - Selects the stock in the watchlist
+ * - Switches manualMode to the requested subchart (default 'trend')
+ * - Expands the dock if collapsed
+ * - Switches layout to mini and records layout change
+ */
+export function navigateToStock(code: string, mode: 'trend' | 'kline' | 'auction' = 'trend'): void {
+  const s = snapshot()
+  if (!s) return
+  const watchlist = s.config.watchlist
+  const idx = watchlist.findIndex((w) => w.code.toLowerCase() === code.toLowerCase())
+  if (idx !== -1) {
+    setSelected(idx)
+  }
+  setMiniModeOverride(mode)
+  if (s.dock?.collapsed) {
+    void invoke('set_dock_collapsed', { collapsed: false })
+  }
+  if (s.config.layout !== 'mini') {
+    recordLayoutChange('mini')
+    void invoke('set_layout', { layout: 'mini' })
+  }
 }
 
 /**
@@ -128,7 +177,12 @@ export async function initStore(): Promise<string | null> {
     setAlertTick((n) => n + 1)
     const first = e.payload?.[0]
     if (first?.message) {
-      showToast(first.message)
+      showToast(first.message, first.code, first.name)
+    }
+  })
+  await listen<{ code: string; mode?: 'trend' | 'kline' | 'auction' }>('navigate_stock', (e) => {
+    if (e.payload?.code) {
+      navigateToStock(e.payload.code, e.payload.mode ?? 'trend')
     }
   })
 

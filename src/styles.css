@@ -764,6 +764,33 @@ button.primary:hover {
   white-space: nowrap;
 }
 
+.toast.clickable {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, background-color 0.15s ease, filter 0.15s ease;
+  user-select: none;
+}
+
+.toast.clickable:hover {
+  filter: brightness(1.1);
+  transform: translateX(-50%) scale(1.03);
+  background: rgba(240, 175, 80, 0.98);
+}
+
+.toast.clickable:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+.toast-hint {
+  font-size: 9.5px;
+  font-weight: 700;
+  opacity: 0.9;
+  letter-spacing: -0.2px;
+}
+
 /* Boot diagnostics overlay — only visible when startup failed. */
 #boot-err {
   position: fixed;

@@ -12,7 +12,7 @@ mod trend_engine;
 
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
 use config::{Config, DataSource, Hotkeys, Layout, VisibilityMode};
@@ -167,6 +167,33 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
     place_window(app, layout, rows);
 
     poller::emit_snapshot(app);
+}
+
+/// Navigate to a specific stock in Mini layout (e.g. from notification click).
+/// Uncollapses the dock, switches layout to Mini if not already in Mini, reveals and focuses the window,
+/// and emits `navigate_stock` event to frontend.
+pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
+    let _ = set_dock_collapsed_inner(app, false);
+
+    let current_layout = {
+        let state = app.state::<AppState>();
+        let l = state.config.lock().unwrap().layout;
+        l
+    };
+    if current_layout != Layout::Mini {
+        apply_layout(app, Layout::Mini);
+    }
+
+    if let Some(win) = app.get_webview_window(DISPLAY) {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+
+    let _ = app.emit("navigate_stock", serde_json::json!({
+        "code": code,
+        "mode": "trend"
+    }));
 }
 
 /// Resize the display window to the current layout's size. Called after the
