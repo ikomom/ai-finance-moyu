@@ -83,8 +83,14 @@ export function Widget() {
     const err = await initStore()
     if (err) setError(err)
 
-    document.addEventListener('contextmenu', async (e) => {
+    let lastMenuClosedAt = 0
+
+    const handleContextMenu = async (e: MouseEvent) => {
       e.preventDefault()
+      // Reject if context menu is already active or in dismiss cooldown window
+      if (isContextMenuOpen() || Date.now() - lastMenuClosedAt < 250) {
+        return
+      }
       if (isCollapsed()) {
         void invoke('set_dock_collapsed', { collapsed: false })
         return
@@ -95,12 +101,17 @@ export function Widget() {
         await invoke('show_context_menu')
       } finally {
         setContextMenuOpen(false)
+        lastMenuClosedAt = Date.now()
       }
-    })
-    document.addEventListener('mousedown', (e) => {
+    }
+
+    const handleMouseDownOutside = (e: MouseEvent) => {
       // Dismiss on any press outside the menu, right-click included.
       if (!(e.target as HTMLElement).closest?.('.menu')) closeMenu()
-    })
+    }
+
+    document.addEventListener('contextmenu', handleContextMenu)
+    document.addEventListener('mousedown', handleMouseDownOutside)
     // Disable Ctrl + wheel zoom and keyboard zoom
     document.addEventListener(
       'wheel',
@@ -151,6 +162,8 @@ export function Widget() {
     window.addEventListener('resize', () => report())
 
     onCleanup(() => {
+      document.removeEventListener('contextmenu', handleContextMenu)
+      document.removeEventListener('mousedown', handleMouseDownOutside)
       document.removeEventListener('mousedown', preventDefaultSideButtons)
       document.removeEventListener('mouseup', handleMouseSideButtons)
       document.removeEventListener('auxclick', preventDefaultSideButtons)

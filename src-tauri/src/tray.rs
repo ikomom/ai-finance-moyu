@@ -128,7 +128,29 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
     }
 }
 
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+
+static IS_SHOWING_MENU: AtomicBool = AtomicBool::new(false);
+static LAST_MENU_CLOSED_MILLIS: AtomicI64 = AtomicI64::new(0);
+
 pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::Result<()> {
+    let now = chrono::Utc::now().timestamp_millis();
+    if now - LAST_MENU_CLOSED_MILLIS.load(Ordering::SeqCst) < 250 {
+        return Ok(());
+    }
+    if IS_SHOWING_MENU.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        return Ok(());
+    }
+
+    struct MenuGuard;
+    impl Drop for MenuGuard {
+        fn drop(&mut self) {
+            LAST_MENU_CLOSED_MILLIS.store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
+            IS_SHOWING_MENU.store(false, Ordering::SeqCst);
+        }
+    }
+    let _guard = MenuGuard;
+
     let state = app.state::<crate::state::AppState>();
     let cfg = state.config.lock().unwrap().clone();
     let current_layout = cfg.layout;
