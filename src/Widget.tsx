@@ -1,7 +1,7 @@
 import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 
-import { ContextMenu, closeMenu, isContextMenuOpen } from './components/ContextMenu'
+import { ContextMenu, closeMenu, isContextMenuOpen, setContextMenuOpen } from './components/ContextMenu'
 import { Toast } from './components/Toast'
 import { Bar } from './layouts/Bar'
 import { List } from './layouts/List'
@@ -83,13 +83,19 @@ export function Widget() {
     const err = await initStore()
     if (err) setError(err)
 
-    document.addEventListener('contextmenu', (e) => {
+    document.addEventListener('contextmenu', async (e) => {
       e.preventDefault()
       if (isCollapsed()) {
         void invoke('set_dock_collapsed', { collapsed: false })
         return
       }
-      void invoke('show_context_menu')
+      clearLeaveTimer()
+      setContextMenuOpen(true)
+      try {
+        await invoke('show_context_menu')
+      } finally {
+        setContextMenuOpen(false)
+      }
     })
     document.addEventListener('mousedown', (e) => {
       // Dismiss on any press outside the menu, right-click included.

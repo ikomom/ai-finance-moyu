@@ -20,6 +20,7 @@ const VISIBILITY_MODES: Array<[VisibilityMode, string]> = [
 // Module-level: there is exactly one context menu, and the right-click handler
 // lives outside the component tree.
 const [at, setAt] = createSignal<{ x: number; y: number } | null>(null)
+const [isNativeMenuOpen, setIsNativeMenuOpen] = createSignal(false)
 
 export function openMenuAt(x: number, y: number): void {
   setAt({ x, y })
@@ -27,10 +28,15 @@ export function openMenuAt(x: number, y: number): void {
 
 export function closeMenu(): void {
   setAt(null)
+  setIsNativeMenuOpen(false)
+}
+
+export function setContextMenuOpen(open: boolean): void {
+  setIsNativeMenuOpen(open)
 }
 
 export function isContextMenuOpen(): boolean {
-  return at() !== null
+  return isNativeMenuOpen() || at() !== null
 }
 
 export function ContextMenu() {

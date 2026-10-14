@@ -183,7 +183,69 @@ pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::
         ])
         .build()?;
 
-    menu.popup(win.as_ref().window().clone())?;
-    Ok(())
+    #[cfg(windows)]
+    let raw_hwnd = win.hwnd().ok().map(|h| h.0);
+
+    #[cfg(windows)]
+    let orig_ex = raw_hwnd.map(|raw| {
+        use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, SetForegroundWindow,
+            SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE,
+            SWP_NOZORDER, WS_EX_NOACTIVATE,
+        };
+        unsafe {
+            let ex = GetWindowLongPtrW(raw, GWL_EXSTYLE);
+            // Temporarily strip WS_EX_NOACTIVATE so Windows permits SetForegroundWindow and outside-click dismissal
+            SetWindowLongPtrW(raw, GWL_EXSTYLE, ex & !(WS_EX_NOACTIVATE as isize));
+            SetWindowPos(
+                raw,
+                0 as _,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            );
+
+            let fg_hwnd = GetForegroundWindow();
+            let cur_thread = GetCurrentThreadId();
+            let fg_thread = GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut());
+            if fg_thread != 0 && fg_thread != cur_thread {
+                AttachThreadInput(cur_thread, fg_thread, 1);
+                SetForegroundWindow(raw);
+                AttachThreadInput(cur_thread, fg_thread, 0);
+            } else {
+                SetForegroundWindow(raw);
+            }
+
+            ex
+        }
+    });
+
+    let result = menu.popup(win.as_ref().window().clone());
+
+    #[cfg(windows)]
+    if let (Some(raw), Some(orig_ex)) = (raw_hwnd, orig_ex) {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            PostMessageW, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, SWP_FRAMECHANGED,
+            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WM_NULL,
+        };
+        unsafe {
+            PostMessageW(raw, WM_NULL, 0, 0);
+            SetWindowLongPtrW(raw, GWL_EXSTYLE, orig_ex);
+            SetWindowPos(
+                raw,
+                0 as _,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+        }
+    }
+
+    result
 }
 
