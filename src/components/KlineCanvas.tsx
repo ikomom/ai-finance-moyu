@@ -207,11 +207,13 @@ export function KlineCanvas(props: KlineCanvasProps) {
     const plotW = Math.max(10, w - padL - padR)
 
     const contentH = Math.max(20, h - legendH - bottomAxisH)
-    const priceH = Math.max(20, Math.round(contentH * 0.72))
-    const volH = Math.max(10, contentH - priceH - 4)
+    const priceH = Math.max(20, Math.round(contentH * 0.58))
+    const volH = Math.max(12, contentH - priceH - 3)
 
     const priceT = legendH
-    const volT = priceT + priceH + 4
+    const volT = priceT + priceH + 3
+    const subPlotPad = 10
+    const subPlotH = Math.max(6, volH - subPlotPad)
 
     // Window slice
     const total = allBars.length
@@ -272,7 +274,7 @@ export function KlineCanvas(props: KlineCanvasProps) {
     const pRange = maxP - minP
 
     const yOfPrice = (p: number) => priceT + priceH - ((p - minP) / pRange) * priceH
-    const yOfVol = (v: number) => (maxV > 0 ? volT + volH - (v / maxV) * volH : volT + volH)
+    const yOfVol = (v: number) => (maxV > 0 ? volT + volH - (v / maxV) * subPlotH : volT + volH)
 
     const slotW = plotW / slice.length
     const xOfIdx = (i: number) => plotL + i * slotW + slotW / 2
@@ -416,7 +418,7 @@ export function KlineCanvas(props: KlineCanvasProps) {
       const midM = (maxM + minM) / 2
       const macdMin = midM - spanM / 2
       const macdMax = midM + spanM / 2
-      const yOfMacd = (v: number) => volT + volH - ((v - macdMin) / (macdMax - macdMin)) * volH
+      const yOfMacd = (v: number) => volT + volH - ((v - macdMin) / (macdMax - macdMin)) * subPlotH
       const zeroY = Math.round(yOfMacd(0)) + 0.5
 
       // Zero-axis dashed baseline

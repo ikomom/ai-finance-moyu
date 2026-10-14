@@ -148,11 +148,13 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const plotW = Math.max(1, cssW - pad.left - pad.right)
   const plotH = Math.max(1, cssH - pad.top - pad.bottom)
 
-  // Split plotH into price section (72%) and volume subchart (25%)
-  const priceH = Math.max(20, Math.round(plotH * 0.72))
-  const volGap = 4
+  // Split plotH into price section (58%) and subchart (42%)
+  const priceH = Math.max(20, Math.round(plotH * 0.58))
+  const volGap = 3
   const volT = plotT + priceH + volGap
-  const volH = Math.max(10, plotH - priceH - volGap)
+  const volH = Math.max(12, plotH - priceH - volGap)
+  const subTextPad = 10
+  const subPlotH = Math.max(6, volH - subTextPad)
 
   const points = opts.trend?.points ?? []
   const preClose = opts.preClose || opts.trend?.preClose || 0
@@ -365,7 +367,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
         if (v <= 0) continue
         const slot = slotOf(points[i].time)
         const cx = xOf(slot)
-        const barH = Math.max(1, (Math.sqrt(v) / sqrtMax) * volH)
+        const barH = Math.max(1, (Math.sqrt(v) / sqrtMax) * subPlotH)
         const isUp = i === 0 ? points[0].price >= preClose : points[i].price >= points[i - 1].price
         ctx.fillStyle = isUp ? 'rgba(239, 68, 68, 0.82)' : 'rgba(34, 197, 94, 0.82)'
         ctx.fillRect(cx - barW / 2, volT + volH - barH, barW, barH)
@@ -419,7 +421,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       const midM = (maxM + minM) / 2
       const macdMin = midM - spanM / 2
       const macdMax = midM + spanM / 2
-      const yOfMacd = (v: number) => volT + volH - ((v - macdMin) / (macdMax - macdMin)) * volH
+      const yOfMacd = (v: number) => volT + volH - ((v - macdMin) / (macdMax - macdMin)) * subPlotH
       const zeroY = Math.round(yOfMacd(0)) + 0.5
 
       // Zero-axis dashed baseline
