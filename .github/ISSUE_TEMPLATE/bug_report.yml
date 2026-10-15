@@ -1,0 +1,46 @@
+name: 🐛 Bug 报告
+description: 提交程序缺陷、渲染异常或行情拉取错误
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈问题！在提交 Bug 之前，请确认您使用的是最新版本，并先查阅现有的 Issues。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 异常现象描述
+      description: 发生了什么异常？如白屏、数据卡住、贴边收起异常等。
+      placeholder: 请在此清晰描述遇到的问题...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 如何重现该问题？
+      placeholder: |
+        1. 启动挂件并切换至「...」形态
+        2. 添加自选股代码「...」
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 运行日志或错误输出
+      description: 可在【设置 - 运行日志】面板中点击「打开日志目录」获取最新的 app.log。
+      render: shell
+
+  - type: input
+    id: environment
+    attributes:
+      label: 操作系统与运行环境
+      description: 如 Windows 11 23H2 / WebView2 版本
+      placeholder: 例如：Windows 11 x64, Node 20, Rust 1.80
+    validations:
+      required: false

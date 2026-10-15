@@ -1,0 +1,33 @@
+name: 💡 功能建议 / 需求提议
+description: 为摸鱼挂件提议新功能、新指标或交互体验优化
+title: "[Feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎分享您的使用创意与需求想法！
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 痛点与背景
+      description: 当前缺少什么功能？或者目前的某种交互给您带来了什么不便？
+      placeholder: 在日常盯盘或摸鱼时，我发现...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 期望的解决方案
+      description: 您希望我们如何实现或设计这个功能？
+      placeholder: 建议在...增加...，并在...时触发...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选方案或补充说明
+      description: 您是否考虑过其他替代实现？
