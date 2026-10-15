@@ -797,12 +797,15 @@ select option {
   font-size: 13px;
   padding: 0 4px;
   user-select: none;
-  transition: color 0.15s ease;
+  touch-action: none;
+  transition: color 0.15s ease, background 0.15s ease;
   line-height: 1;
+  border-radius: 4px;
 }
 
 .drag-handle:hover {
   color: #93c5fd;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .drag-handle:active {
@@ -812,12 +815,36 @@ select option {
 .watch.is-dragging {
   opacity: 0.35;
   border-style: dashed;
+  border-color: rgba(75, 142, 247, 0.6) !important;
+  background: rgba(75, 142, 247, 0.04);
 }
 
-.watch.drag-over {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px var(--accent-glow);
-  background: rgba(75, 142, 247, 0.08);
+.watch.drop-before::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #4b8ef7;
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(75, 142, 247, 0.95), 0 0 4px #fff;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.watch.drop-after::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #4b8ef7;
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(75, 142, 247, 0.95), 0 0 4px #fff;
+  z-index: 10;
+  pointer-events: none;
 }
 
 .watch-actions {
@@ -873,6 +900,7 @@ select option {
 }
 
 .watch {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px 11px;

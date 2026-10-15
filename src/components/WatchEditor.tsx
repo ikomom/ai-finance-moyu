@@ -29,9 +29,27 @@ export function WatchEditor(props: Props) {
   const [isSearching, setIsSearching] = createSignal(false)
   const [showDropdown, setShowDropdown] = createSignal(false)
   const [highlightedIndex, setHighlightedIndex] = createSignal(0)
-  const [draggedIdx, setDraggedIdx] = createSignal<number | null>(null)
-  const [dragOverIdx, setDragOverIdx] = createSignal<number | null>(null)
+  const [draggingIndex, setDraggingIndex] = createSignal<number | null>(null)
+  const [dropTarget, setDropTarget] = createSignal<{ index: number; position: 'before' | 'after' } | null>(null)
   const [expandedMap, setExpandedMap] = createSignal<Record<string, boolean>>({})
+
+  const isDropBefore = (i: number) => {
+    const dt = dropTarget()
+    const dIdx = draggingIndex()
+    if (!dt || dIdx === null || dIdx === i) return false
+    if (dIdx < dt.index && dt.position === 'before' && dt.index - 1 === dIdx) return false
+    if (dIdx > dt.index && dt.position === 'after' && dt.index + 1 === dIdx) return false
+    return dt.index === i && dt.position === 'before'
+  }
+
+  const isDropAfter = (i: number) => {
+    const dt = dropTarget()
+    const dIdx = draggingIndex()
+    if (!dt || dIdx === null || dIdx === i) return false
+    if (dIdx < dt.index && dt.position === 'before' && dt.index - 1 === dIdx) return false
+    if (dIdx > dt.index && dt.position === 'after' && dt.index + 1 === dIdx) return false
+    return dt.index === i && dt.position === 'after'
+  }
 
   const isExpanded = (code: string, idx: number) => Boolean(expandedMap()[code || String(idx)])
   const toggleExpand = (code: string, idx: number) => {
@@ -64,6 +82,14 @@ export function WatchEditor(props: Props) {
 
   let searchBoxRef: HTMLDivElement | undefined
   let debounceTimer: number | undefined
+  let scrollAnimFrame: number | null = null
+
+  const stopAutoScroll = () => {
+    if (scrollAnimFrame !== null) {
+      cancelAnimationFrame(scrollAnimFrame)
+      scrollAnimFrame = null
+    }
+  }
 
   const numOrNull = (v: string): number | null => (v.trim() === '' ? null : Number(v))
 
@@ -80,7 +106,128 @@ export function WatchEditor(props: Props) {
   onCleanup(() => {
     window.removeEventListener('mousedown', handleGlobalMouseDown)
     if (debounceTimer) clearTimeout(debounceTimer)
+    stopAutoScroll()
   })
+
+  const onHandlePointerDown = (e: PointerEvent, startIndex: number) => {
+    if (e.button !== 0) return
+
+    const startY = e.clientY
+    let isDraggingActive = false
+    let currentDropTarget: { index: number; position: 'before' | 'after' } | null = null
+
+    const handleEl = e.currentTarget as HTMLElement
+    const scrollContainer = handleEl.closest('.content-body') as HTMLElement | null
+    const watchListEl = handleEl.closest('.watch-list') as HTMLElement | null
+
+    const doAutoScroll = (clientY: number) => {
+      if (!scrollContainer) return
+      const rect = scrollContainer.getBoundingClientRect()
+      const edgeThreshold = 45
+      let speed = 0
+
+      if (clientY < rect.top + edgeThreshold) {
+        const intensity = Math.min(1, (rect.top + edgeThreshold - clientY) / edgeThreshold)
+        speed = -Math.round(intensity * 12)
+      } else if (clientY > rect.bottom - edgeThreshold) {
+        const intensity = Math.min(1, (clientY - (rect.bottom - edgeThreshold)) / edgeThreshold)
+        speed = Math.round(intensity * 12)
+      }
+
+      if (speed !== 0) {
+        scrollContainer.scrollTop += speed
+        updateDropTarget(clientY)
+        scrollAnimFrame = requestAnimationFrame(() => doAutoScroll(clientY))
+      } else {
+        stopAutoScroll()
+      }
+    }
+
+    const updateDropTarget = (clientY: number) => {
+      if (!watchListEl) return
+      const cards = Array.from(watchListEl.querySelectorAll<HTMLElement>('.watch'))
+      if (cards.length === 0) return
+
+      let foundTarget: { index: number; position: 'before' | 'after' } | null = null
+
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i]
+        const rect = card.getBoundingClientRect()
+        if (clientY >= rect.top && clientY <= rect.bottom) {
+          const midY = rect.top + rect.height / 2
+          foundTarget = {
+            index: i,
+            position: clientY < midY ? 'before' : 'after',
+          }
+          break
+        }
+      }
+
+      if (!foundTarget && cards.length > 0) {
+        const firstRect = cards[0].getBoundingClientRect()
+        const lastRect = cards[cards.length - 1].getBoundingClientRect()
+        if (clientY < firstRect.top) {
+          foundTarget = { index: 0, position: 'before' }
+        } else if (clientY > lastRect.bottom) {
+          foundTarget = { index: cards.length - 1, position: 'after' }
+        }
+      }
+
+      currentDropTarget = foundTarget
+      setDropTarget(foundTarget)
+    }
+
+    const onPointerMove = (moveEv: PointerEvent) => {
+      if (!isDraggingActive) {
+        if (Math.abs(moveEv.clientY - startY) > 3) {
+          isDraggingActive = true
+          setDraggingIndex(startIndex)
+          document.body.style.userSelect = 'none'
+          document.body.style.cursor = 'grabbing'
+        }
+      }
+
+      if (isDraggingActive) {
+        updateDropTarget(moveEv.clientY)
+        stopAutoScroll()
+        doAutoScroll(moveEv.clientY)
+      }
+    }
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerUp)
+      stopAutoScroll()
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+
+      if (isDraggingActive && currentDropTarget) {
+        const from = startIndex
+        const target = currentDropTarget.index
+        const pos = currentDropTarget.position
+
+        let to = from
+        if (from < target) {
+          to = pos === 'before' ? target - 1 : target
+        } else if (from > target) {
+          to = pos === 'before' ? target : target + 1
+        }
+
+        if (to !== from && to >= 0 && to < props.items.length) {
+          props.move(from, to)
+          props.onToast?.('已调整自选股排序（点击底部保存生效）', 'ok')
+        }
+      }
+
+      setDraggingIndex(null)
+      setDropTarget(null)
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
+  }
 
   const onSearchInput = (val: string) => {
     setQuery(val)
@@ -365,44 +512,17 @@ export function WatchEditor(props: Props) {
             <div
               class="watch"
               classList={{
-                'is-dragging': draggedIdx() === i(),
-                'drag-over': dragOverIdx() === i(),
+                'is-dragging': draggingIndex() === i(),
+                'drop-before': isDropBefore(i()),
+                'drop-after': isDropAfter(i()),
                 'is-expanded': isExpanded(item.code, i()),
-              }}
-              onDragOver={(e) => {
-                e.preventDefault()
-                if (draggedIdx() !== null && draggedIdx() !== i()) {
-                  setDragOverIdx(i())
-                }
-              }}
-              onDragLeave={() => {
-                if (dragOverIdx() === i()) setDragOverIdx(null)
-              }}
-              onDrop={(e) => {
-                e.preventDefault()
-                const from = draggedIdx()
-                const to = i()
-                if (from !== null && from !== to) {
-                  props.move(from, to)
-                }
-                setDraggedIdx(null)
-                setDragOverIdx(null)
               }}
             >
               <div class="watch-head">
                 <div
                   class="drag-handle"
-                  draggable={true}
                   title="按住上下拖拽排序"
-                  onDragStart={(e) => {
-                    setDraggedIdx(i())
-                    e.dataTransfer?.setData('text/plain', String(i()))
-                    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
-                  }}
-                  onDragEnd={() => {
-                    setDraggedIdx(null)
-                    setDragOverIdx(null)
-                  }}
+                  onPointerDown={(e) => onHandlePointerDown(e, i())}
                 >
                   ⋮⋮
                 </div>
