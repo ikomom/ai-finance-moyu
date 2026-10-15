@@ -148,11 +148,14 @@ pub fn is_index(code: &str) -> bool {
     s.starts_with("sh000") || s.starts_with("sz399") || s.starts_with("bj899")
 }
 
-/// Calculate the number of continuous trading minutes that have elapsed today (1.0 to 240.0).
-pub fn elapsed_trading_minutes(now: NaiveDateTime) -> f64 {
-    let t = now.time();
-    let (h, m) = (t.hour(), t.minute());
-    let current_mins = h * 60 + m;
+/// Current Beijing time (UTC+8). A-share markets strictly operate under China Standard Time.
+pub fn beijing_now() -> NaiveDateTime {
+    let beijing = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
+    chrono::Utc::now().with_timezone(&beijing).naive_local()
+}
+
+/// Calculate elapsed continuous trading minutes at a given minute of the day (0..1440).
+pub fn elapsed_trading_minutes_at_minute(current_mins: u32) -> f64 {
     let m_open = 9 * 60 + 30; // 570 (09:30)
     let m_noon = 11 * 60 + 30; // 690 (11:30)
     let a_open = 13 * 60; // 780 (13:00)
@@ -169,6 +172,47 @@ pub fn elapsed_trading_minutes(now: NaiveDateTime) -> f64 {
     } else {
         240.0
     }
+}
+
+/// Parse time string into minute-of-day (0..1440).
+/// Supports "HH:MM:SS", "HH:MM", "YYYYMMDDHHMMSS", and "HHMMSS".
+pub fn parse_time_to_minutes(time_str: &str) -> Option<u32> {
+    let s = time_str.trim();
+    if s.contains(':') {
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() >= 2 {
+            let h = parts[0].parse::<u32>().ok()?;
+            let m = parts[1].parse::<u32>().ok()?;
+            if h < 24 && m < 60 {
+                return Some(h * 60 + m);
+            }
+        }
+    } else if s.len() == 14 && s.chars().all(|c| c.is_ascii_digit()) {
+        let h = s[8..10].parse::<u32>().ok()?;
+        let m = s[10..12].parse::<u32>().ok()?;
+        if h < 24 && m < 60 {
+            return Some(h * 60 + m);
+        }
+    } else if s.len() == 6 && s.chars().all(|c| c.is_ascii_digit()) {
+        let h = s[0..2].parse::<u32>().ok()?;
+        let m = s[2..4].parse::<u32>().ok()?;
+        if h < 24 && m < 60 {
+            return Some(h * 60 + m);
+        }
+    }
+    None
+}
+
+/// Calculate elapsed trading minutes directly from a quote's timestamp, if available.
+pub fn elapsed_trading_minutes_from_quote(quote: &crate::quote::Quote) -> Option<f64> {
+    parse_time_to_minutes(&quote.time).map(elapsed_trading_minutes_at_minute)
+}
+
+/// Calculate the number of continuous trading minutes that have elapsed today (1.0 to 240.0).
+pub fn elapsed_trading_minutes(now: NaiveDateTime) -> f64 {
+    let t = now.time();
+    let current_mins = t.hour() * 60 + t.minute();
+    elapsed_trading_minutes_at_minute(current_mins)
 }
 
 #[cfg(test)]
@@ -254,5 +298,31 @@ mod tests {
         assert!(!Session::PreTrade.is_live());
         assert!(!Session::LunchBreak.is_live());
         assert!(!Session::Closed.is_live());
+    }
+
+    #[test]
+    fn parses_time_and_calculates_elapsed_minutes() {
+        assert_eq!(parse_time_to_minutes("09:30:00"), Some(570));
+        assert_eq!(parse_time_to_minutes("10:00:00"), Some(600));
+        assert_eq!(parse_time_to_minutes("20261015143000"), Some(870));
+        assert_eq!(parse_time_to_minutes("150000"), Some(900));
+        assert_eq!(parse_time_to_minutes("invalid"), None);
+
+        // 09:30 or before -> 1.0 min
+        assert_eq!(elapsed_trading_minutes_at_minute(570), 1.0);
+        // 10:00 -> 30.0 mins
+        assert_eq!(elapsed_trading_minutes_at_minute(600), 30.0);
+        // 11:30 -> 120.0 mins
+        assert_eq!(elapsed_trading_minutes_at_minute(690), 120.0);
+        // 12:00 (lunch) -> 120.0 mins
+        assert_eq!(elapsed_trading_minutes_at_minute(720), 120.0);
+        // 13:00 -> 120.0 mins
+        assert_eq!(elapsed_trading_minutes_at_minute(780), 120.0);
+        // 14:00 -> 180.0 mins
+        assert_eq!(elapsed_trading_minutes_at_minute(840), 180.0);
+        // 15:00 -> 240.0 mins
+        assert_eq!(elapsed_trading_minutes_at_minute(900), 240.0);
+        // 16:00 -> 240.0 mins
+        assert_eq!(elapsed_trading_minutes_at_minute(960), 240.0);
     }
 }

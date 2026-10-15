@@ -329,7 +329,7 @@ impl MarketFetcher {
             return Ok(cached);
         };
 
-        let today = Local::now().format("%Y-%m-%d").to_string();
+        let today = crate::market::beijing_now().format("%Y-%m-%d").to_string();
 
         // Check if circuit breaker is active for today
         if let Some(ref date) = *self.quota_exhausted_date.lock().unwrap() {
@@ -721,7 +721,7 @@ mod tests {
     #[tokio::test]
     async fn test_quota_circuit_breaker() {
         let fetcher = MarketFetcher::new().unwrap();
-        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let today = crate::market::beijing_now().format("%Y-%m-%d").to_string();
 
         // Manually trigger circuit breaker
         *fetcher.quota_exhausted_date.lock().unwrap() = Some(today);

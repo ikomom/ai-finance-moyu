@@ -49,7 +49,7 @@ pub async fn run(app: AppHandle) {
     loop {
         let (session, poll_ms, trend_ms, feed_is_today, need_retry, is_market, need_market_init) = {
             let state = app.state::<AppState>();
-            let now = Local::now().naive_local();
+            let now = crate::market::beijing_now();
             let session = market::session_at(now);
             if last_session != Some(session) {
                 if let Some(prev) = last_session {
@@ -158,7 +158,7 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let state = app.state::<AppState>();
         let cfg = state.config.lock().unwrap();
 
-        let now = chrono::Local::now().naive_local();
+        let now = crate::market::beijing_now();
         let session = crate::market::session_at(now);
         let in_auction_or_pretrade = session.is_morning_auction() || session == crate::market::Session::PreTrade;
 

@@ -610,10 +610,11 @@ impl CrossingTracker {
                 let dt_secs = now.saturating_duration_since(oldest_sample.time).as_secs();
                 let rate_1min = delta_v / (dt_secs as f64) * 60.0;
 
-                // Real average minute volume: quote.volume / elapsed_minutes
-                let local_now = chrono::Local::now().naive_local();
-                let elapsed = crate::market::elapsed_trading_minutes(local_now);
-                let baseline_avg = (quote.volume / elapsed).max(200.0);
+                // Real average minute volume: baseline before this surge / elapsed_minutes
+                let elapsed = crate::market::elapsed_trading_minutes_from_quote(quote)
+                    .unwrap_or_else(|| crate::market::elapsed_trading_minutes(crate::market::beijing_now()));
+                let baseline_vol = oldest_sample.volume.max(200.0);
+                let baseline_avg = (baseline_vol / elapsed).max(200.0);
 
                 // Price motion check: price must have at least 0.3% movement to count as a directional volume burst
                 let price_motion = if oldest_sample.price > 0.0 {
