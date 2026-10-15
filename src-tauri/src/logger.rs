@@ -256,7 +256,16 @@ pub fn open_log_directory(app: &AppHandle) -> Result<(), String> {
             .map_err(|e| format!("打开日志目录失败: {e}"))?;
     }
 
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let path_str = dir.display().to_string();
+        std::process::Command::new("open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("打开日志目录失败: {e}"))?;
+    }
+
+    #[cfg(all(not(windows), not(target_os = "macos")))]
     {
         let path_str = dir.display().to_string();
         std::process::Command::new("xdg-open")

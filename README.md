@@ -1,7 +1,7 @@
 # 📈 AI Finance Moyu · A股桌面摸鱼悬浮窗
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Platform" />
+  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6?style=flat-square&logo=windows" alt="Platform" />
   <img src="https://img.shields.io/badge/Framework-Tauri%20v2-24C8D8?style=flat-square&logo=tauri" alt="Tauri" />
   <img src="https://img.shields.io/badge/Backend-Rust%202021-DEA584?style=flat-square&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/Frontend-SolidJS%20%2B%20TypeScript-2C4F7C?style=flat-square&logo=solid" alt="SolidJS" />
@@ -102,7 +102,22 @@
 ## 🚀 快速上手
 
 ### 下载预编译版本
-前往 [Releases 页面](../../releases) 下载最新的 Windows 便携包或安装包（解压即可运行）。
+前往 [Releases 页面](../../releases) 获取由 GitHub Actions 自动编译发布的最新双端版本：
+
+- 🪟 **Windows 用户**：下载 `.exe`（NSIS 一键安装包）或 `.msi` 安装包，运行即可。
+- 🍎 **macOS 用户**：下载 Universal 通用版 `.dmg`（已同时内置 Apple Silicon M 系列芯片与 Intel x86_64 架构），将图标拖入 `Applications` 目录即可。
+  > 💡 **macOS 首次打开提示（免证书隔离解除）**：  
+  > 由于个人开源项目未购买商业 Apple 开发者证书（$99/年），macOS Gatekeeper 安全机制可能会拦截并提示「无法验证开发者」或「已损坏，无法打开」。这是 macOS 对未签名开源软件的标准拦截行为，请任选一种方式即可正常打开：  
+  > 1. **系统设置放行**：进入 `系统设置` → `隐私与安全性` → 滑至底部 `安全性` 栏目，点击「仍要打开」；或在访达中右键点按应用，选择「打开」。  
+  > 2. **终端一键解除隔离属性**：  
+  >    ```bash
+  >    sudo xattr -rd com.apple.quarantine /Applications/ai-finance-moyu.app
+  >    ```
+
+### 自动化多端打包 (GitHub Actions)
+仓库已内置多平台自动构建发布流水线 [`.github/workflows/release.yml`](.github/workflows/release.yml)：
+- **触发机制**：推送版本标签（例如 `git tag v0.1.0 && git push origin v0.1.0`）或在 GitHub Actions 页面手动点击 `workflow_dispatch`；
+- **构建矩阵**：并行调度 Windows 与 macOS 矩阵 Runner，自动完成代码编译、打包签名回退、生成 Universal 通用 Binary，并将编译产物自动发布至 GitHub Releases。
 
 ### 从源码构建与开发
 
