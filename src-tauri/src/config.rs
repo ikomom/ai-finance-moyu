@@ -457,7 +457,7 @@ pub fn load(app: &AppHandle) -> Config {
             cfg
         }
         Err(e) => {
-            eprintln!("config.json 解析失败({e})，已备份为 config.json.bak 并回退默认配置");
+            log::error!(target: "SYSTEM", "config.json 解析失败({e})，已备份为 config.json.bak 并回退默认配置");
             let _ = std::fs::rename(&path, path.with_extension("json.bak"));
             Config::default()
         }

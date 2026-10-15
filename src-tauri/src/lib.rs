@@ -1,6 +1,7 @@
 pub mod auction_engine;
 mod config;
 mod crossing;
+pub mod logger;
 mod market;
 pub mod market_overview;
 mod poller;
@@ -149,12 +150,18 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
         cfg.layout = layout;
         (cfg.watchlist.len(), cfg.clone())
     };
+    log::info!(target: "USER", "切换布局模式至 {:?}", layout);
     let _ = config::save(app, &snapshot);
 
     if layout == Layout::Market {
         let handle = app.clone();
         tauri::async_runtime::spawn(async move {
             let _ = poller::poll_market_overview(&handle).await;
+        });
+    } else if layout == Layout::Mini {
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = poller::poll_trends(&handle).await;
         });
     }
 
@@ -276,7 +283,7 @@ fn on_resized(app: &AppHandle, size: tauri::PhysicalSize<u32>, scale: f64) {
             cfg.clone()
         };
         if let Err(e) = config::save(&app, &cfg) {
-            eprintln!("保存窗口尺寸失败: {e}");
+            log::warn!(target: "SYSTEM", "保存窗口尺寸失败: {e}");
         }
     });
 }
@@ -527,6 +534,17 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
             let mut dock = state.dock_state.lock().unwrap();
             dock.collapsed = false;
         }
+
+        let is_mini = {
+            let cfg = state.config.lock().unwrap();
+            cfg.layout == Layout::Mini
+        };
+        if is_mini {
+            let handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = poller::poll_trends(&handle).await;
+            });
+        }
     }
 
     poller::emit_snapshot(app);
@@ -650,10 +668,12 @@ fn save_config(app: AppHandle, mut cfg: Config) -> Result<(), String> {
         }
     }
 
+    log::info!(target: "USER", "保存系统配置，自选股共 {} 只", cfg.watchlist.len());
     config::save(&app, &cfg)?;
     {
         let state = app.state::<AppState>();
         *state.config.lock().unwrap() = cfg.clone();
+        state.market_fetcher.reset_quota_circuit_breaker();
     }
 
     if matches!(cfg.visibility_mode, VisibilityMode::Always | VisibilityMode::Hotkey) {
@@ -701,7 +721,27 @@ fn quit_app(app: AppHandle) {
 /// frontend's own view of what it rendered observable from the dev log.
 #[tauri::command]
 fn frontend_log(msg: String) {
-    println!("[webview] {msg}");
+    log::info!(target: "FRONTEND", "{msg}");
+}
+
+#[tauri::command]
+fn get_recent_logs(target_filter: Option<String>, level_filter: Option<String>) -> Vec<logger::LogEntry> {
+    logger::get_recent_entries(target_filter.as_deref(), level_filter.as_deref())
+}
+
+#[tauri::command]
+fn open_log_dir(app: AppHandle) -> Result<(), String> {
+    logger::open_log_directory(&app)
+}
+
+#[tauri::command]
+fn clear_memory_logs() {
+    logger::clear_memory_entries();
+}
+
+#[tauri::command]
+fn set_log_level(level: String) {
+    logger::set_level(&level);
 }
 
 /// Report the provider list so the settings UI stays in sync with the backend.
@@ -740,20 +780,26 @@ async fn search_securities(query: String) -> Result<Vec<search::SearchResult>, S
 #[tauri::command]
 async fn set_trend_targets(app: AppHandle, targets: Vec<String>) -> Result<(), String> {
     let state = app.state::<AppState>();
-    let needs_fetch = {
+    let (changed, has_cached) = {
         let mut guard = state.active_trend_targets.lock().unwrap();
         let changed = guard.as_ref() != Some(&targets);
         *guard = Some(targets.clone());
         if changed && !targets.is_empty() {
             let trends = state.trends.lock().unwrap();
-            targets.iter().any(|c| !trends.contains_key(c))
+            let has_cached = targets.iter().all(|c| trends.contains_key(c));
+            (true, has_cached)
         } else {
-            false
+            (false, false)
         }
     };
 
-    if needs_fetch {
-        // Trigger an immediate background poll for the newly requested trend targets
+    if changed {
+        // If we already have cached trend points in memory, push snapshot immediately
+        // so the frontend renders with 0ms blank-screen delay
+        if has_cached {
+            poller::emit_snapshot(&app);
+        }
+        // Always trigger an immediate background poll to fetch the freshest real-time ticks
         tauri::async_runtime::spawn(async move {
             let _ = poller::poll_trends(&app).await;
         });
@@ -825,7 +871,7 @@ fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
         ("大盘全景", keys.layout_market.as_str(), market),
     ] {
         if let Err(e) = shortcuts.register(shortcut) {
-            eprintln!("快捷键 {name}（{chord}）注册失败，可能已被别的程序占用: {e}");
+            log::warn!(target: "SYSTEM", "快捷键 {name}（{chord}）注册失败，可能已被别的程序占用: {e}");
         }
     }
 
@@ -898,7 +944,7 @@ fn hide_from_alt_tab(win: &tauri::WebviewWindow) {
     // `tauri` and `windows-sys` both type HWND as a raw pointer, so `.0` bridges
     // them without either crate having to know about the other.
     let Ok(hwnd) = win.hwnd() else {
-        eprintln!("无法获取窗口句柄，Alt+Tab 隐藏未生效");
+        log::warn!(target: "SYSTEM", "无法获取窗口句柄，Alt+Tab 隐藏未生效");
         return;
     };
     let raw = hwnd.0;
@@ -933,6 +979,10 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            if let Err(e) = logger::init(app.handle()) {
+                eprintln!("初始化日志系统失败: {e}");
+            }
+
             let cfg = config::load(app.handle());
 
             // Registered here rather than in the builder chain so the chords can
@@ -940,7 +990,7 @@ pub fn run() {
             // widget is still usable from the tray and the right-click menu, and
             // refusing to start over a hotkey would be far worse.
             if let Err(e) = register_hotkeys(app.handle(), &cfg.hotkeys) {
-                eprintln!("{e}（其余功能不受影响）");
+                log::warn!(target: "SYSTEM", "{e}（其余功能不受影响）");
             }
 
             let fetcher = Fetcher::new().map_err(|e| e.to_string())?;
@@ -1042,6 +1092,10 @@ pub fn run() {
             search_securities,
             set_trend_targets,
             get_kline,
+            get_recent_logs,
+            open_log_dir,
+            clear_memory_logs,
+            set_log_level,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

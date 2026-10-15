@@ -80,7 +80,7 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
         "toggle" => crate::toggle_window(app),
         "settings" => {
             if let Err(e) = crate::open_settings(app) {
-                eprintln!("{e}");
+                log::warn!(target: "SYSTEM", "打开设置窗口失败: {e}");
             }
         }
         "quit" => app.exit(0),

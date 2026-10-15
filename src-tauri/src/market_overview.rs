@@ -117,6 +117,7 @@ fn get_iwencai_api_key(configured_key: Option<&str>) -> Option<String> {
 pub struct MarketFetcher {
     client: reqwest::Client,
     cached_breadth: std::sync::Mutex<(u32, u32, u32, Option<f64>, Option<f64>)>,
+    quota_exhausted_date: std::sync::Mutex<Option<String>>,
 }
 
 impl Default for MarketFetcher {
@@ -143,7 +144,13 @@ impl MarketFetcher {
                 Some(-19.09),
                 Some(-365890000000.0),
             )),
+            quota_exhausted_date: std::sync::Mutex::new(None),
         })
+    }
+
+    /// Reset quota circuit breaker (e.g. after user updates API Key).
+    pub fn reset_quota_circuit_breaker(&self) {
+        *self.quota_exhausted_date.lock().unwrap() = None;
     }
 
     pub async fn fetch_overview(&self, configured_key: Option<&str>) -> Result<MarketOverview, String> {
@@ -158,14 +165,14 @@ impl MarketFetcher {
         let top_sectors = sectors_res.unwrap_or_default();
         let (up_count, down_count, flat_count, turnover_change_pct, turnover_change_amount) = match breadth_res {
             Ok((u, d, f, pct, amt)) => {
-                println!("fetch_breadth succeeded: up={u}, down={d}, flat={f}, pct={pct:?}");
+                log::debug!(target: "MARKET", "涨跌统计拉取成功: 涨={u}, 跌={d}, 平={f}, 环比={pct:?}");
                 if u > 0 || d > 0 {
                     *self.cached_breadth.lock().unwrap() = (u, d, f, pct, amt);
                 }
                 (u, d, f, pct, amt)
             }
             Err(ref e) => {
-                println!("fetch_breadth (自动回退基准缓存): {e}");
+                log::warn!(target: "NET", "全市场涨跌统计异常(已回退基准缓存): {e}");
                 *self.cached_breadth.lock().unwrap()
             }
         };
@@ -321,6 +328,17 @@ impl MarketFetcher {
             let cached = *self.cached_breadth.lock().unwrap();
             return Ok(cached);
         };
+
+        let today = Local::now().format("%Y-%m-%d").to_string();
+
+        // Check if circuit breaker is active for today
+        if let Some(ref date) = *self.quota_exhausted_date.lock().unwrap() {
+            if date == &today {
+                let cached = *self.cached_breadth.lock().unwrap();
+                return Ok(cached);
+            }
+        }
+
         let url = "https://openapi.iwencai.com/v1/query2data";
 
         let now_nanos = std::time::SystemTime::now()
@@ -354,14 +372,28 @@ impl MarketFetcher {
             .await
             .map_err(|e| format!("请求同花顺问财涨跌统计失败: {e}"))?;
 
+        let status = res.status();
         let text = res
             .text()
             .await
             .map_err(|e| format!("读取涨跌统计响应失败: {e}"))?;
 
         let trimmed = text.trim();
+        if !status.is_success() {
+            let sample: String = trimmed.chars().take(80).collect();
+            if status == reqwest::StatusCode::UNAUTHORIZED || status.as_u16() == 429 || trimmed.contains("次数已用完") {
+                *self.quota_exhausted_date.lock().unwrap() = Some(today);
+                return Err(format!(
+                    "问财接口配额耗尽/鉴权受限 (HTTP {status}: {sample})。已启动今日熔断保护，暂停后续请求并平滑回退基准缓存，次日自动恢复。"
+                ));
+            }
+            return Err(format!("问财接口 HTTP {status}: {sample}"));
+        }
         if trimmed.is_empty() {
             return Err("问财接口返回空响应（服务端限流或网络抖动，已自动回退基准缓存）".to_string());
+        }
+        if trimmed.starts_with('<') {
+            return Err(format!("问财接口返回非 JSON 页面 (HTTP {status})"));
         }
 
         let json: serde_json::Value = serde_json::from_str(trimmed)
@@ -684,5 +716,22 @@ mod tests {
         // 5. Index symbols always return None
         let l5 = match_stock_sector("sh000001", "上证指数", 0.5, &sectors, 0.5);
         assert!(l5.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_quota_circuit_breaker() {
+        let fetcher = MarketFetcher::new().unwrap();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+        // Manually trigger circuit breaker
+        *fetcher.quota_exhausted_date.lock().unwrap() = Some(today);
+
+        // fetch_breadth should return cached without network error
+        let breadth = fetcher.fetch_breadth(Some("invalid-token-should-not-hit-network")).await;
+        assert!(breadth.is_ok());
+
+        // Resetting circuit breaker clears it
+        fetcher.reset_quota_circuit_breaker();
+        assert!(fetcher.quota_exhausted_date.lock().unwrap().is_none());
     }
 }

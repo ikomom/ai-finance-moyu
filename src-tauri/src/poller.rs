@@ -44,12 +44,21 @@ pub async fn run(app: AppHandle) {
     let mut last_trend: Option<Instant> = Some(Instant::now());
     let _ = poll_market_overview(&app).await;
     let mut last_market: Option<Instant> = Some(Instant::now());
+    let mut last_session: Option<market::Session> = None;
 
     loop {
         let (session, poll_ms, trend_ms, feed_is_today, need_retry, is_market, need_market_init) = {
             let state = app.state::<AppState>();
             let now = Local::now().naive_local();
             let session = market::session_at(now);
+            if last_session != Some(session) {
+                if let Some(prev) = last_session {
+                    log::info!(target: "SESSION", "A股交易时段切换: {:?} -> {:?}", prev, session);
+                } else {
+                    log::info!(target: "SESSION", "初始识别A股交易时段: {:?}", session);
+                }
+                last_session = Some(session);
+            }
             let cfg = state.config.lock().unwrap();
             let st = state.status.lock().unwrap();
             let quotes = state.quotes.lock().unwrap();
@@ -115,7 +124,7 @@ pub async fn poll_market_overview(app: &AppHandle) -> Result<(), String> {
             Ok(())
         }
         Err(e) => {
-            eprintln!("拉取大盘全景数据失败: {e}");
+            log::warn!(target: "NET", "拉取大盘全景数据失败: {e}");
             Err(e)
         }
     }
@@ -206,9 +215,12 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
                 .collect()
         };
 
-        if cfg.notifications && !notifications.is_empty() {
+        if !notifications.is_empty() {
             for notif in &notifications {
-                spawn_system_notification(app, notif);
+                log::info!(target: "ALERT", "[盘中异动] {} ({}): {}", notif.name, notif.code, notif.message);
+                if cfg.notifications {
+                    spawn_system_notification(app, notif);
+                }
             }
         }
 
@@ -240,7 +252,22 @@ async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let mut auction_tracker = state.auction_tracker.lock().unwrap_or_else(|e| e.into_inner());
         if session.is_morning_auction() || session == crate::market::Session::PreTrade {
             for q in &quotes {
+                let prev_tag = auction_tracker.data.get(&q.code).and_then(|d| d.diagnosis.as_ref()).map(|d| d.tag);
                 auction_tracker.update_quote(session, q);
+                let new_diag = auction_tracker.data.get(&q.code).and_then(|d| d.diagnosis.as_ref()).cloned();
+                if let Some(diag) = new_diag {
+                    if prev_tag != Some(diag.tag) && diag.tag != crate::auction_engine::AuctionTag::Normal {
+                        log::warn!(
+                            target: "AUCTION",
+                            "[集合竞价诊断] {} ({}): {} - {} (开盘试盘: {:.2}%)",
+                            q.name,
+                            q.code,
+                            diag.label,
+                            diag.detail,
+                            q.change_pct
+                        );
+                    }
+                }
             }
         } else {
             for q in &quotes {
@@ -321,10 +348,10 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
                 state.trends.lock().unwrap().insert(code, trend);
             }
             Ok((code, Err(e))) => {
-                eprintln!("分时拉取失败 {code}: {e}");
+                log::warn!(target: "NET", "分时拉取失败 {code}: {e}");
             }
             Err(e) => {
-                eprintln!("分时拉取任务异常: {e}");
+                log::error!(target: "SYSTEM", "分时拉取任务异常: {e}");
             }
         }
     }

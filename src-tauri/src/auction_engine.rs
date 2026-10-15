@@ -13,6 +13,15 @@ use std::collections::HashMap;
 use crate::market::Session;
 use crate::quote::Quote;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum UnmatchedSide {
+    #[default]
+    None,
+    Buy,
+    Sell,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuctionTag {
@@ -30,8 +39,47 @@ pub struct AuctionPoint {
     pub time: u32,
     /// Auction match price.
     pub price: f64,
-    /// Cumulative / matched volume in 手.
+    /// Total volume (matched + unmatched) in 手.
     pub volume: f64,
+    /// Matched volume in 手.
+    #[serde(default)]
+    pub matched_volume: f64,
+    /// Unmatched residual order volume in 手.
+    #[serde(default)]
+    pub unmatched_volume: f64,
+    /// Direction of unmatched order volume.
+    #[serde(default)]
+    pub unmatched_side: UnmatchedSide,
+}
+
+impl AuctionPoint {
+    pub fn new(time: u32, price: f64, volume: f64) -> Self {
+        Self {
+            time,
+            price,
+            volume,
+            matched_volume: volume,
+            unmatched_volume: 0.0,
+            unmatched_side: UnmatchedSide::None,
+        }
+    }
+
+    pub fn with_unmatched(
+        time: u32,
+        price: f64,
+        matched_volume: f64,
+        unmatched_volume: f64,
+        unmatched_side: UnmatchedSide,
+    ) -> Self {
+        Self {
+            time,
+            price,
+            volume: matched_volume + unmatched_volume,
+            matched_volume,
+            unmatched_volume,
+            unmatched_side,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +139,32 @@ impl AuctionTracker {
             return;
         }
 
+        let b1_vol = quote.bids.first().map(|b| b.1).unwrap_or(0.0);
+        let a1_vol = quote.asks.first().map(|a| a.1).unwrap_or(0.0);
+
+        let (matched_vol, unmatched_vol, unmatched_side) = if time_num == 925 {
+            // 09:25 is formal opening trade completion: full matched volume, unmatched goes to 0
+            (quote.volume.max(0.0), 0.0, UnmatchedSide::None)
+        } else if b1_vol > 0.0 && a1_vol > 0.0 {
+            let m = b1_vol.min(a1_vol);
+            let u = (b1_vol - a1_vol).abs();
+            let side = if b1_vol > a1_vol {
+                UnmatchedSide::Buy
+            } else if a1_vol > b1_vol {
+                UnmatchedSide::Sell
+            } else {
+                UnmatchedSide::None
+            };
+            (m, u, side)
+        } else if b1_vol > 0.0 && a1_vol <= 0.0 {
+            (0.0, b1_vol, UnmatchedSide::Buy)
+        } else if a1_vol > 0.0 && b1_vol <= 0.0 {
+            (0.0, a1_vol, UnmatchedSide::Sell)
+        } else {
+            (quote.volume.max(0.0), 0.0, UnmatchedSide::None)
+        };
+        let total_vol = (matched_vol + unmatched_vol).max(quote.volume);
+
         let entry = self.data.entry(quote.code.clone()).or_insert_with(|| AuctionData {
             code: quote.code.clone(),
             date: quote.date.clone(),
@@ -101,19 +175,28 @@ impl AuctionTracker {
         if let Some(last) = entry.points.last_mut() {
             if last.time == time_num {
                 last.price = quote.price;
-                last.volume = quote.volume;
+                last.volume = total_vol;
+                last.matched_volume = matched_vol;
+                last.unmatched_volume = unmatched_vol;
+                last.unmatched_side = unmatched_side;
             } else if time_num > last.time {
                 entry.points.push(AuctionPoint {
                     time: time_num,
                     price: quote.price,
-                    volume: quote.volume,
+                    volume: total_vol,
+                    matched_volume: matched_vol,
+                    unmatched_volume: unmatched_vol,
+                    unmatched_side: unmatched_side,
                 });
             }
         } else {
             entry.points.push(AuctionPoint {
                 time: time_num,
                 price: quote.price,
-                volume: quote.volume,
+                volume: total_vol,
+                matched_volume: matched_vol,
+                unmatched_volume: unmatched_vol,
+                unmatched_side: unmatched_side,
             });
         }
 
@@ -153,6 +236,9 @@ impl AuctionTracker {
                     time: 925,
                     price: quote.open,
                     volume: quote.volume,
+                    matched_volume: quote.volume,
+                    unmatched_volume: 0.0,
+                    unmatched_side: UnmatchedSide::None,
                 }],
                 diagnosis: Some(AuctionDiagnosis {
                     tag: AuctionTag::Normal,
@@ -170,6 +256,9 @@ impl AuctionTracker {
                 time: 925,
                 price: quote.open,
                 volume: quote.volume,
+                matched_volume: quote.volume,
+                unmatched_volume: 0.0,
+                unmatched_side: UnmatchedSide::None,
             });
         }
     }
@@ -281,20 +370,64 @@ pub fn evaluate_auction(pre_close: f64, points: &[AuctionPoint]) -> Option<Aucti
         None
     };
 
+    // Unmatched volume peak analysis in 09:15-09:19
+    let early_max_unmatched_buy = early_points
+        .iter()
+        .filter(|p| p.unmatched_side == UnmatchedSide::Buy)
+        .map(|p| p.unmatched_volume)
+        .fold(0.0, f64::max);
+    let early_max_unmatched_sell = early_points
+        .iter()
+        .filter(|p| p.unmatched_side == UnmatchedSide::Sell)
+        .map(|p| p.unmatched_volume)
+        .fold(0.0, f64::max);
+
+    let latest_unmatched_buy = if latest_locked.unmatched_side == UnmatchedSide::Buy {
+        latest_locked.unmatched_volume
+    } else {
+        0.0
+    };
+    let latest_unmatched_sell = if latest_locked.unmatched_side == UnmatchedSide::Sell {
+        latest_locked.unmatched_volume
+    } else {
+        0.0
+    };
+
+    let unmatched_buy_drop = if early_max_unmatched_buy > 0.0 && early_max_unmatched_buy > latest_unmatched_buy {
+        Some((early_max_unmatched_buy - latest_unmatched_buy) / early_max_unmatched_buy * 100.0)
+    } else {
+        None
+    };
+    let unmatched_sell_drop = if early_max_unmatched_sell > 0.0 && early_max_unmatched_sell > latest_unmatched_sell {
+        Some((early_max_unmatched_sell - latest_unmatched_sell) / early_max_unmatched_sell * 100.0)
+    } else {
+        None
+    };
+
     // 1. 虚拉大撤单诱多 (Bull Trap)
     // 09:15-09:19 冲高 (>= +2.0%)，09:20 锁定后撤单跳水 (落差 >= 1.5% 或翻绿)
     let drop_from_peak = early_max_pct - locked_pct;
     let significant_vol_drop = vol_drop.map_or(false, |d| d >= 30.0);
+    let significant_buy_cancel = unmatched_buy_drop.map_or(false, |d| d >= 50.0);
 
-    if early_max_pct >= 2.0 && (drop_from_peak >= 1.5 || (locked_pct <= 0.0 && early_max_pct >= 1.5)) && (significant_vol_drop || drop_from_peak >= 2.0) {
+    if early_max_pct >= 2.0 && (drop_from_peak >= 1.5 || (locked_pct <= 0.0 && early_max_pct >= 1.5)) && (significant_vol_drop || significant_buy_cancel || drop_from_peak >= 2.0) {
+        let cancel_desc = if let Some(bd) = unmatched_buy_drop {
+            if bd >= 50.0 && early_max_unmatched_buy >= 500.0 {
+                format!("，买单撤离 {:.0}%", bd)
+            } else {
+                vol_drop.map(|v| format!("（量能缩减 {:.0}%）", v)).unwrap_or_default()
+            }
+        } else {
+            vol_drop.map(|v| format!("（量能缩减 {:.0}%）", v)).unwrap_or_default()
+        };
         return Some(AuctionDiagnosis {
             tag: AuctionTag::BullTrap,
             label: "⚠️ 疑似诱多".to_string(),
             detail: format!(
-                "早盘虚拉冲高至 +{:.1}%，09:20锁定后撤单跳水至 {:+.1}%（量能缩减 {:.0}%），警惕开盘接盘风险",
+                "早盘虚拉冲高至 +{:.1}%，09:20锁定后撤单跳水至 {:+.1}%{}，警惕开盘接盘风险",
                 early_max_pct,
                 locked_pct,
-                vol_drop.unwrap_or(0.0)
+                cancel_desc
             ),
             early_peak_pct: early_max_pct,
             locked_pct,
@@ -305,18 +438,32 @@ pub fn evaluate_auction(pre_close: f64, points: &[AuctionPoint]) -> Option<Aucti
     // 2. 恐吓大撤单诱空 (Bear Trap)
     // 09:15-09:19 砸盘恐吓 (<= -2.0%)，09:20 锁定后撤单拉升 (反弹 >= 1.5% 或翻红)
     let rebound_from_trough = locked_pct - early_min_pct;
-    if early_min_pct <= -2.0 && (rebound_from_trough >= 1.5 || (locked_pct >= 0.0 && early_min_pct <= -1.5)) {
+    let significant_sell_cancel = unmatched_sell_drop.map_or(false, |d| d >= 50.0);
+    if early_min_pct <= -2.0
+        && (rebound_from_trough >= 1.5 || (locked_pct >= 0.0 && early_min_pct <= -1.5))
+        && (significant_vol_drop || significant_sell_cancel || rebound_from_trough >= 2.0 || locked_pct >= 0.0)
+    {
+        let cancel_desc = if let Some(sd) = unmatched_sell_drop {
+            if sd >= 50.0 && early_max_unmatched_sell >= 500.0 {
+                format!("，恐慌卖单撤离 {:.0}%", sd)
+            } else {
+                vol_drop.map(|v| format!("（量能缩减 {:.0}%）", v)).unwrap_or_default()
+            }
+        } else {
+            vol_drop.map(|v| format!("（量能缩减 {:.0}%）", v)).unwrap_or_default()
+        };
         return Some(AuctionDiagnosis {
             tag: AuctionTag::BearTrap,
             label: "🟢 疑似诱空".to_string(),
             detail: format!(
-                "早盘恐吓深跌至 {:.1}%，09:20锁定后恐慌大单撤离拉升至 {:+.1}%，虚晃一枪暗含承接",
+                "早盘恐吓深跌至 {:.1}%，09:20锁定后大单撤离拉升至 {:+.1}%{}，虚晃一枪暗含承接",
                 early_min_pct,
-                locked_pct
+                locked_pct,
+                cancel_desc
             ),
             early_peak_pct: early_min_pct,
             locked_pct,
-            volume_drop_pct: None,
+            volume_drop_pct: vol_drop,
         });
     }
 
@@ -383,11 +530,11 @@ mod tests {
     fn detects_bull_trap_fake_spike_and_cancel() {
         let pre_close = 10.0;
         let points = vec![
-            AuctionPoint { time: 915, price: 10.2, volume: 500.0 },
-            AuctionPoint { time: 918, price: 10.8, volume: 5000.0 }, // +8.0%, 5000手
-            AuctionPoint { time: 919, price: 10.7, volume: 4800.0 },
-            AuctionPoint { time: 920, price: 10.1, volume: 800.0 },  // +1.0%, 800手 (撤单暴跌)
-            AuctionPoint { time: 924, price: 10.05, volume: 900.0 },
+            AuctionPoint::new(915, 10.2, 500.0),
+            AuctionPoint::new(918, 10.8, 5000.0), // +8.0%, 5000手
+            AuctionPoint::new(919, 10.7, 4800.0),
+            AuctionPoint::new(920, 10.1, 800.0),  // +1.0%, 800手 (撤单暴跌)
+            AuctionPoint::new(924, 10.05, 900.0),
         ];
         let diag = evaluate_auction(pre_close, &points).expect("diagnosis");
         assert_eq!(diag.tag, AuctionTag::BullTrap);
@@ -395,13 +542,27 @@ mod tests {
     }
 
     #[test]
+    fn detects_bull_trap_via_unmatched_buy_order_cancel() {
+        let pre_close = 10.0;
+        let points = vec![
+            AuctionPoint::with_unmatched(915, 10.2, 500.0, 1000.0, UnmatchedSide::Buy),
+            AuctionPoint::with_unmatched(918, 10.8, 1000.0, 5000.0, UnmatchedSide::Buy), // 5000手未匹配买单虚托
+            AuctionPoint::with_unmatched(920, 10.1, 900.0, 100.0, UnmatchedSide::Buy),  // 买单大撤单98%
+            AuctionPoint::with_unmatched(924, 10.05, 900.0, 50.0, UnmatchedSide::Buy),
+        ];
+        let diag = evaluate_auction(pre_close, &points).expect("diagnosis");
+        assert_eq!(diag.tag, AuctionTag::BullTrap);
+        assert!(diag.detail.contains("买单撤离"));
+    }
+
+    #[test]
     fn detects_bear_trap_scare_and_rebound() {
         let pre_close = 10.0;
         let points = vec![
-            AuctionPoint { time: 915, price: 9.8, volume: 500.0 },
-            AuctionPoint { time: 918, price: 9.2, volume: 4000.0 }, // -8.0% 跌停恐吓
-            AuctionPoint { time: 920, price: 9.9, volume: 600.0 },  // 撤单拉起至 -1.0%
-            AuctionPoint { time: 924, price: 10.05, volume: 800.0 }, // 翻红
+            AuctionPoint::new(915, 9.8, 500.0),
+            AuctionPoint::new(918, 9.2, 4000.0), // -8.0% 跌停恐吓
+            AuctionPoint::new(920, 9.9, 600.0),  // 撤单拉起至 -1.0%
+            AuctionPoint::new(924, 10.05, 800.0), // 翻红
         ];
         let diag = evaluate_auction(pre_close, &points).expect("diagnosis");
         assert_eq!(diag.tag, AuctionTag::BearTrap);
@@ -409,13 +570,27 @@ mod tests {
     }
 
     #[test]
+    fn detects_bear_trap_via_unmatched_sell_order_cancel() {
+        let pre_close = 10.0;
+        let points = vec![
+            AuctionPoint::with_unmatched(915, 9.8, 400.0, 800.0, UnmatchedSide::Sell),
+            AuctionPoint::with_unmatched(918, 9.2, 800.0, 4500.0, UnmatchedSide::Sell), // 4500手巨额卖单封杀恐吓
+            AuctionPoint::with_unmatched(920, 9.9, 700.0, 200.0, UnmatchedSide::Sell),  // 恐慌卖单撤离
+            AuctionPoint::with_unmatched(924, 10.05, 800.0, 100.0, UnmatchedSide::Buy),
+        ];
+        let diag = evaluate_auction(pre_close, &points).expect("diagnosis");
+        assert_eq!(diag.tag, AuctionTag::BearTrap);
+        assert!(diag.detail.contains("恐慌卖单撤离"));
+    }
+
+    #[test]
     fn detects_real_snatching() {
         let pre_close = 10.0;
         let points = vec![
-            AuctionPoint { time: 916, price: 10.2, volume: 1000.0 },
-            AuctionPoint { time: 919, price: 10.4, volume: 2500.0 },
-            AuctionPoint { time: 920, price: 10.45, volume: 3000.0 },
-            AuctionPoint { time: 924, price: 10.5, volume: 3500.0 }, // +5.0% 持续放量
+            AuctionPoint::new(916, 10.2, 1000.0),
+            AuctionPoint::new(919, 10.4, 2500.0),
+            AuctionPoint::new(920, 10.45, 3000.0),
+            AuctionPoint::new(924, 10.5, 3500.0), // +5.0% 持续放量
         ];
         let diag = evaluate_auction(pre_close, &points).expect("diagnosis");
         assert_eq!(diag.tag, AuctionTag::Snatching);
@@ -426,14 +601,69 @@ mod tests {
     fn detects_real_dumping() {
         let pre_close = 10.0;
         let points = vec![
-            AuctionPoint { time: 916, price: 9.7, volume: 1000.0 },
-            AuctionPoint { time: 919, price: 9.5, volume: 2000.0 },
-            AuctionPoint { time: 920, price: 9.4, volume: 2800.0 },
-            AuctionPoint { time: 924, price: 9.35, volume: 3200.0 }, // -6.5% 持续沉重
+            AuctionPoint::new(916, 9.7, 1000.0),
+            AuctionPoint::new(919, 9.5, 2000.0),
+            AuctionPoint::new(920, 9.4, 2800.0),
+            AuctionPoint::new(924, 9.35, 3200.0), // -6.5% 持续沉重
         ];
         let diag = evaluate_auction(pre_close, &points).expect("diagnosis");
         assert_eq!(diag.tag, AuctionTag::Dumping);
         assert_eq!(diag.label, "❄️ 真实抛压");
+    }
+
+    #[test]
+    fn calculates_matched_and_unmatched_volume_from_quote() {
+        let mut tracker = AuctionTracker::new();
+        // Quote at 09:18 with Bids: 1500手, Asks: 500手 (Excess Buy)
+        let q1 = Quote {
+            code: "sh600000".into(),
+            name: "浦发银行".into(),
+            price: 10.5,
+            pre_close: 10.0,
+            open: 0.0,
+            high: 0.0,
+            low: 0.0,
+            volume: 0.0,
+            bids: vec![(10.5, 1500.0)],
+            asks: vec![(10.5, 500.0)],
+            date: "20261015".into(),
+            time: "09:18:00".into(),
+            ..Default::default()
+        };
+        tracker.update_quote(Session::CallAuctionCancelable, &q1);
+        let data = tracker.data.get("sh600000").expect("auction data present");
+        assert_eq!(data.points.len(), 1);
+        let p = &data.points[0];
+        assert_eq!(p.time, 918);
+        assert_eq!(p.matched_volume, 500.0);
+        assert_eq!(p.unmatched_volume, 1000.0);
+        assert_eq!(p.unmatched_side, UnmatchedSide::Buy);
+        assert_eq!(p.volume, 1500.0);
+
+        // At 09:25: opening matched anchor
+        let q2 = Quote {
+            code: "sh600000".into(),
+            name: "浦发银行".into(),
+            price: 10.4,
+            pre_close: 10.0,
+            open: 10.4,
+            high: 10.4,
+            low: 10.4,
+            volume: 2000.0,
+            bids: vec![(10.4, 0.0)],
+            asks: vec![(10.4, 0.0)],
+            date: "20261015".into(),
+            time: "09:25:00".into(),
+            ..Default::default()
+        };
+        tracker.update_quote(Session::PreTrade, &q2);
+        let data = tracker.data.get("sh600000").expect("auction data present");
+        assert_eq!(data.points.len(), 2);
+        let p2 = &data.points[1];
+        assert_eq!(p2.time, 925);
+        assert_eq!(p2.matched_volume, 2000.0);
+        assert_eq!(p2.unmatched_volume, 0.0);
+        assert_eq!(p2.unmatched_side, UnmatchedSide::None);
     }
 
     #[test]
@@ -469,8 +699,8 @@ mod tests {
     fn cold_start_after_920_returns_normal_diagnosis() {
         let pre_close = 10.0;
         let points = vec![
-            AuctionPoint { time: 922, price: 10.3, volume: 2000.0 },
-            AuctionPoint { time: 924, price: 10.35, volume: 2500.0 },
+            AuctionPoint::new(922, 10.3, 2000.0),
+            AuctionPoint::new(924, 10.35, 2500.0),
         ];
         let diag = evaluate_auction(pre_close, &points).expect("diagnosis");
         assert_eq!(diag.tag, AuctionTag::Normal);

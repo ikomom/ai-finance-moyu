@@ -187,8 +187,6 @@ export function Widget() {
     onCleanup(() => window.clearTimeout(timer))
   })
 
-  createEffect(() => report())
-
   return (
     <div
       class="widget"

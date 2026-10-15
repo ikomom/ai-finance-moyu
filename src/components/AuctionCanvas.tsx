@@ -82,7 +82,8 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
         maxDev = Math.max(maxDev, Math.abs(p.price - preClose))
       }
     }
-    const maxVol = Math.max(10, ...points.map((p) => p.volume))
+    const pointTotalVol = (p: AuctionPoint) => (p.matchedVolume ?? p.volume) + (p.unmatchedVolume ?? 0)
+    const maxVol = Math.max(10, ...points.map(pointTotalVol))
 
     const yOfPrice = (price: number) => {
       const norm = (price - preClose) / (maxDev || 1)
@@ -129,16 +130,44 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
     ctx.stroke()
     ctx.restore()
 
-    // 5. Volume histogram in bottom section
+    // 5. Volume histogram in bottom section: Dual-layer stacked bar (matched + unmatched)
     for (const p of points) {
       const slot = slotOfAuctionTime(p.time)
       const x = xOfSlot(slot)
-      const barH = maxVol > 0 ? (p.volume / maxVol) * volH : 0
-      const barY = volT + volH - barH
-      const barColor = p.price >= preClose ? UP : DOWN
-      ctx.fillStyle = barColor
-      ctx.globalAlpha = 0.75
-      ctx.fillRect(x - 2.5, barY, 5, Math.max(1, barH))
+      const matchedVol = p.matchedVolume ?? p.volume
+      const unmatchedVol = p.unmatchedVolume ?? 0
+      const side = p.unmatchedSide ?? 'none'
+
+      const matchedH = maxVol > 0 ? (matchedVol / maxVol) * volH : 0
+      const unmatchedH = maxVol > 0 ? (unmatchedVol / maxVol) * volH : 0
+      const barW = 5
+      const barX = x - barW / 2
+
+      // Bottom solid bar: matched volume
+      if (matchedH > 0) {
+        const matchedY = volT + volH - matchedH
+        const matchedColor = p.price >= preClose ? UP : DOWN
+        ctx.fillStyle = matchedColor
+        ctx.globalAlpha = 0.85
+        ctx.fillRect(barX, matchedY, barW, Math.max(1, matchedH))
+      }
+
+      // Top extension bar: unmatched residual order volume
+      if (unmatchedH > 0) {
+        const unmatchedY = volT + volH - matchedH - unmatchedH
+        const sideColor = side === 'buy' ? UP : side === 'sell' ? DOWN : 'rgba(255, 255, 255, 0.45)'
+
+        // Semi-transparent hollow body
+        ctx.fillStyle = sideColor
+        ctx.globalAlpha = 0.28
+        ctx.fillRect(barX, unmatchedY, barW, Math.max(1, unmatchedH))
+
+        // Crisp 1px outline
+        ctx.strokeStyle = sideColor
+        ctx.lineWidth = 1
+        ctx.globalAlpha = 0.85
+        ctx.strokeRect(barX + 0.5, unmatchedY + 0.5, barW - 1, Math.max(1, unmatchedH - 1))
+      }
       ctx.globalAlpha = 1.0
     }
 
@@ -250,9 +279,10 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
       }
     }
 
-    // 8. Hover Crosshair
+    // 8. Hover Crosshair & Interactive Probing
     if (hoverSlot() != null) {
-      const hx = xOfSlot(hoverSlot()!)
+      const hs = hoverSlot()!
+      const hx = xOfSlot(hs)
       ctx.save()
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
       ctx.setLineDash([2, 2])
@@ -261,6 +291,24 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
       ctx.lineTo(hx, volT + volH)
       ctx.stroke()
       ctx.restore()
+
+      // Highlight the hovered point on the price curve
+      const hp = points.find((p) => slotOfAuctionTime(p.time) === hs)
+      if (hp) {
+        const hy = yOfPrice(hp.price)
+        const pColor = hp.price >= preClose ? UP : DOWN
+        ctx.save()
+        ctx.fillStyle = pColor
+        ctx.beginPath()
+        ctx.arc(hx, hy, 4, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.arc(hx, hy, 4, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.restore()
+      }
     }
 
     // 9. Scales & Axis Labels

@@ -288,7 +288,18 @@ export function Mini(props: { flash: boolean }) {
             }
             if (activeMode() === 'auction') {
               const ap = hoveredAuctionPoint()
-              return ap ? `量 ${Math.round(ap.volume)}手` : null
+              if (!ap) return null
+              const m = ap.matchedVolume ?? ap.volume
+              const u = ap.unmatchedVolume ?? 0
+              const side = ap.unmatchedSide ?? 'none'
+              if (u > 0 && side !== 'none') {
+                const sideText = side === 'buy' ? '买剩' : '卖剩'
+                return `撮合 ${fmtVol(m)}手 · ${sideText} ${fmtVol(u)}手`
+              }
+              if (m > 0) {
+                return `撮合 ${fmtVol(m)}手 (完全撮合)`
+              }
+              return `量 ${fmtVol(ap.volume)}手`
             }
             const hpe = hoveredPointExtra()
             if (hpe) {

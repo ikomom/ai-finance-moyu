@@ -303,13 +303,22 @@ export interface Trend {
   points: TrendPoint[]
 }
 
+export type UnmatchedSide = 'none' | 'buy' | 'sell'
+
 export type AuctionTag = 'normal' | 'bull_trap' | 'bear_trap' | 'snatching' | 'dumping'
 
 export interface AuctionPoint {
   /** 24h format HHMM, e.g. 915, 918, 920. */
   time: number
   price: number
+  /** Total volume (matched + unmatched) in 手. */
   volume: number
+  /** Matched volume in 手. */
+  matchedVolume?: number
+  /** Unmatched residual order volume in 手. */
+  unmatchedVolume?: number
+  /** Direction of unmatched order volume: 'none' | 'buy' | 'sell'. */
+  unmatchedSide?: UnmatchedSide
 }
 
 export interface AuctionDiagnosis {
@@ -453,4 +462,11 @@ export function trendClass(changePct: number): string {
 /** Check if symbol represents an index (no individual call auction or VWAP) */
 export function isIndexCode(code: string): boolean {
   return code.startsWith('sh000') || code.startsWith('sz399') || code.startsWith('bj899')
+}
+
+export interface LogEntry {
+  timestamp: string
+  level: string
+  target: string
+  message: string
 }
