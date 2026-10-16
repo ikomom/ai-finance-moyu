@@ -804,7 +804,7 @@ export function Settings() {
                           checked={form.anomalyAlerts?.limitBoard ?? true}
                           onChange={(e) => setForm('anomalyAlerts', 'limitBoard', e.currentTarget.checked)}
                         />
-                        <span>🔴 接近涨跌停 / 涨停炸板提醒（逼近涨停或封板后开板）</span>
+                        <span>🔴 涨跌停全周期监控（逼近/封板/封单松动预警/开板炸板/跌停翘板）</span>
                       </label>
                     </div>
                   </div>

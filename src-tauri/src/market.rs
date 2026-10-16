@@ -148,6 +148,34 @@ pub fn is_index(code: &str) -> bool {
     s.starts_with("sh000") || s.starts_with("sz399") || s.starts_with("bj899")
 }
 
+/// Calculate A-share daily upper and lower price limits (涨停价, 跌停价) based on pre_close.
+/// Rules:
+/// - ChiNext (sz30*) & STAR Market (sh68*): ±20%
+/// - Beijing Stock Exchange (bj8*, bj43*, bj92*): ±30%
+/// - ST securities (name contains "ST"): ±5%
+/// - Main Board (sh60*, sz00*): ±10%
+/// Prices are rounded to 2 decimal places according to exchange rules.
+pub fn calculate_limit_prices(code: &str, name: &str, pre_close: f64) -> Option<(f64, f64)> {
+    if pre_close <= 0.0 {
+        return None;
+    }
+    let is_gem_or_star = code.starts_with("sz30") || code.starts_with("sh68");
+    let is_bse = code.starts_with("bj8") || code.starts_with("bj43") || code.starts_with("bj92");
+    let is_st = name.contains("ST");
+    let ratio = if is_bse {
+        0.30
+    } else if is_gem_or_star {
+        0.20
+    } else if is_st {
+        0.05
+    } else {
+        0.10
+    };
+    let up_price = ((pre_close * (1.0 + ratio) * 100.0).round()) / 100.0;
+    let down_price = ((pre_close * (1.0 - ratio) * 100.0).round()) / 100.0;
+    Some((up_price, down_price))
+}
+
 /// Current Beijing time (UTC+8). A-share markets strictly operate under China Standard Time.
 pub fn beijing_now() -> NaiveDateTime {
     let beijing = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
@@ -324,5 +352,40 @@ mod tests {
         assert_eq!(elapsed_trading_minutes_at_minute(900), 240.0);
         // 16:00 -> 240.0 mins
         assert_eq!(elapsed_trading_minutes_at_minute(960), 240.0);
+    }
+
+    #[test]
+    fn test_calculate_limit_prices() {
+        // Main Board 10%
+        let (up, down) = calculate_limit_prices("sh600000", "浦发银行", 10.00).unwrap();
+        assert_eq!(up, 11.00);
+        assert_eq!(down, 9.00);
+
+        // Main Board rounding to cent
+        let (up2, down2) = calculate_limit_prices("sz000001", "平安银行", 9.45).unwrap();
+        assert_eq!(up2, 10.40);
+        assert_eq!(down2, 8.50);
+
+        // ChiNext (20%)
+        let (up_gem, down_gem) = calculate_limit_prices("sz300750", "宁德时代", 200.00).unwrap();
+        assert_eq!(up_gem, 240.00);
+        assert_eq!(down_gem, 160.00);
+
+        // STAR Market (20%)
+        let (up_star, down_star) = calculate_limit_prices("sh688981", "中芯国际", 50.00).unwrap();
+        assert_eq!(up_star, 60.00);
+        assert_eq!(down_star, 40.00);
+
+        // BSE (30%)
+        let (up_bse, down_bse) = calculate_limit_prices("bj830799", "艾融软件", 20.00).unwrap();
+        assert_eq!(up_bse, 26.00);
+        assert_eq!(down_bse, 14.00);
+
+        // ST (5%)
+        let (up_st, down_st) = calculate_limit_prices("sh600123", "*ST测试", 5.00).unwrap();
+        assert_eq!(up_st, 5.25);
+        assert_eq!(down_st, 4.75);
+
+        assert!(calculate_limit_prices("sh600000", "无效", 0.0).is_none());
     }
 }

@@ -118,15 +118,23 @@ pub struct WatchSpec {
     pub price_lines: Vec<PriceLine>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LimitBoardKind {
-    /// 触及/逼近涨停
+    /// 触及/逼近涨停 (盘口接近涨停但尚未封死)
     NearLimitUp,
+    /// 封死涨停 (卖一吃空，买一封单)
+    SealedLimitUp { seal_hands: f64 },
+    /// 涨停封单松动 (买一封单较峰值骤降 >= 60%，炸板前兆)
+    SealLoosening { peak_hands: f64, current_hands: f64, drop_pct: f64 },
+    /// 涨停炸板 (曾封死涨停，后被大单砸开)
+    BrokenLimitUp,
     /// 触及/逼近跌停
     NearLimitDown,
-    /// 涨停炸板 (打开涨停)
-    BrokenLimitUp,
+    /// 封死跌停 (买一吃空，卖一封单)
+    SealedLimitDown { seal_hands: f64 },
+    /// 跌停撬板 (曾封死跌停，后被大资金撬开反弹)
+    BrokenLimitDown,
 }
 
 /// Something that just crossed a threshold or triggered an anomaly.
@@ -222,8 +230,18 @@ impl CrossingEvent {
             CrossingEvent::LimitBoard { board_kind, price, change_pct, .. } => {
                 match board_kind {
                     LimitBoardKind::NearLimitUp => format!("{name} 🔴 逼近涨停！现价 {price:.2} ({change_pct:+.2}%)"),
-                    LimitBoardKind::NearLimitDown => format!("{name} 🟢 逼近跌停！现价 {price:.2} ({change_pct:+.2}%)"),
+                    LimitBoardKind::SealedLimitUp { seal_hands } => {
+                        format!("{name} 🔒 封死涨停！封单 {seal_hands:.0} 手，现价 {price:.2} ({change_pct:+.2}%)")
+                    }
+                    LimitBoardKind::SealLoosening { peak_hands, current_hands, drop_pct } => {
+                        format!("{name} ⚡ 涨停封单骤降！从 {peak_hands:.0} 手降至 {current_hands:.0} 手 (-{drop_pct:.0}%)，谨防开板！")
+                    }
                     LimitBoardKind::BrokenLimitUp => format!("{name} ⚠️ 涨停炸板！开板回落至 {change_pct:+.2}%，现价 {price:.2}"),
+                    LimitBoardKind::NearLimitDown => format!("{name} 🟢 逼近跌停！现价 {price:.2} ({change_pct:+.2}%)"),
+                    LimitBoardKind::SealedLimitDown { seal_hands } => {
+                        format!("{name} 🔒 封死跌停！封单 {seal_hands:.0} 手，现价 {price:.2} ({change_pct:+.2}%)")
+                    }
+                    LimitBoardKind::BrokenLimitDown => format!("{name} 🚀 跌停翘板！开板回升至 {change_pct:+.2}%，现价 {price:.2}"),
                 }
             }
         }
@@ -237,6 +255,16 @@ struct QuoteSample {
     volume: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BoardState {
+    #[default]
+    Normal,
+    NearLimitUp,
+    SealedLimitUp,
+    NearLimitDown,
+    SealedLimitDown,
+}
+
 #[derive(Debug, Clone, Default)]
 struct SecurityIntradayState {
     samples: Vec<QuoteSample>,
@@ -244,7 +272,11 @@ struct SecurityIntradayState {
     alert_high_anchor: Option<f64>,
     session_low: Option<f64>,
     alert_low_anchor: Option<f64>,
-    had_hit_limit_up: bool,
+    board_state: BoardState,
+    had_been_sealed_up: bool,
+    had_been_sealed_down: bool,
+    peak_seal_vol: f64,
+    seal_loosening_warned: bool,
     initialized: bool,
     last_surge_price: Option<f64>,
     last_drop_price: Option<f64>,
@@ -457,20 +489,48 @@ impl CrossingTracker {
                 price: quote.price,
                 volume: quote.volume,
             });
-            let is_gem_or_star = quote.code.starts_with("sz30") || quote.code.starts_with("sh68");
-            let is_bse = quote.code.starts_with("bj8") || quote.code.starts_with("bj43") || quote.code.starts_with("bj92");
-            let is_st = quote.name.contains("ST");
-            let up_limit = if is_bse {
-                28.5
-            } else if is_gem_or_star {
-                19.0
-            } else if is_st {
-                4.8
-            } else {
-                9.6
-            };
-            if quote.change_pct >= up_limit {
-                state.had_hit_limit_up = true;
+            let is_ipo_unrestricted = quote.name.starts_with('N') || quote.name.starts_with('C');
+            if !is_ipo_unrestricted {
+                if let Some((up_price, down_price)) = crate::market::calculate_limit_prices(&quote.code, &quote.name, quote.pre_close) {
+                    let is_at_up_price = (quote.price - up_price).abs() < 0.005 || quote.price > up_price;
+                    let is_at_down_price = (quote.price - down_price).abs() < 0.005 || quote.price < down_price;
+                    let b1_vol = quote.bids.first().map(|b| b.1).unwrap_or(0.0);
+                    let a1_vol = quote.asks.first().map(|a| a.1).unwrap_or(0.0);
+                    let has_depth = !quote.bids.is_empty() || !quote.asks.is_empty();
+                    let asks_empty = quote.asks.is_empty()
+                        || quote.asks[0].0 <= 0.0
+                        || quote.asks[0].1 <= 0.0
+                        || quote.asks[0].0 > up_price;
+                    let bids_empty = quote.bids.is_empty()
+                        || quote.bids[0].0 <= 0.0
+                        || quote.bids[0].1 <= 0.0
+                        || quote.bids[0].0 < down_price;
+
+                    let is_sealed_up = if has_depth {
+                        is_at_up_price && asks_empty && b1_vol > 0.0
+                    } else {
+                        is_at_up_price
+                    };
+
+                    let is_sealed_down = if has_depth {
+                        is_at_down_price && bids_empty && a1_vol > 0.0
+                    } else {
+                        is_at_down_price
+                    };
+
+                    if is_sealed_up {
+                        state.board_state = BoardState::SealedLimitUp;
+                        state.had_been_sealed_up = true;
+                        state.peak_seal_vol = b1_vol;
+                    } else if is_at_up_price || quote.price >= (up_price * 0.995).min(up_price - 0.02) {
+                        state.board_state = BoardState::NearLimitUp;
+                    } else if is_sealed_down {
+                        state.board_state = BoardState::SealedLimitDown;
+                        state.had_been_sealed_down = true;
+                    } else if is_at_down_price || quote.price <= (down_price * 1.005).max(down_price + 0.02) {
+                        state.board_state = BoardState::NearLimitDown;
+                    }
+                }
             }
             return events;
         }
@@ -643,56 +703,174 @@ impl CrossingTracker {
             }
         }
 
-        // 4. 接近涨跌停与涨停炸板 (Limit board & Broken limit)
+        // 4. 精确四层涨跌停状态机：逼近 -> 封死 -> 封单松动预警 -> 真实炸板/翘板
         let is_ipo_unrestricted = quote.name.starts_with('N') || quote.name.starts_with('C');
         if anomaly_cfg.limit_board && !is_ipo_unrestricted {
-            let is_gem_or_star = quote.code.starts_with("sz30") || quote.code.starts_with("sh68");
-            let is_bse = quote.code.starts_with("bj8") || quote.code.starts_with("bj43") || quote.code.starts_with("bj92");
-            let is_st = quote.name.contains("ST");
-            let up_limit = if is_bse {
-                28.5
-            } else if is_gem_or_star {
-                19.0
-            } else if is_st {
-                4.8
-            } else {
-                9.6
-            };
-            let down_limit = -up_limit;
+            if let Some((up_price, down_price)) = crate::market::calculate_limit_prices(&quote.code, &quote.name, quote.pre_close) {
+                let is_at_up_price = (quote.price - up_price).abs() < 0.005 || quote.price > up_price;
+                let is_at_down_price = (quote.price - down_price).abs() < 0.005 || quote.price < down_price;
 
-            if quote.change_pct >= up_limit {
-                state.had_hit_limit_up = true;
-                let key = format!("{}:limit_up", spec.code);
-                if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
-                    events.push(CrossingEvent::LimitBoard {
-                        code: spec.code.clone(),
-                        board_kind: LimitBoardKind::NearLimitUp,
-                        price: quote.price,
-                        change_pct: quote.change_pct,
-                    });
-                }
-            } else if state.had_hit_limit_up && quote.change_pct < (up_limit - 0.8) {
-                state.had_hit_limit_up = false;
-                let key = format!("{}:broken_limit_up", spec.code);
-                if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
-                    events.push(CrossingEvent::LimitBoard {
-                        code: spec.code.clone(),
-                        board_kind: LimitBoardKind::BrokenLimitUp,
-                        price: quote.price,
-                        change_pct: quote.change_pct,
-                    });
-                }
-            }
+                let b1_vol = quote.bids.first().map(|b| b.1).unwrap_or(0.0);
+                let a1_vol = quote.asks.first().map(|a| a.1).unwrap_or(0.0);
 
-            if quote.change_pct <= down_limit {
-                let key = format!("{}:limit_down", spec.code);
-                if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
-                    events.push(CrossingEvent::LimitBoard {
-                        code: spec.code.clone(),
-                        board_kind: LimitBoardKind::NearLimitDown,
-                        price: quote.price,
-                        change_pct: quote.change_pct,
-                    });
+                let has_depth = !quote.bids.is_empty() || !quote.asks.is_empty();
+                let asks_empty = quote.asks.is_empty()
+                    || quote.asks[0].0 <= 0.0
+                    || quote.asks[0].1 <= 0.0
+                    || quote.asks[0].0 > up_price;
+                let bids_empty = quote.bids.is_empty()
+                    || quote.bids[0].0 <= 0.0
+                    || quote.bids[0].1 <= 0.0
+                    || quote.bids[0].0 < down_price;
+
+                // 真实封板判定：现价在涨停价，且卖盘被吃空且买一有挂单 (若无盘口深度则按触及涨停价)
+                let is_sealed_up = if has_depth {
+                    is_at_up_price && asks_empty && b1_vol > 0.0
+                } else {
+                    is_at_up_price
+                };
+
+                let is_sealed_down = if has_depth {
+                    is_at_down_price && bids_empty && a1_vol > 0.0
+                } else {
+                    is_at_down_price
+                };
+
+                // --- 涨停侧处理 ---
+                if is_sealed_up {
+                    if state.board_state != BoardState::SealedLimitUp {
+                        // 首次封板或重封涨停
+                        state.board_state = BoardState::SealedLimitUp;
+                        state.had_been_sealed_up = true;
+                        state.peak_seal_vol = b1_vol;
+                        state.seal_loosening_warned = false;
+
+                        let key = format!("{}:sealed_limit_up", spec.code);
+                        if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
+                            events.push(CrossingEvent::LimitBoard {
+                                code: spec.code.clone(),
+                                board_kind: LimitBoardKind::SealedLimitUp { seal_hands: b1_vol },
+                                price: quote.price,
+                                change_pct: quote.change_pct,
+                            });
+                        }
+                    } else {
+                        // 维持封板中，追踪买一封单量
+                        if b1_vol > state.peak_seal_vol {
+                            state.peak_seal_vol = b1_vol;
+                            state.seal_loosening_warned = false; // 封单创新高，重新武装预警
+                        } else if state.peak_seal_vol >= 1000.0 && b1_vol <= state.peak_seal_vol * 0.4 && !state.seal_loosening_warned {
+                            // 封单较峰值骤降 >= 60%
+                            state.seal_loosening_warned = true;
+                            let drop_pct = ((state.peak_seal_vol - b1_vol) / state.peak_seal_vol * 100.0).round();
+                            let key = format!("{}:seal_loosening", spec.code);
+                            if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(180), &key, now) {
+                                events.push(CrossingEvent::LimitBoard {
+                                    code: spec.code.clone(),
+                                    board_kind: LimitBoardKind::SealLoosening {
+                                        peak_hands: state.peak_seal_vol,
+                                        current_hands: b1_vol,
+                                        drop_pct,
+                                    },
+                                    price: quote.price,
+                                    change_pct: quote.change_pct,
+                                });
+                            }
+                        } else if b1_vol >= state.peak_seal_vol * 0.9 {
+                            // 重新补量回血，重新武装
+                            state.seal_loosening_warned = false;
+                        }
+                    }
+                } else if state.had_been_sealed_up && (!is_at_up_price || (has_depth && !asks_empty)) {
+                    // 曾封死涨停，现在被大单砸开或跌破涨停价 -> 真实涨停炸板！
+                    state.had_been_sealed_up = false;
+                    state.board_state = BoardState::NearLimitUp;
+                    state.seal_loosening_warned = false;
+                    state.peak_seal_vol = 0.0;
+
+                    let key = format!("{}:broken_limit_up", spec.code);
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
+                        events.push(CrossingEvent::LimitBoard {
+                            code: spec.code.clone(),
+                            board_kind: LimitBoardKind::BrokenLimitUp,
+                            price: quote.price,
+                            change_pct: quote.change_pct,
+                        });
+                    }
+                } else {
+                    // 未封死涨停状态
+                    let near_up_threshold = (up_price * 0.995).min(up_price - 0.02);
+                    if quote.price >= near_up_threshold && !is_at_up_price {
+                        if state.board_state == BoardState::Normal {
+                            state.board_state = BoardState::NearLimitUp;
+                            let key = format!("{}:near_limit_up", spec.code);
+                            if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(600), &key, now) {
+                                events.push(CrossingEvent::LimitBoard {
+                                    code: spec.code.clone(),
+                                    board_kind: LimitBoardKind::NearLimitUp,
+                                    price: quote.price,
+                                    change_pct: quote.change_pct,
+                                });
+                            }
+                        }
+                    } else if quote.price < up_price * 0.97 {
+                        // 跌出逼近区间，重置为 Normal
+                        if state.board_state == BoardState::NearLimitUp {
+                            state.board_state = BoardState::Normal;
+                        }
+                    }
+                }
+
+                // --- 跌停侧处理 ---
+                if is_sealed_down {
+                    if state.board_state != BoardState::SealedLimitDown {
+                        state.board_state = BoardState::SealedLimitDown;
+                        state.had_been_sealed_down = true;
+
+                        let key = format!("{}:sealed_limit_down", spec.code);
+                        if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
+                            events.push(CrossingEvent::LimitBoard {
+                                code: spec.code.clone(),
+                                board_kind: LimitBoardKind::SealedLimitDown { seal_hands: a1_vol },
+                                price: quote.price,
+                                change_pct: quote.change_pct,
+                            });
+                        }
+                    }
+                } else if state.had_been_sealed_down && (!is_at_down_price || (has_depth && !bids_empty)) {
+                    // 曾封死跌停，现在大单撬开跌停板 -> 跌停撬板！
+                    state.had_been_sealed_down = false;
+                    state.board_state = BoardState::NearLimitDown;
+
+                    let key = format!("{}:broken_limit_down", spec.code);
+                    if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(300), &key, now) {
+                        events.push(CrossingEvent::LimitBoard {
+                            code: spec.code.clone(),
+                            board_kind: LimitBoardKind::BrokenLimitDown,
+                            price: quote.price,
+                            change_pct: quote.change_pct,
+                        });
+                    }
+                } else {
+                    let near_down_threshold = (down_price * 1.005).max(down_price + 0.02);
+                    if quote.price <= near_down_threshold && !is_at_down_price {
+                        if state.board_state == BoardState::Normal {
+                            state.board_state = BoardState::NearLimitDown;
+                            let key = format!("{}:near_limit_down", spec.code);
+                            if Self::check_cooldown(&mut self.last_fired, Duration::from_secs(600), &key, now) {
+                                events.push(CrossingEvent::LimitBoard {
+                                    code: spec.code.clone(),
+                                    board_kind: LimitBoardKind::NearLimitDown,
+                                    price: quote.price,
+                                    change_pct: quote.change_pct,
+                                });
+                            }
+                        }
+                    } else if quote.price > down_price * 1.03 {
+                        if state.board_state == BoardState::NearLimitDown {
+                            state.board_state = BoardState::Normal;
+                        }
+                    }
                 }
             }
         }
@@ -1030,15 +1208,65 @@ mod tests {
         let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
         t.update_quote_at(&s, &q0, &cfg, t0);
 
-        // Limit up at +9.8% -> fires near limit up
-        let q1 = mock_quote("sh600000", 10.98, 9.8, 5000.0);
+        // 1. Approaches limit up at +9.8% (10.98, near 11.00) -> fires NearLimitUp
+        let mut q1 = mock_quote("sh600000", 10.98, 9.8, 5000.0);
+        q1.bids = vec![(10.98, 2000.0)];
+        q1.asks = vec![(11.00, 1500.0)]; // Ask still exists -> NOT sealed yet
         let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(5));
         assert!(evs.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::NearLimitUp, .. })));
 
-        // Falls back to +8.5% -> fires broken limit up (炸板)
-        let q2 = mock_quote("sh600000", 10.85, 8.5, 6000.0);
-        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(10));
+        // 2. High-level oscillation (未封死高位震荡) -> does NOT spam NearLimitUp
+        let mut q1_repeat = mock_quote("sh600000", 10.97, 9.7, 5200.0);
+        q1_repeat.bids = vec![(10.97, 2100.0)];
+        q1_repeat.asks = vec![(11.00, 1200.0)];
+        let evs_repeat = t.update_quote_at(&s, &q1_repeat, &cfg, t0 + Duration::from_secs(8));
+        assert!(evs_repeat.is_empty(), "High oscillation without sealing should NOT spam alerts");
+
+        // 3. Actually locks limit up at 11.00 (卖一吃空，买一封死 10,000 手) -> fires SealedLimitUp
+        let mut q_seal = mock_quote("sh600000", 11.00, 10.0, 8000.0);
+        q_seal.bids = vec![(11.00, 10000.0)];
+        q_seal.asks = vec![];
+        let evs_seal = t.update_quote_at(&s, &q_seal, &cfg, t0 + Duration::from_secs(12));
+        assert!(evs_seal.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::SealedLimitUp { seal_hands: 10000.0 }, .. })));
+
+        // 4. Seal loosening: Buy 1 drops to 3000 hands (-70%) -> fires SealLoosening
+        let mut q_loose = mock_quote("sh600000", 11.00, 10.0, 9500.0);
+        q_loose.bids = vec![(11.00, 3000.0)];
+        q_loose.asks = vec![];
+        let evs_loose = t.update_quote_at(&s, &q_loose, &cfg, t0 + Duration::from_secs(16));
+        assert!(evs_loose.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::SealLoosening { .. }, .. })));
+
+        // 5. Falls back below limit up -> fires BrokenLimitUp (真实涨停炸板)
+        let mut q2 = mock_quote("sh600000", 10.85, 8.5, 12000.0);
+        q2.bids = vec![(10.85, 1000.0)];
+        q2.asks = vec![(10.86, 2000.0)];
+        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(20));
         assert!(evs2.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::BrokenLimitUp, .. })));
+    }
+
+    #[test]
+    fn unsealed_pullback_does_not_fire_broken_limit() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
+        t.update_quote_at(&s, &q0, &cfg, t0);
+
+        // Stock touches 10.96 (+9.6%) with active asks (not sealed)
+        let mut q1 = mock_quote("sh600000", 10.96, 9.6, 2000.0);
+        q1.bids = vec![(10.96, 500.0)];
+        q1.asks = vec![(10.97, 1000.0)];
+        let evs1 = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(5));
+        assert!(evs1.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::NearLimitUp, .. })));
+
+        // Stock pulls back to 10.80 (+8.0%) -> was NEVER sealed, so MUST NOT fire BrokenLimitUp!
+        let mut q2 = mock_quote("sh600000", 10.80, 8.0, 2500.0);
+        q2.bids = vec![(10.80, 500.0)];
+        q2.asks = vec![(10.81, 1000.0)];
+        let evs2 = t.update_quote_at(&s, &q2, &cfg, t0 + Duration::from_secs(10));
+        assert!(!evs2.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::BrokenLimitUp, .. })), "Unsealed stock must NEVER fire broken limit alert");
     }
 
     #[test]
