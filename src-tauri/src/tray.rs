@@ -4,7 +4,7 @@
 use tauri::{
     menu::{CheckMenuItemBuilder, ContextMenu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, AppHandle, Manager,
+    App, AppHandle, Emitter, Manager,
 };
 
 use crate::config;
@@ -30,6 +30,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
     let sep_mode = tauri::menu::PredefinedMenuItem::separator(app)?;
 
     let settings = MenuItemBuilder::with_id("settings", "设置…").build(app)?;
+    let check_update = MenuItemBuilder::with_id("check_update", "检查更新…").build(app)?;
     let sep_settings = tauri::menu::PredefinedMenuItem::separator(app)?;
 
     let autostart = CheckMenuItemBuilder::with_id("autostart", "开机自启")
@@ -40,8 +41,8 @@ pub fn build(app: &App) -> tauri::Result<()> {
 
     let menu = MenuBuilder::new(app)
         .items(&[
-            &toggle, &refresh, &sep1, &bar, &mini, &list, &market, &sep2, &mode_sub, &sep_mode, &settings, &sep_settings,
-            &autostart, &sep3, &quit,
+            &toggle, &refresh, &sep1, &bar, &mini, &list, &market, &sep2, &mode_sub, &sep_mode, &settings,
+            &check_update, &sep_settings, &autostart, &sep3, &quit,
         ])
         .build()?;
 
@@ -82,6 +83,12 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
             if let Err(e) = crate::open_settings(app) {
                 log::warn!(target: "SYSTEM", "打开设置窗口失败: {e}");
             }
+        }
+        "check_update" => {
+            if let Err(e) = crate::open_settings(app) {
+                log::warn!(target: "SYSTEM", "打开设置窗口失败: {e}");
+            }
+            let _ = app.emit("trigger-check-update", ());
         }
         "quit" => app.exit(0),
         "refresh" => {

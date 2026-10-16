@@ -99,10 +99,14 @@ pub struct LayoutSizes {
 /// True when no layout has a user-set size, so the whole map can be left out of
 /// the config file rather than serializing as an empty object.
 fn sizes_are_empty(s: &LayoutSizes) -> bool {
-    s.bar.is_none() && s.mini.is_none() && s.list.is_none() && s.market.is_none()
+    s.is_empty()
 }
 
 impl LayoutSizes {
+    pub fn is_empty(&self) -> bool {
+        self.bar.is_none() && self.mini.is_none() && self.list.is_none() && self.market.is_none()
+    }
+
     pub fn get(&self, layout: Layout) -> Option<(f64, f64)> {
         let v = match layout {
             Layout::Bar => self.bar,
@@ -368,19 +372,19 @@ impl Config {
         for layout in [Layout::Bar, Layout::Mini, Layout::List, Layout::Market] {
             if let Some((w, h)) = self.layout_sizes.get(layout) {
                 if layout == Layout::Bar {
-                    if w < 140.0 || w > 900.0 || !w.is_finite() {
+                    if w < 140.0 || w > 1400.0 || !w.is_finite() {
                         self.layout_sizes.clear(Layout::Bar);
                     } else {
                         // Bar is strictly a 32px horizontal pill; fix any legacy heights.
-                        self.layout_sizes.set(Layout::Bar, w, 32.0);
+                        self.layout_sizes.set(Layout::Bar, w.clamp(180.0, 1400.0), 32.0);
                     }
                     continue;
                 }
                 let (max_w, max_h) = match layout {
-                    Layout::Bar => (900.0, 32.0),
-                    Layout::Mini => (500.0, 320.0),
-                    Layout::List => (700.0, 900.0),
-                    Layout::Market => (500.0, 450.0),
+                    Layout::Bar => (1400.0, 32.0),
+                    Layout::Mini => (1200.0, 900.0),
+                    Layout::List => (1400.0, 1200.0),
+                    Layout::Market => (1200.0, 900.0),
                 };
                 if !w.is_finite() || !h.is_finite() || w < 140.0 || h < 24.0 || w > max_w || h > max_h {
                     self.layout_sizes.clear(layout);

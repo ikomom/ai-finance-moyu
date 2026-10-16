@@ -4,6 +4,10 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import { WatchEditor } from './components/WatchEditor'
+import { UpdateModal } from './components/UpdateModal'
+import { checkAppUpdate, setSkippedVersion, type CheckResult } from './services/updater'
+import { listen } from '@tauri-apps/api/event'
+import { getVersion } from '@tauri-apps/api/app'
 import type { Config, DataSource, Layout, LogEntry, PriceLine, Snapshot, VisibilityMode, WatchItem } from './types'
 
 type TabKey = 'watchlist' | 'appearance' | 'alerts' | 'system' | 'logs'
@@ -48,6 +52,12 @@ const [msg, setMsg] = createSignal<{ text: string; kind: '' | 'ok' | 'bad' }>({
   text: '',
   kind: '',
 })
+
+const [currentAppVersion, setCurrentAppVersion] = createSignal('0.1.0')
+const [updateResult, setUpdateResult] = createSignal<CheckResult | null>(null)
+const [isCheckingUpdate, setIsCheckingUpdate] = createSignal(false)
+const [isUpdateModalOpen, setIsUpdateModalOpen] = createSignal(false)
+const [updateCheckMsg, setUpdateCheckMsg] = createSignal('')
 
 const TABS: Array<{ id: TabKey; label: string; icon: string; desc: string }> = [
   { id: 'watchlist', label: '自选标的', icon: '📊', desc: '数据源与股票池' },
@@ -162,7 +172,65 @@ export function Settings() {
     } catch (e) {
       setMsg({ text: `读取配置失败：${e}`, kind: 'bad' })
     }
+
+    getVersion().then((v) => setCurrentAppVersion(v)).catch(() => {})
+
+    let unlistenTray: (() => void) | undefined
+    listen('trigger-check-update', () => {
+      setActiveTab('system')
+      void handleManualCheckUpdate()
+    }).then((unlisten) => {
+      unlistenTray = unlisten
+    })
+    onCleanup(() => {
+      if (unlistenTray) unlistenTray()
+    })
+
+    const bgTimer = setTimeout(async () => {
+      try {
+        const res = await checkAppUpdate(false)
+        setUpdateResult(res)
+        if (res.hasUpdate) {
+          setUpdateCheckMsg(`发现新版本 v${res.newVersion}`)
+        }
+      } catch {
+        // 静默检查网络故障不打扰用户
+      }
+    }, 5000)
+    onCleanup(() => clearTimeout(bgTimer))
   })
+
+  const handleOpenReleasePage = async () => {
+    const url = 'https://github.com/ikomom/ai-finance-moyu/releases/latest'
+    try {
+      await invoke('open_url', { url })
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
+
+  const handleManualCheckUpdate = async () => {
+    if (isCheckingUpdate()) return
+    setIsCheckingUpdate(true)
+    setUpdateCheckMsg('正在检查更新…')
+    try {
+      const res = await checkAppUpdate(true)
+      setUpdateResult(res)
+      if (res.hasUpdate) {
+        setUpdateCheckMsg(`发现新版本 v${res.newVersion}`)
+        setIsUpdateModalOpen(true)
+      } else {
+        setUpdateCheckMsg(`当前已是最新版本 (v${res.currentVersion})`)
+        say(`当前已是最新版本 (v${res.currentVersion})`, 'ok')
+      }
+    } catch (err) {
+      const errorStr = err instanceof Error ? err.message : String(err)
+      setUpdateCheckMsg(`检查更新异常`)
+      say(`检查更新失败：${errorStr}`, 'bad')
+    } finally {
+      setIsCheckingUpdate(false)
+    }
+  }
 
   const updateItem = (i: number, patch: Partial<WatchItem>) => setForm('watchlist', i, patch)
   const addItem = () => setForm('watchlist', (list) => [...list, { code: '', priceLines: [] }])
@@ -297,10 +365,11 @@ export function Settings() {
 
   const sizesText = () => {
     const s = form.layoutSizes ?? {}
-    return (['bar', 'mini', 'list'] as const)
+    return (['bar', 'mini', 'list', 'market'] as const)
       .map((k) => {
         const v = s[k]
-        return `${k === 'bar' ? '数字条' : k === 'mini' ? '迷你图' : '列表'} ${v ? `${Math.round(v[0])}×${Math.round(v[1])}` : '自动'}`
+        const name = k === 'bar' ? '数字条' : k === 'mini' ? '迷你图' : k === 'list' ? '列表' : '大盘全景'
+        return `${name} ${v ? `${Math.round(v[0])}×${Math.round(v[1])}` : '默认'}`
       })
       .join(' · ')
   }
@@ -337,6 +406,26 @@ export function Settings() {
                 )}
               </For>
             </nav>
+
+            {/* Sidebar Footer with Version & Check Update */}
+            <div class="sidebar-footer">
+              <div class="version-status-row">
+                <span class="version-label">
+                  v{currentAppVersion()}
+                  <Show when={updateResult()?.hasUpdate}>
+                    <span class="update-available-dot" title="有新版本可用" />
+                  </Show>
+                </span>
+                <button
+                  type="button"
+                  class="btn-check-update-sidebar"
+                  disabled={isCheckingUpdate()}
+                  onClick={() => void handleManualCheckUpdate()}
+                >
+                  {isCheckingUpdate() ? '检查中…' : updateResult()?.hasUpdate ? '发现新版' : '检查更新'}
+                </button>
+              </div>
+            </div>
           </aside>
 
           {/* Right Main Content Panel */}
@@ -867,6 +956,47 @@ export function Settings() {
                       <span>开机自动在后台启动挂件</span>
                     </label>
                   </div>
+
+                  <div class="card">
+                    <div class="card-title-row">
+                      <h2>版本与自动更新</h2>
+                      <span class="card-badge">正式发布通道</span>
+                    </div>
+                    <p class="hint">
+                      通过 GitHub Releases 官方通道获取最新构建与更新日志，支持应用内自动下载校验、一键安装与重启。
+                    </p>
+                    <div class="field" style={{ "margin-top": "12px" }}>
+                      <div class="inline" style={{ "justify-content": "space-between", "align-items": "center" }}>
+                        <div>
+                          <strong>当前运行版本：</strong>
+                          <span class="mono" style={{ "color": "#70aaff", "font-weight": "600" }}>v{currentAppVersion()}</span>
+                          <Show when={updateCheckMsg()}>
+                            <span class="muted" style={{ "margin-left": "14px", "font-size": "12px" }}>
+                              {updateCheckMsg()}
+                            </span>
+                          </Show>
+                        </div>
+                        <div class="inline" style={{ "gap": "8px" }}>
+                          <button
+                            type="button"
+                            class="ghost"
+                            onClick={() => void handleOpenReleasePage()}
+                          >
+                            🌐 发布页面
+                          </button>
+                          <button
+                            type="button"
+                            class="btn-primary"
+                            style={{ "padding": "5px 12px", "font-size": "12px" }}
+                            disabled={isCheckingUpdate()}
+                            onClick={() => void handleManualCheckUpdate()}
+                          >
+                            {isCheckingUpdate() ? '🔄 检查中…' : '🔄 检查更新'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </Show>
 
@@ -1013,6 +1143,18 @@ export function Settings() {
           </section>
         </div>
       </Show>
+
+      <UpdateModal
+        isOpen={isUpdateModalOpen()}
+        update={updateResult()?.update ?? null}
+        currentVersion={currentAppVersion()}
+        onClose={() => setIsUpdateModalOpen(false)}
+        onSkipVersion={(v) => {
+          setSkippedVersion(v)
+          setUpdateResult((prev) => (prev ? { ...prev, hasUpdate: false } : null))
+          say(`已跳过版本 v${v}，可在设置面板中重新检查`, 'ok')
+        }}
+      />
     </div>
   )
 }

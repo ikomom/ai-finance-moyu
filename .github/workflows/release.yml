@@ -52,14 +52,20 @@ jobs:
       - name: Build Frontend
         run: npm run build
 
+      - name: Extract Release Notes
+        id: release_notes
+        run: node scripts/extract-changelog.js ${{ github.event.workflow_run.head_branch || github.ref_name }}
+
       - name: Build and Publish Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.event.workflow_run.head_branch || github.ref_name || 'v__VERSION__' }}
+          tagName: ${{ (startsWith(github.event.workflow_run.head_branch, 'v') && github.event.workflow_run.head_branch) || (startsWith(github.ref_name, 'v') && github.ref_name) || 'v__VERSION__' }}
           releaseName: 'ai-finance-moyu v__VERSION__'
-          releaseBody: 'See assets below to download and install this version.'
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

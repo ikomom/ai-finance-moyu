@@ -56,7 +56,7 @@ fn size_for(layout: Layout, rows: usize, sizes: &config::LayoutSizes) -> (f64, f
                 .get(Layout::Bar)
                 .map(|(w, _)| w)
                 .unwrap_or_else(|| natural_size(Layout::Bar, rows).0);
-            (w.clamp(200.0, 900.0), 32.0)
+            (w.clamp(180.0, 1400.0), 32.0)
         }
         Layout::Mini => sizes.get(Layout::Mini).unwrap_or_else(|| natural_size(Layout::Mini, rows)),
         Layout::List => sizes.get(Layout::List).unwrap_or_else(|| natural_size(Layout::List, rows)),
@@ -137,6 +137,7 @@ fn place_window(app: &AppHandle, layout: Layout, rows: usize) {
     // size, and this order avoids a frame at the wrong shape.
     let _ = win.set_size(tauri::LogicalSize::new(w, h));
     let _ = win.set_position(tauri::LogicalPosition::new(x, y));
+    let _ = win.set_resizable(true);
     disable_maximize(&win);
 }
 
@@ -248,38 +249,41 @@ fn on_resized(app: &AppHandle, size: tauri::PhysicalSize<u32>, scale: f64) {
 
     let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
     // Ignore degenerate sizes or OS snap blowout.
-    if w < 140.0 || h < 24.0 || w > 750.0 || h > 950.0 {
+    if w < 140.0 || h < 24.0 || w > 1600.0 || h > 1400.0 {
         return;
+    }
+
+    // Immediately commit the dragged size to live memory state so any subsequent
+    // edge dock collapse or uncollapse immediately has the fresh size!
+    {
+        let mut cfg = state.config.lock().unwrap();
+        let layout = cfg.layout;
+        if layout == Layout::Bar {
+            cfg.layout_sizes.set(Layout::Bar, w.clamp(180.0, 1400.0), 32.0);
+        } else {
+            let (max_w, max_h) = match layout {
+                Layout::Bar => (1400.0, 32.0),
+                Layout::Mini => (1200.0, 900.0),
+                Layout::List => (1400.0, 1200.0),
+                Layout::Market => (1200.0, 900.0),
+            };
+            if w <= max_w && h <= max_h {
+                cfg.layout_sizes.set(layout, w, h);
+            }
+        }
     }
 
     let generation = state.resize_gen.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(450)).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
 
         let state = app.state::<AppState>();
-        if state.dock_state.lock().unwrap().collapsed {
-            return;
-        }
         if state.resize_gen.load(std::sync::atomic::Ordering::SeqCst) != generation {
             return;
         }
         let cfg = {
-            let mut cfg = state.config.lock().unwrap();
-            let layout = cfg.layout;
-            if layout == Layout::Bar {
-                cfg.layout_sizes.set(Layout::Bar, w.clamp(200.0, 900.0), 32.0);
-            } else {
-                let (max_w, max_h) = match layout {
-                    Layout::Bar => (900.0, 32.0),
-                    Layout::Mini => (500.0, 320.0),
-                    Layout::List => (700.0, 900.0),
-                    Layout::Market => (500.0, 450.0),
-                };
-                if w <= max_w && h <= max_h {
-                    cfg.layout_sizes.set(layout, w, h);
-                }
-            }
+            let cfg = state.config.lock().unwrap();
             cfg.clone()
         };
         if let Err(e) = config::save(&app, &cfg) {
@@ -596,11 +600,12 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     if let Some(win) = app.get_webview_window(SETTINGS) {
         let _ = win.show();
         let _ = win.unminimize();
+        let _ = win.set_always_on_top(true);
         let _ = win.set_focus();
         return Ok(());
     }
 
-    tauri::WebviewWindowBuilder::new(
+    let win = tauri::WebviewWindowBuilder::new(
         app,
         SETTINGS,
         tauri::WebviewUrl::App("settings.html".into()),
@@ -612,12 +617,13 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     .resizable(true)
     .decorations(true)
     .transparent(false)
-    .always_on_top(false)
+    .always_on_top(true)
     .skip_taskbar(false)
     .focused(true)
     .build()
     .map_err(|e| format!("打开设置窗口失败: {e}"))?;
 
+    let _ = win.set_focus();
     Ok(())
 }
 
@@ -652,6 +658,17 @@ fn save_config(app: AppHandle, mut cfg: Config) -> Result<(), String> {
     for item in cfg.watchlist.iter_mut() {
         item.code = market::normalize_code(&item.code)?;
     }
+
+    // Preserve live dragged layout sizes from state unless user explicitly reset sizes
+    if !cfg.layout_sizes.is_empty() {
+        let live_sizes = {
+            let state = app.state::<AppState>();
+            let sizes = state.config.lock().unwrap().layout_sizes.clone();
+            sizes
+        };
+        cfg.layout_sizes = live_sizes;
+    }
+
     cfg.sanitize();
 
     // Autostart lives in the OS, not in the file, so a change made in the
@@ -732,6 +749,32 @@ fn get_recent_logs(target_filter: Option<String>, level_filter: Option<String>) 
 #[tauri::command]
 fn open_log_dir(app: AppHandle) -> Result<(), String> {
     logger::open_log_directory(&app)
+}
+
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", &url])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -978,6 +1021,8 @@ pub fn run() {
                 .app_name("ai-finance-moyu")
                 .build(),
         )
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             if let Err(e) = logger::init(app.handle()) {
                 eprintln!("初始化日志系统失败: {e}");
@@ -1002,6 +1047,7 @@ pub fn run() {
             tray::build(app)?;
 
             // Restore the saved geometry, clamped to the current display.
+            suppress_resize(app.handle(), Duration::from_millis(700));
             place_window(app.handle(), layout, rows);
 
             // Determine initial dock edge from restored position
@@ -1052,8 +1098,12 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Only the display window's size and dock position are remembered;
-            // the settings window manages its own geometry.
+            if window.label() == SETTINGS {
+                if let WindowEvent::Focused(focused) = event {
+                    let _ = window.set_always_on_top(*focused);
+                }
+                return;
+            }
             if window.label() != DISPLAY {
                 return;
             }
@@ -1094,6 +1144,7 @@ pub fn run() {
             get_kline,
             get_recent_logs,
             open_log_dir,
+            open_url,
             clear_memory_logs,
             set_log_level,
         ])
