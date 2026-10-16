@@ -143,8 +143,6 @@ fn place_window(app: &AppHandle, layout: Layout, rows: usize) {
 
 /// Switch layout: persist it, resize the window, tell the frontend.
 pub fn apply_layout(app: &AppHandle, layout: Layout) {
-    let _ = set_dock_collapsed_inner(app, false);
-
     let (rows, snapshot) = {
         let state = app.state::<AppState>();
         let mut cfg = state.config.lock().unwrap();
@@ -153,6 +151,15 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
     };
     log::info!(target: "USER", "切换布局模式至 {:?}", layout);
     let _ = config::save(app, &snapshot);
+
+    // 1. Uncollapse dock with the NEW layout dimensions
+    let _ = set_dock_collapsed_inner(app, false);
+
+    // 2. If the window was hidden (e.g. by boss key) or minimized, reveal and show it immediately!
+    if let Some(win) = app.get_webview_window(DISPLAY) {
+        let _ = win.unminimize();
+        let _ = win.show();
+    }
 
     if layout == Layout::Market {
         let handle = app.clone();
@@ -685,12 +692,23 @@ fn save_config(app: AppHandle, mut cfg: Config) -> Result<(), String> {
         }
     }
 
+    let hotkeys_changed = {
+        let state = app.state::<AppState>();
+        let current_keys = state.config.lock().unwrap().hotkeys.clone();
+        current_keys != cfg.hotkeys
+    };
+
     log::info!(target: "USER", "保存系统配置，自选股共 {} 只", cfg.watchlist.len());
     config::save(&app, &cfg)?;
     {
         let state = app.state::<AppState>();
         *state.config.lock().unwrap() = cfg.clone();
         state.market_fetcher.reset_quota_circuit_breaker();
+    }
+
+    if hotkeys_changed {
+        sync_hotkeys(&app, &cfg.hotkeys);
+        log::info!(target: "SYSTEM", "全局热键已动态同步更新");
     }
 
     if matches!(cfg.visibility_mode, VisibilityMode::Always | VisibilityMode::Hotkey) {
@@ -860,39 +878,25 @@ async fn get_kline(app: AppHandle, code: String) -> Result<quote::KLineData, Str
 
 // ------------------------------------------------------------------- setup
 
-/// Register the global shortcuts named in the config.
-///
-/// Matching compares parsed [`Shortcut`] values, so a chord changed in
-/// `config.json` is both registered *and* dispatched correctly — the handler
-/// needs no separate table of keys.
+/// Register the global shortcuts plugin and sync active chords.
 fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
-    fn parse(action: &str, chord: &str) -> Result<Shortcut, String> {
-        chord
-            .parse::<Shortcut>()
-            .map_err(|e| format!("快捷键 {action}=\"{chord}\" 无法解析: {e}"))
-    }
-
-    let toggle = parse("toggle", &keys.toggle)?;
-    let bar = parse("layoutBar", &keys.layout_bar)?;
-    let mini = parse("layoutMini", &keys.layout_mini)?;
-    let list = parse("layoutList", &keys.layout_list)?;
-    let market = parse("layoutMarket", &keys.layout_market)?;
-
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, shortcut, event| {
                 if event.state != ShortcutState::Pressed {
                     return;
                 }
-                if shortcut == &toggle {
+                let state = app.state::<AppState>();
+                let bindings = state.hotkey_bindings.lock().unwrap().clone();
+                if bindings.toggle.as_ref() == Some(shortcut) {
                     toggle_window(app);
-                } else if shortcut == &bar {
+                } else if bindings.bar.as_ref() == Some(shortcut) {
                     apply_layout(app, Layout::Bar);
-                } else if shortcut == &mini {
+                } else if bindings.mini.as_ref() == Some(shortcut) {
                     apply_layout(app, Layout::Mini);
-                } else if shortcut == &list {
+                } else if bindings.list.as_ref() == Some(shortcut) {
                     apply_layout(app, Layout::List);
-                } else if shortcut == &market {
+                } else if bindings.market.as_ref() == Some(shortcut) {
                     apply_layout(app, Layout::Market);
                 }
             })
@@ -900,25 +904,57 @@ fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
     )
     .map_err(|e| format!("加载快捷键插件失败: {e}"))?;
 
-    // Registered one at a time rather than through `with_shortcuts`, which fails
-    // as a batch: a single chord already held by another program would otherwise
-    // take the whole set down. A chord we can't have is worth reporting, not
-    // worth refusing to start over.
+    sync_hotkeys(app, keys);
+    Ok(())
+}
+
+/// Dynamically sync and register hotkeys without restarting the app.
+pub fn sync_hotkeys(app: &AppHandle, keys: &Hotkeys) {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    fn parse(chord: &str) -> Option<Shortcut> {
+        let trimmed = chord.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        trimmed.parse::<Shortcut>().ok()
+    }
+
+    let toggle = parse(&keys.toggle);
+    let bar = parse(&keys.layout_bar);
+    let mini = parse(&keys.layout_mini);
+    let list = parse(&keys.layout_list);
+    let market = parse(&keys.layout_market);
+
     let shortcuts = app.global_shortcut();
-    for (name, chord, shortcut) in [
-        ("老板键", keys.toggle.as_str(), toggle),
-        ("数字条", keys.layout_bar.as_str(), bar),
-        ("迷你图", keys.layout_mini.as_str(), mini),
-        ("列表", keys.layout_list.as_str(), list),
-        ("大盘全景", keys.layout_market.as_str(), market),
+    let _ = shortcuts.unregister_all();
+
+    let new_bindings = state::HotkeyBindings {
+        toggle,
+        bar,
+        mini,
+        list,
+        market,
+    };
+
+    for (name, chord, opt_s) in [
+        ("老板键", keys.toggle.as_str(), new_bindings.toggle),
+        ("数字条", keys.layout_bar.as_str(), new_bindings.bar),
+        ("迷你图", keys.layout_mini.as_str(), new_bindings.mini),
+        ("列表", keys.layout_list.as_str(), new_bindings.list),
+        ("大盘全景", keys.layout_market.as_str(), new_bindings.market),
     ] {
-        if let Err(e) = shortcuts.register(shortcut) {
-            log::warn!(target: "SYSTEM", "快捷键 {name}（{chord}）注册失败，可能已被别的程序占用: {e}");
+        if let Some(s) = opt_s {
+            if let Err(e) = shortcuts.register(s) {
+                log::warn!(target: "SYSTEM", "快捷键 {name}（{chord}）注册失败，可能已被别的程序占用: {e}");
+            }
+        } else if !chord.trim().is_empty() {
+            log::warn!(target: "SYSTEM", "快捷键 {name}（\"{chord}\"）格式无效，无法解析");
         }
     }
 
-    Ok(())
+    let state = app.state::<AppState>();
+    *state.hotkey_bindings.lock().unwrap() = new_bindings;
 }
 
 #[cfg(windows)]
@@ -1029,20 +1065,20 @@ pub fn run() {
             }
 
             let cfg = config::load(app.handle());
+            let fetcher = Fetcher::new().map_err(|e| e.to_string())?;
+            let cache = config::load_cache(app.handle());
+            let rows = cfg.watchlist.len();
+            let layout = cfg.layout;
+            let hotkeys = cfg.hotkeys.clone();
+            app.manage(AppState::new(cfg, fetcher, cache));
 
             // Registered here rather than in the builder chain so the chords can
             // come from the config file. A failure is reported and survived: the
             // widget is still usable from the tray and the right-click menu, and
             // refusing to start over a hotkey would be far worse.
-            if let Err(e) = register_hotkeys(app.handle(), &cfg.hotkeys) {
+            if let Err(e) = register_hotkeys(app.handle(), &hotkeys) {
                 log::warn!(target: "SYSTEM", "{e}（其余功能不受影响）");
             }
-
-            let fetcher = Fetcher::new().map_err(|e| e.to_string())?;
-            let cache = config::load_cache(app.handle());
-            let rows = cfg.watchlist.len();
-            let layout = cfg.layout;
-            app.manage(AppState::new(cfg, fetcher, cache));
 
             tray::build(app)?;
 
@@ -1150,4 +1186,39 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod hotkey_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_all_hotkeys() {
+        let keys = Hotkeys::default();
+        let toggle = keys.toggle.parse::<Shortcut>();
+        let bar = keys.layout_bar.parse::<Shortcut>();
+        let mini = keys.layout_mini.parse::<Shortcut>();
+        let list = keys.layout_list.parse::<Shortcut>();
+        let market = keys.layout_market.parse::<Shortcut>();
+
+        assert!(toggle.is_ok(), "toggle chord must be valid");
+        assert!(bar.is_ok(), "bar chord must be valid");
+        assert!(mini.is_ok(), "mini chord must be valid");
+        assert!(list.is_ok(), "list chord must be valid");
+        assert!(market.is_ok(), "market chord must be valid");
+
+        let set = [
+            toggle.unwrap(),
+            bar.unwrap(),
+            mini.unwrap(),
+            list.unwrap(),
+            market.unwrap(),
+        ];
+        // Ensure no chords overlap
+        for i in 0..set.len() {
+            for j in (i + 1)..set.len() {
+                assert_ne!(set[i], set[j], "chords must be unique");
+            }
+        }
+    }
 }

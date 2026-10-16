@@ -62,6 +62,15 @@ pub struct Snapshot {
     pub market_overview: Option<MarketOverview>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct HotkeyBindings {
+    pub toggle: Option<tauri_plugin_global_shortcut::Shortcut>,
+    pub bar: Option<tauri_plugin_global_shortcut::Shortcut>,
+    pub mini: Option<tauri_plugin_global_shortcut::Shortcut>,
+    pub list: Option<tauri_plugin_global_shortcut::Shortcut>,
+    pub market: Option<tauri_plugin_global_shortcut::Shortcut>,
+}
+
 pub struct AppState {
     pub config: Mutex<Config>,
     pub tracker: Mutex<CrossingTracker>,
@@ -89,6 +98,7 @@ pub struct AppState {
     pub market_fetcher: MarketFetcher,
     pub market_overview: Mutex<Option<MarketOverview>>,
     pub auction_tracker: Mutex<crate::auction_engine::AuctionTracker>,
+    pub hotkey_bindings: Mutex<HotkeyBindings>,
 }
 
 impl AppState {
@@ -119,6 +129,7 @@ impl AppState {
             market_fetcher: MarketFetcher::default(),
             market_overview: Mutex::new(None),
             auction_tracker: Mutex::new(crate::auction_engine::AuctionTracker::new()),
+            hotkey_bindings: Mutex::new(HotkeyBindings::default()),
         }
     }
 
