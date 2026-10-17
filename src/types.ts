@@ -108,7 +108,7 @@ export interface SearchResult {
   category: string
 }
 
-export type Layout = 'bar' | 'mini' | 'list' | 'market'
+export type Layout = 'bar' | 'mini' | 'list' | 'market' | 'global'
 
 /** Which upstream provider to fetch from. */
 export type DataSource = 'tencent' | 'sina'
@@ -132,6 +132,7 @@ export interface LayoutSizes {
   mini?: [number, number]
   list?: [number, number]
   market?: [number, number]
+  global?: [number, number]
 }
 
 export interface WindowGeom {
@@ -154,6 +155,7 @@ export interface Hotkeys {
   layoutMini: string
   layoutList: string
   layoutMarket: string
+  layoutGlobal: string
 }
 
 export interface MarketIndex {
@@ -203,6 +205,7 @@ export interface MarketOverview {
   northNetFlow?: number | null
   topSectors: SectorItem[]
   updatedAt: string
+  globalIndices?: MarketIndex[]
 }
 
 export type TrendState =

@@ -1,0 +1,39 @@
+/* PillTabs - Horizontal scrollable switching tabs */
+.mini-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  white-space: nowrap;
+  padding: 0 2px 2px 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--surface-border-divider);
+}
+.mini-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.mini-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-card);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+.mini-tab:hover {
+  background: var(--surface-card-active);
+  color: #fff;
+}
+.mini-tab.active {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+  color: var(--color-accent-light);
+  font-weight: 500;
+}

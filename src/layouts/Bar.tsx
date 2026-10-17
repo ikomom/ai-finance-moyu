@@ -1,6 +1,7 @@
 import { For, onMount, Show } from 'solid-js'
 
 import { setTrendTargets } from '../tauri'
+import './Bar.css'
 import {
   fmtMoney,
   fmtPct,

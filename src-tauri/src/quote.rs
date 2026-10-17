@@ -20,6 +20,7 @@
 
 use std::time::Duration;
 
+use chrono::DateTime;
 use encoding_rs::GB18030;
 use serde::{Deserialize, Serialize};
 
@@ -909,7 +910,13 @@ pub const QUOTE_CHUNK_SIZE: usize = 50;
 
 #[derive(Clone)]
 pub struct Fetcher {
+    /// Domestic client: configured with `.no_proxy()` to bypass local dev proxies
+    /// and connect directly to Chinese domestic CDN endpoints (Tencent, Sina).
     client: reqwest::Client,
+    /// Global client: respects system proxy / environment proxy (`HTTP_PROXY`,
+    /// `HTTPS_PROXY`, `ALL_PROXY`) so overseas endpoints (Yahoo Finance) can
+    /// resolve through the user's proxy without triggering regional 403 blocks.
+    global_client: reqwest::Client,
 }
 
 impl Fetcher {
@@ -921,7 +928,15 @@ impl Fetcher {
             .user_agent(USER_AGENT)
             .build()
             .map_err(net_err)?;
-        Ok(Self { client })
+
+        let global_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .connect_timeout(Duration::from_secs(6))
+            .user_agent(USER_AGENT)
+            .build()
+            .map_err(net_err)?;
+
+        Ok(Self { client, global_client })
     }
 
     /// One request for any number of codes — both providers accept a code list.
@@ -1094,6 +1109,43 @@ impl Fetcher {
         Err(last_err.unwrap_or_else(|| net_err("网络请求失败")))
     }
 
+    async fn get_global_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
+        let mut last_err = None;
+        for attempt in 0..2 {
+            if attempt > 0 {
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            let mut req = self.global_client.get(url)
+                .header(reqwest::header::ACCEPT, "*/*")
+                .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7");
+            if let Some(r) = referer {
+                req = req.header(reqwest::header::REFERER, r);
+            }
+            match req.send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if !status.is_success() {
+                        last_err = Some(FetchError {
+                            kind: FetchErrorKind::Network,
+                            message: format!("HTTP {status}"),
+                        });
+                        continue;
+                    }
+                    match resp.bytes().await {
+                        Ok(b) => return Ok(b.to_vec()),
+                        Err(e) => {
+                            last_err = Some(net_err(e));
+                        }
+                    }
+                }
+                Err(e) => {
+                    last_err = Some(net_err(e));
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| net_err("全球网络请求失败")))
+    }
+
     /// Fetch daily candlestick series with forward adjustment (QFQ) and moving averages.
     ///
     /// Tries Tencent's forward-adjusted endpoint first, then falls back to Sina if unavailable.
@@ -1113,6 +1165,308 @@ impl Fetcher {
         let bars = sina::parse_kline(code, &bytes)?;
         Ok(compute_kline_indicators(code, bars))
     }
+
+    /// Fetch daily candlestick series for global indices.
+    /// Supports US/HK indices (via Tencent fqkline or Yahoo Finance fallback)
+    /// and Asia-Pacific / European indices (Nikkei 225, KOSPI, FTSE 100 via Yahoo Finance).
+    pub async fn fetch_global_kline(&self, code: &str) -> Result<KLineData, FetchError> {
+        let code_clean = code.trim();
+
+        // 1. For US/HK indices, Tencent fqkline is fast and reliable
+        let is_tencent_cand = code_clean.starts_with("us") || code_clean.starts_with("hk");
+        if is_tencent_cand {
+            let tencent_url = tencent::kline_url(code_clean);
+            if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
+                if let Ok(bars) = tencent::parse_kline(code_clean, &bytes) {
+                    return Ok(compute_kline_indicators(code_clean, bars));
+                }
+            }
+        }
+
+        // 2. Fetch from Yahoo Finance
+        if let Some(yahoo_symbol) = global_code_to_yahoo_symbol(code_clean) {
+            let encoded_symbol = if yahoo_symbol.starts_with('^') {
+                format!("%5E{}", &yahoo_symbol[1..])
+            } else {
+                yahoo_symbol.to_string()
+            };
+            let yahoo_url = format!(
+                "https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}?interval=1d&range=6mo"
+            );
+            let bytes = self.get_global_bytes(&yahoo_url, None).await?;
+            let bars = parse_yahoo_chart(code_clean, &bytes)?;
+            return Ok(compute_kline_indicators(code_clean, bars));
+        }
+
+        Err(parse_err(format!("不支持的全球指数代码: {code}")))
+    }
+
+    /// Fetch intraday minute trend (分时走势) for global indices.
+    /// Supports US/HK indices (via Tencent minute query or Yahoo fallback)
+    /// and Asia-Pacific / European indices (Nikkei 225, KOSPI, FTSE 100 via Yahoo 1m/5m chart).
+    pub async fn fetch_global_trend(&self, code: &str) -> Result<Trend, FetchError> {
+        let code_clean = code.trim();
+
+        // 1. For US/HK indices, Tencent minute query has great domestic speed and no proxy need
+        let is_tencent_cand = code_clean.starts_with("us") || code_clean.starts_with("hk");
+        if is_tencent_cand {
+            let tencent_url = tencent::trend_url(code_clean);
+            if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
+                if let Ok(trend) = tencent::parse_trend(code_clean, &bytes) {
+                    if trend.points.len() > 1 {
+                        return Ok(trend);
+                    }
+                }
+            }
+        }
+
+        // 2. Fetch from Yahoo Finance 1m chart (or 5m chart fallback)
+        if let Some(yahoo_symbol) = global_code_to_yahoo_symbol(code_clean) {
+            let encoded_symbol = if yahoo_symbol.starts_with('^') {
+                format!("%5E{}", &yahoo_symbol[1..])
+            } else {
+                yahoo_symbol.to_string()
+            };
+            let yahoo_url = format!(
+                "https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}?interval=1m&range=1d"
+            );
+            if let Ok(bytes) = self.get_global_bytes(&yahoo_url, None).await {
+                if let Ok(trend) = parse_yahoo_trend(code_clean, &bytes) {
+                    if !trend.points.is_empty() {
+                        return Ok(trend);
+                    }
+                }
+            }
+
+            // Fallback: try 5m interval
+            let yahoo_url_5m = format!(
+                "https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}?interval=5m&range=1d"
+            );
+            if let Ok(bytes) = self.get_global_bytes(&yahoo_url_5m, None).await {
+                if let Ok(trend) = parse_yahoo_trend(code_clean, &bytes) {
+                    if !trend.points.is_empty() {
+                        return Ok(trend);
+                    }
+                }
+            }
+        }
+
+        Err(parse_err(format!("不支持或未能获取全球指数分时: {code}")))
+    }
+}
+
+#[derive(Deserialize)]
+struct YahooChartResponse {
+    chart: YahooChartBody,
+}
+
+#[derive(Deserialize)]
+struct YahooChartBody {
+    result: Option<Vec<YahooChartResult>>,
+}
+
+#[derive(Deserialize)]
+struct YahooChartResult {
+    meta: Option<YahooMeta>,
+    timestamp: Option<Vec<i64>>,
+    indicators: Option<YahooIndicators>,
+}
+
+#[derive(Deserialize, Default)]
+#[allow(dead_code)]
+struct YahooMeta {
+    #[serde(rename = "previousClose")]
+    previous_close: Option<f64>,
+    #[serde(rename = "chartPreviousClose")]
+    chart_previous_close: Option<f64>,
+    #[serde(rename = "regularMarketPrice")]
+    regular_market_price: Option<f64>,
+    gmtoffset: Option<i64>,
+    timezone: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct YahooIndicators {
+    quote: Option<Vec<YahooQuoteData>>,
+}
+
+#[derive(Deserialize)]
+struct YahooQuoteData {
+    open: Option<Vec<Option<f64>>>,
+    high: Option<Vec<Option<f64>>>,
+    low: Option<Vec<Option<f64>>>,
+    close: Option<Vec<Option<f64>>>,
+    volume: Option<Vec<Option<f64>>>,
+}
+
+pub fn parse_yahoo_trend(code: &str, bytes: &[u8]) -> Result<Trend, FetchError> {
+    let resp: YahooChartResponse = serde_json::from_slice(bytes)
+        .map_err(|e| parse_err(format!("Yahoo Finance 分时 JSON解析失败: {e}")))?;
+
+    let result = resp
+        .chart
+        .result
+        .and_then(|r| r.into_iter().next())
+        .ok_or_else(|| parse_err("Yahoo Finance 未返回有效分时图表数据"))?;
+
+    let meta = result.meta.unwrap_or_default();
+    let pre_close = meta.previous_close
+        .or(meta.chart_previous_close)
+        .unwrap_or(0.0);
+    let gmtoffset = meta.gmtoffset.unwrap_or(0);
+
+    let timestamps = result.timestamp.unwrap_or_default();
+    let quote_data = result
+        .indicators
+        .and_then(|ind| ind.quote)
+        .and_then(|q| q.into_iter().next())
+        .ok_or_else(|| parse_err("Yahoo Finance 缺少分时指标数据"))?;
+
+    let closes = quote_data.close.unwrap_or_default();
+    let volumes = quote_data.volume.unwrap_or_default();
+    let n = timestamps.len();
+
+    let mut points = Vec::with_capacity(n);
+    let mut cum_volume = 0.0;
+    let mut prev_price = if pre_close > 0.0 { pre_close } else { 0.0 };
+    let mut date_str = String::new();
+
+    for i in 0..n {
+        let ts = timestamps[i];
+        let price = match closes.get(i).copied().flatten() {
+            Some(p) if p > 0.0 => {
+                prev_price = p;
+                p
+            }
+            _ => {
+                if prev_price > 0.0 { prev_price } else { continue; }
+            }
+        };
+
+        let vol = volumes.get(i).copied().flatten().unwrap_or(0.0);
+        cum_volume += vol;
+
+        let local_ts = ts + gmtoffset;
+        if date_str.is_empty() {
+            if let Some(dt) = DateTime::from_timestamp(local_ts, 0) {
+                date_str = dt.format("%Y%m%d").to_string();
+            }
+        }
+
+        let seconds_in_day = local_ts.rem_euclid(86400);
+        let hour = (seconds_in_day / 3600) as u32;
+        let min = ((seconds_in_day % 3600) / 60) as u32;
+        let time = hour * 100 + min;
+
+        points.push(TrendPoint {
+            time,
+            price,
+            cum_volume,
+            cum_amount: 0.0,
+            avg_price: 0.0,
+        });
+    }
+
+    if points.is_empty() {
+        return Err(parse_err(format!("{code} 有效分时数据为空")));
+    }
+
+    let actual_pre_close = if pre_close > 0.0 {
+        pre_close
+    } else {
+        points.first().map(|p| p.price).unwrap_or(0.0)
+    };
+
+    Ok(Trend {
+        code: code.to_string(),
+        date: date_str,
+        pre_close: actual_pre_close,
+        points,
+    })
+}
+
+pub fn global_code_to_yahoo_symbol(code: &str) -> Option<&'static str> {
+    let clean = code.trim();
+    match clean.to_ascii_uppercase().as_str() {
+        "USIXIC" | "IXIC" | ".IXIC" => Some("^IXIC"),
+        "USDJI" | "DJI" | ".DJI" => Some("^DJI"),
+        "USINX" | "INX" | ".INX" => Some("^GSPC"),
+        "HKHSI" | "HSI" => Some("^HSI"),
+        "GZN225" | "N225" => Some("^N225"),
+        "GZKS11" | "KS11" => Some("^KS11"),
+        "GZFTSE" | "FTSE" => Some("^FTSE"),
+        s if s.starts_with('^') => None,
+        _ => None,
+    }
+}
+
+pub fn parse_yahoo_chart(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, FetchError> {
+    let resp: YahooChartResponse = serde_json::from_slice(bytes)
+        .map_err(|e| parse_err(format!("Yahoo Finance K线 JSON解析失败: {e}")))?;
+
+    let result = resp
+        .chart
+        .result
+        .and_then(|r| r.into_iter().next())
+        .ok_or_else(|| parse_err("Yahoo Finance 未返回有效图表数据"))?;
+
+    let timestamps = result.timestamp.unwrap_or_default();
+    let quote_data = result
+        .indicators
+        .and_then(|ind| ind.quote)
+        .and_then(|q| q.into_iter().next())
+        .ok_or_else(|| parse_err("Yahoo Finance 缺少K线指标数据"))?;
+
+    let opens = quote_data.open.unwrap_or_default();
+    let highs = quote_data.high.unwrap_or_default();
+    let lows = quote_data.low.unwrap_or_default();
+    let closes = quote_data.close.unwrap_or_default();
+    let volumes = quote_data.volume.unwrap_or_default();
+
+    let n = timestamps.len();
+    let mut bars = Vec::with_capacity(n);
+
+    for i in 0..n {
+        let ts = timestamps[i];
+        let Some(open) = opens.get(i).copied().flatten() else { continue; };
+        let Some(high) = highs.get(i).copied().flatten() else { continue; };
+        let Some(low) = lows.get(i).copied().flatten() else { continue; };
+        let Some(close) = closes.get(i).copied().flatten() else { continue; };
+        let volume = volumes.get(i).copied().flatten().unwrap_or(0.0);
+
+        if open <= 0.0 || high <= 0.0 || low <= 0.0 || close <= 0.0 {
+            continue;
+        }
+
+        let date = DateTime::from_timestamp(ts, 0)
+            .map(|dt| dt.format("%Y-%m-%d").to_string())
+            .unwrap_or_default();
+
+        if date.is_empty() {
+            continue;
+        }
+
+        bars.push(KLineBar {
+            date,
+            open,
+            close,
+            high,
+            low,
+            volume,
+            ma5: None,
+            ma10: None,
+            ma20: None,
+            dif: None,
+            dea: None,
+            macd: None,
+        });
+    }
+
+    if bars.is_empty() {
+        return Err(parse_err(format!("{code} 有效日K线数据为空")));
+    }
+
+    Ok(bars)
 }
 
 #[cfg(test)]
@@ -1564,6 +1918,87 @@ mod tests {
         assert!(last.ma10.unwrap() > last.ma20.unwrap());
         assert_eq!(kline.ma_signal, "bull_aligned");
         assert!(kline.ma_comment.contains("多头排列"));
+    }
+
+    #[test]
+    fn test_global_code_to_yahoo_symbol() {
+        assert_eq!(global_code_to_yahoo_symbol("usIXIC"), Some("^IXIC"));
+        assert_eq!(global_code_to_yahoo_symbol("usINX"), Some("^GSPC"));
+        assert_eq!(global_code_to_yahoo_symbol("usDJI"), Some("^DJI"));
+        assert_eq!(global_code_to_yahoo_symbol("hkHSI"), Some("^HSI"));
+        assert_eq!(global_code_to_yahoo_symbol("gzN225"), Some("^N225"));
+        assert_eq!(global_code_to_yahoo_symbol("gzKS11"), Some("^KS11"));
+        assert_eq!(global_code_to_yahoo_symbol("gzFTSE"), Some("^FTSE"));
+        assert_eq!(global_code_to_yahoo_symbol("invalid"), None);
+    }
+
+    #[test]
+    fn parses_yahoo_chart_json_sample() {
+        let json = r#"{
+            "chart": {
+                "result": [
+                    {
+                        "timestamp": [1792022400, 1792108800],
+                        "indicators": {
+                            "quote": [
+                                {
+                                    "open": [5673.0, 5653.99],
+                                    "high": [5751.45, 5809.94],
+                                    "low": [5450.81, 5590.33],
+                                    "close": [5554.22, 5668.05],
+                                    "volume": [385800, 286453]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "error": null
+            }
+        }"#;
+        let bars = parse_yahoo_chart("gzKS11", json.as_bytes()).unwrap();
+        assert_eq!(bars.len(), 2);
+        assert_eq!(bars[0].open, 5673.0);
+        assert_eq!(bars[0].close, 5554.22);
+        assert_eq!(bars[1].high, 5809.94);
+        assert_eq!(bars[1].volume, 286453.0);
+    }
+
+    #[test]
+    fn parses_yahoo_trend_json_sample() {
+        let json = r#"{
+            "chart": {
+                "result": [
+                    {
+                        "meta": {
+                            "previousClose": 5554.22,
+                            "chartPreviousClose": 5554.22,
+                            "gmtoffset": 32400
+                        },
+                        "timestamp": [1792108800, 1792108860],
+                        "indicators": {
+                            "quote": [
+                                {
+                                    "open": [5653.99, 5660.00],
+                                    "high": [5665.41, 5662.50],
+                                    "low": [5653.99, 5658.10],
+                                    "close": [5660.12, 5661.80],
+                                    "volume": [1200, 2400]
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "error": null
+            }
+        }"#;
+        let trend = parse_yahoo_trend("gzKS11", json.as_bytes()).unwrap();
+        assert_eq!(trend.code, "gzKS11");
+        assert_eq!(trend.pre_close, 5554.22);
+        assert_eq!(trend.points.len(), 2);
+        assert_eq!(trend.points[0].price, 5660.12);
+        assert_eq!(trend.points[0].cum_volume, 1200.0);
+        assert_eq!(trend.points[1].price, 5661.80);
+        assert_eq!(trend.points[1].cum_volume, 3600.0);
     }
 }
 

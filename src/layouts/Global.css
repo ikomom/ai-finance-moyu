@@ -1,0 +1,296 @@
+/* Layout 5 — 全球股指 (Global Indices) */
+.layout-global {
+  position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 8px 10px 6px 10px;
+  border-radius: var(--radius-card);
+  background: var(--surface-glass-bg);
+  border: 1px solid var(--surface-glass-border);
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  justify-content: space-between;
+  user-select: none;
+  gap: 4px;
+}
+
+.global-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.global-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.global-title .icon {
+  font-size: 12px;
+}
+
+.global-time .update-badge {
+  font-size: 9.5px;
+  opacity: 0.55;
+  font-family: var(--font-mono);
+}
+
+.global-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.global-body::-webkit-scrollbar {
+  display: none;
+}
+
+.global-index-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.global-index-card {
+  background: var(--surface-card-bg);
+  border: 1px solid var(--surface-border-divider);
+  border-radius: 7px;
+  padding: 5px 7px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.global-index-card:hover {
+  background: var(--surface-card-hover);
+  border-color: var(--surface-input-border);
+  transform: translateY(-1px);
+}
+
+.global-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.global-card-header .idx-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.global-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 3.5px;
+}
+.global-card-header .idx-code-pill {
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-card-active);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.global-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+}
+.global-card-body .idx-price {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.global-card-body .idx-change {
+  display: flex;
+  gap: 2px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+}
+
+.global-card-hint {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  font-size: 8px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.global-index-card:hover .global-card-hint {
+  color: var(--text-muted);
+}
+
+.global-kline-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  gap: 2px;
+  overflow: hidden;
+}
+.global-kline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2px;
+}
+.global-back-btn {
+  background: var(--surface-card-hover);
+  border: 1px solid var(--surface-border-subtle);
+  color: var(--text-secondary);
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.global-back-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+.global-kline-title {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.global-kline-title .name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.global-kline-title .code {
+  font-size: 8.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.global-kline-quote {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-mono);
+}
+.global-kline-quote .price {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.global-kline-quote .pct {
+  font-size: 9.5px;
+}
+
+.global-kline-stats-bar {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  height: 14px;
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+}
+.kline-stats-default {
+  display: flex;
+  gap: 6px;
+}
+.kline-stats-default .ma5 { color: var(--color-warning); }
+.kline-stats-default .ma10 { color: #c084fc; }
+.kline-stats-default .ma20 { color: #38bdf8; }
+
+.kline-stats-hovered {
+  display: flex;
+  gap: 5px;
+  color: var(--text-primary);
+}
+.kline-stats-hovered .stat-date {
+  color: var(--text-muted);
+}
+
+.global-kline-chart-wrap {
+  flex: 1;
+  min-height: 165px;
+  height: 100%;
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+.global-kline-chart-wrap > .chart-wrap {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.kline-loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.global-tab-pills {
+  display: flex;
+  background: var(--surface-card-active);
+  padding: 1.5px;
+  border-radius: var(--radius-sm);
+  gap: 2px;
+}
+.global-tab-pill {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 8.5px;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-weight: 500;
+}
+.global-tab-pill:hover {
+  color: var(--text-primary);
+}
+.global-tab-pill.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.global-retry-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+  font-size: 8.5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  margin-top: 4px;
+  transition: all var(--transition-fast);
+}
+.global-retry-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}

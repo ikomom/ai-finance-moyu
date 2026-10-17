@@ -69,6 +69,7 @@ pub struct HotkeyBindings {
     pub mini: Option<tauri_plugin_global_shortcut::Shortcut>,
     pub list: Option<tauri_plugin_global_shortcut::Shortcut>,
     pub market: Option<tauri_plugin_global_shortcut::Shortcut>,
+    pub global: Option<tauri_plugin_global_shortcut::Shortcut>,
 }
 
 pub struct AppState {

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { ContextMenu, closeMenu, isContextMenuOpen, setContextMenuOpen } from './components/ContextMenu'
 import { Toast } from './components/Toast'
 import { Bar } from './layouts/Bar'
+import { Global } from './layouts/Global'
 import { List } from './layouts/List'
 import { Market } from './layouts/Market'
 import { Mini } from './layouts/Mini'
@@ -239,6 +240,9 @@ export function Widget() {
                   </Match>
                   <Match when={s().config.layout === 'market'}>
                     <Market flash={flash()} />
+                  </Match>
+                  <Match when={s().config.layout === 'global'}>
+                    <Global flash={flash()} />
                   </Match>
                   <Match when={true}>
                     <Mini flash={flash()} />

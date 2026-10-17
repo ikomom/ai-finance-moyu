@@ -28,6 +28,7 @@ export function Chart(props: ChartProps) {
       orbLow: props.orbLow,
       subchartMode: props.subchartMode,
       macdParams: props.macdParams,
+      isGlobal: props.isGlobal,
     })
 
   onMount(() => {
@@ -51,12 +52,19 @@ export function Chart(props: ChartProps) {
     if (slot == null || !props.trend?.points?.length) return null
     const points = props.trend.points
     let closestIdx = 0
-    let minDiff = 999
-    for (let i = 0; i < points.length; i++) {
-      const diff = Math.abs(slotOf(points[i].time) - slot)
-      if (diff < minDiff) {
-        minDiff = diff
-        closestIdx = i
+    if (props.isGlobal) {
+      closestIdx = Math.min(
+        points.length - 1,
+        Math.max(0, Math.round((slot / 240) * (points.length - 1)))
+      )
+    } else {
+      let minDiff = 999
+      for (let i = 0; i < points.length; i++) {
+        const diff = Math.abs(slotOf(points[i].time) - slot)
+        if (diff < minDiff) {
+          minDiff = diff
+          closestIdx = i
+        }
       }
     }
     const pt = points[closestIdx]

@@ -1,4 +1,5 @@
 import { For, Show } from 'solid-js'
+import './Market.css'
 
 import { Grip } from '../components/Grip'
 import { StatusLine } from '../components/StatusLine'
@@ -19,9 +20,8 @@ function fmtTurnover(turnover: number): string {
   return `${(turnover / 1e4).toFixed(0)}万`
 }
 
-
 /**
- * Layout 4 — 大盘全景看板 (市场温度与板块情绪).
+ * Layout 4 — 大盘全景看板 (A股市场温度与板块情绪).
  */
 export function Market(props: { flash: boolean }) {
   const s = () => snapshot()!
@@ -74,11 +74,18 @@ export function Market(props: { flash: boolean }) {
                 {(idx) => (
                   <div class="index-card">
                     <div class="idx-name">{idx.name}</div>
-                    <div class={`idx-price ${idx.price > 0 ? trendClass(idx.changePct) : 'flat'}`}>
+                    <div
+                      class={`idx-price ${idx.price > 0 ? trendClass(idx.changePct) : 'flat'}`}
+                    >
                       {idx.price > 0 ? fmtPrice(idx.price, 2) : '--'}
                     </div>
-                    <div class={`idx-change ${idx.price > 0 ? trendClass(idx.changePct) : 'flat'}`}>
-                      <span>{idx.change >= 0 ? '+' : ''}{idx.change.toFixed(2)}</span>
+                    <div
+                      class={`idx-change ${idx.price > 0 ? trendClass(idx.changePct) : 'flat'}`}
+                    >
+                      <span>
+                        {idx.change >= 0 ? '+' : ''}
+                        {idx.change.toFixed(2)}
+                      </span>
                       <span>{idx.price > 0 ? fmtPct(idx.changePct) : '--'}</span>
                     </div>
                   </div>
@@ -131,15 +138,17 @@ export function Market(props: { flash: boolean }) {
                     const isDown = pctVal < 0
                     const tag = isUp ? '放量' : isDown ? '缩量' : '平'
                     const sign = isUp ? '+' : ''
-                    const amtStr = data().turnoverChangeAmount != null
-                      ? ` (${isUp ? '+' : '-'}${fmtTurnover(Math.abs(data().turnoverChangeAmount!))})`
-                      : ''
+                    const amtStr =
+                      data().turnoverChangeAmount != null
+                        ? ` (${isUp ? '+' : '-'}${fmtTurnover(Math.abs(data().turnoverChangeAmount!))})`
+                        : ''
                     return (
                       <span
                         class={`stat-value ${trendClass(pctVal)}`}
                         title={`${tag} ${sign}${pctVal.toFixed(2)}%${amtStr}`}
                       >
-                        {tag} {sign}{pctVal.toFixed(1)}%
+                        {tag} {sign}
+                        {pctVal.toFixed(1)}%
                       </span>
                     )
                   })()}

@@ -63,7 +63,8 @@ pub async fn run(app: AppHandle) {
             let st = state.status.lock().unwrap();
             let quotes = state.quotes.lock().unwrap();
             let need_retry = quotes.is_empty() || st.error.is_some();
-            let is_market = cfg.layout == crate::config::Layout::Market;
+            let is_market = cfg.layout == crate::config::Layout::Market
+                || cfg.layout == crate::config::Layout::Global;
             let need_market_init = state.market_overview.lock().unwrap().is_none();
             (session, cfg.poll_quotes_ms, cfg.poll_trend_ms, st.trading_today, need_retry, is_market, need_market_init)
         };
@@ -303,7 +304,9 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
             }
             None => {
                 match cfg.layout {
-                    crate::config::Layout::Bar | crate::config::Layout::Market => Vec::new(),
+                    crate::config::Layout::Bar
+                    | crate::config::Layout::Market
+                    | crate::config::Layout::Global => Vec::new(),
                     crate::config::Layout::Mini => {
                         watchlist_codes.into_iter().take(1).collect()
                     }

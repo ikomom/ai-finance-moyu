@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { KLineData } from './types'
+import type { KLineData, Trend } from './types'
 
 /**
  * Whether a Tauri runtime is present to talk to. False when the page is opened
@@ -35,6 +35,32 @@ export async function fetchKLine(code: string): Promise<KLineData | null> {
     return await invoke<KLineData>('get_kline', { code })
   } catch (e) {
     logToBackend(`fetchKLine failed for ${code}: ${e}`)
+    return null
+  }
+}
+
+/**
+ * Request daily candlestick series for global indices from backend.
+ */
+export async function fetchGlobalKLine(code: string): Promise<KLineData | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<KLineData>('get_global_kline', { code })
+  } catch (e) {
+    logToBackend(`fetchGlobalKLine failed for ${code}: ${e}`)
+    return null
+  }
+}
+
+/**
+ * Request intraday minute trend (分时走势) for global indices from backend.
+ */
+export async function fetchGlobalTrend(code: string): Promise<Trend | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<Trend>('get_global_trend', { code })
+  } catch (e) {
+    logToBackend(`fetchGlobalTrend failed for ${code}: ${e}`)
     return null
   }
 }

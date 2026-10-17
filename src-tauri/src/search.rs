@@ -163,6 +163,11 @@ pub fn parse_tencent_smartbox(text: &str) -> Vec<SearchResult> {
             continue;
         }
 
+        // A-share code must be exactly 6 ASCII digits
+        if bare_code.len() != 6 || !bare_code.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+
         let canonical_code = format!("{}{}", market, bare_code);
         let category = classify_tencent_security(&market, bare_code, type_tag);
 
@@ -247,8 +252,14 @@ pub fn parse_eastmoney_suggest(bytes: &[u8]) -> Vec<SearchResult> {
             continue;
         }
 
+        // A-share code must be exactly 6 ASCII digits
+        if bare_code.len() != 6 || !bare_code.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+
         // Determine market prefix
         let prefix = if type_name.contains("京")
+            || quote_id.starts_with("2.")
             || bare_code.starts_with("83")
             || bare_code.starts_with("87")
             || bare_code.starts_with("88")
@@ -259,13 +270,25 @@ pub fn parse_eastmoney_suggest(bytes: &[u8]) -> Vec<SearchResult> {
         } else if quote_id.starts_with("1.")
             || bare_code.starts_with("60")
             || bare_code.starts_with("68")
+            || bare_code.starts_with("50")
             || bare_code.starts_with("51")
             || bare_code.starts_with("56")
             || bare_code.starts_with("58")
+            || type_name.contains("沪")
         {
             "sh"
-        } else {
+        } else if quote_id.starts_with("0.")
+            || bare_code.starts_with("00")
+            || bare_code.starts_with("30")
+            || bare_code.starts_with("15")
+            || bare_code.starts_with("16")
+            || bare_code.starts_with("18")
+            || bare_code.starts_with("39")
+            || type_name.contains("深")
+        {
             "sz"
+        } else {
+            continue;
         };
 
         let canonical_code = format!("{}{}", prefix, bare_code);
@@ -356,4 +379,42 @@ mod tests {
         assert_eq!(list[1].name, "沪深300ETF");
         assert_eq!(list[1].category, "ETF");
     }
+
+    #[test]
+    fn parses_eastmoney_suggest_filters_non_a_share_and_alphanumeric_codes() {
+        let json = r#"{
+            "QuotationCodeTable": {
+                "Data": [
+                    {
+                        "Code": "KOSPI200",
+                        "Name": "韩国KOSPI200",
+                        "PinYin": "HGKOSPI200",
+                        "SecurityTypeName": "全球指数",
+                        "QuoteID": "100.KOSPI200"
+                    },
+                    {
+                        "Code": "HSI",
+                        "Name": "恒生指数",
+                        "PinYin": "HSZS",
+                        "SecurityTypeName": "港股指数",
+                        "QuoteID": "100.HSI"
+                    },
+                    {
+                        "Code": "600519",
+                        "Name": "贵州茅台",
+                        "PinYin": "GZMT",
+                        "SecurityTypeName": "沪A",
+                        "QuoteID": "1.600519"
+                    }
+                ]
+            }
+        }"#;
+        let list = parse_eastmoney_suggest(json.as_bytes());
+        // Non-6-digit codes like KOSPI200 and HSI must be ignored
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].code, "sh600519");
+        assert_eq!(list[0].name, "贵州茅台");
+        assert_eq!(list[0].category, "A股");
+    }
 }
+

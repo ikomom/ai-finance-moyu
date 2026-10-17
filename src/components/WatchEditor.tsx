@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
-
+import './WatchEditor.css'
 import type { PriceLine, SearchResult, StockIndicatorMode, WatchItem } from '../types'
 
 export type SortCriterion = 'code-asc' | 'code-desc' | 'name' | 'holding' | 'reverse'

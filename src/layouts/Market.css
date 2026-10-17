@@ -1,0 +1,222 @@
+/* Layout 4 — 大盘全景 (Market Overview) */
+.layout-market {
+  position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 8px 10px 6px 10px;
+  border-radius: var(--radius-card);
+  background: var(--surface-glass-bg);
+  border: 1px solid var(--surface-glass-border);
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  justify-content: space-between;
+  user-select: none;
+  gap: 4px;
+}
+
+.market-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.market-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.market-title .icon {
+  font-size: 12px;
+}
+
+.market-time .update-badge {
+  font-size: 9.5px;
+  opacity: 0.55;
+  font-family: var(--font-mono);
+}
+
+.market-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: 1;
+  padding: 20px 0;
+}
+
+.market-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.market-body::-webkit-scrollbar {
+  display: none;
+}
+
+.index-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.index-card {
+  background: var(--surface-card-bg);
+  border: 1px solid var(--surface-border-divider);
+  border-radius: var(--radius-md);
+  padding: 4px 5px;
+  text-align: center;
+  box-sizing: border-box;
+}
+.index-card .idx-name {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.index-card .idx-price {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1.2;
+}
+.index-card .idx-change {
+  font-size: 9px;
+  font-weight: 500;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 1px;
+  font-family: var(--font-mono);
+}
+
+.breadth-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  box-sizing: border-box;
+}
+
+.breadth-counts {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+}
+.breadth-counts .count-tag.up { color: var(--color-up); }
+.breadth-counts .count-tag.down { color: var(--color-down); }
+.breadth-counts .count-tag.flat { color: var(--color-flat); }
+
+.breadth-bar-container {
+  display: flex;
+  height: 5px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  background: var(--surface-card-active);
+}
+.breadth-bar-segment.up-bar {
+  background: var(--color-up);
+  transition: width 0.3s ease;
+}
+.breadth-bar-segment.down-bar {
+  background: var(--color-down);
+  transition: width 0.3s ease;
+}
+
+.macro-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.macro-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 3px 7px;
+  font-size: 9.5px;
+}
+.macro-stat-item .stat-label {
+  color: var(--text-muted);
+}
+.macro-stat-item .stat-value {
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.sectors-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sectors-title {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.sectors-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.sector-badge {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 9.5px;
+}
+.sector-badge .sec-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+.sector-badge .sec-name {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 78px;
+}
+.sector-badge .sec-pct {
+  font-family: var(--font-mono);
+}
+.sector-badge .sec-lead {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.sector-badge .lead-label {
+  color: var(--text-dim);
+}
+.sector-badge .lead-stock {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 85px;
+}

@@ -1,0 +1,93 @@
+/**
+ * Design Tokens - AI Finance Moyu
+ * 统一金融配色、暗黑毛玻璃材质、字阶、圆角与阴影变量
+ */
+:root {
+  /* ------------------------------------------------ Financial Semantic Colors */
+  /* A-share: Red Up, Green Down, Gray Flat */
+  --color-up: #eb4d4b;
+  --color-up-subtle: #f87171;
+  --color-up-bg: rgba(235, 77, 75, 0.16);
+  --color-up-border: rgba(235, 77, 75, 0.35);
+
+  --color-down: #2ecc71;
+  --color-down-subtle: #4ade80;
+  --color-down-bg: rgba(46, 204, 113, 0.16);
+  --color-down-border: rgba(46, 204, 113, 0.35);
+
+  --color-flat: #9ca3af;
+  --color-flat-bg: rgba(156, 163, 175, 0.12);
+  --color-flat-border: rgba(156, 163, 175, 0.25);
+
+  /* Primary Accent (Electric Cyan-Blue) */
+  --color-accent: #4b8ef7;
+  --color-accent-light: #70aaff;
+  --color-accent-hover: #8fc0ff;
+  --color-accent-bg: rgba(75, 142, 247, 0.16);
+  --color-accent-border: rgba(75, 142, 247, 0.35);
+
+  /* Warning & Danger */
+  --color-warning: #f59e0b;
+  --color-warning-light: #fbbf24;
+  --color-warning-bg: rgba(245, 158, 11, 0.16);
+  --color-warning-border: rgba(245, 158, 11, 0.35);
+
+  --color-danger: #e64545;
+  --color-danger-bg: rgba(230, 69, 69, 0.18);
+  --color-danger-border: rgba(230, 69, 69, 0.4);
+
+  /* ------------------------------------------------ Surfaces & Backgrounds */
+  --surface-app-bg: #101216;
+  --surface-glass-bg: rgba(18, 20, 26, 0.92);
+  --surface-glass-border: rgba(255, 255, 255, 0.12);
+  --surface-card-bg: rgba(255, 255, 255, 0.04);
+  --surface-card-hover: rgba(255, 255, 255, 0.08);
+  --surface-card-active: rgba(255, 255, 255, 0.12);
+  --surface-border-subtle: rgba(255, 255, 255, 0.08);
+  --surface-border-divider: rgba(255, 255, 255, 0.06);
+  --surface-popover-bg: rgba(18, 22, 31, 0.96);
+  --surface-input-bg: rgba(0, 0, 0, 0.28);
+  --surface-input-border: rgba(255, 255, 255, 0.14);
+
+  /* ------------------------------------------------ Typography & Text */
+  --text-primary: #f3f4f6;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-dim: #6b7280;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* ------------------------------------------------ Global Market Status Badges */
+  --status-trading: #22c55e;
+  --status-trading-bg: rgba(34, 197, 94, 0.16);
+  --status-trading-border: rgba(34, 197, 94, 0.28);
+
+  --status-prepost: #f59e0b;
+  --status-prepost-bg: rgba(245, 158, 11, 0.16);
+  --status-prepost-border: rgba(245, 158, 11, 0.28);
+
+  --status-break: #eab308;
+  --status-break-bg: rgba(234, 179, 8, 0.16);
+  --status-break-border: rgba(234, 179, 8, 0.28);
+
+  --status-closed: #6b7280;
+  --status-closed-bg: rgba(156, 163, 175, 0.12);
+  --status-closed-border: rgba(156, 163, 175, 0.2);
+
+  /* ------------------------------------------------ Radius & Shadows */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-card: 12px;
+  --radius-pill: 9999px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-popover: 0 8px 32px rgba(0, 0, 0, 0.85);
+
+  /* ------------------------------------------------ Transitions */
+  --transition-fast: 0.12s ease;
+  --transition-normal: 0.18s ease;
+}

@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-
+import './TrendBadge.css'
 import { fmtPct, fmtSigned, isIndexCode, trendClass, type Quote, type TrendSignal } from '../types'
 
 function roleBadgeClass(role: string): string {

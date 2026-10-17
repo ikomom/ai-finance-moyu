@@ -1,0 +1,66 @@
+/* Global market status badges */
+.global-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 7.5px;
+  padding: 0.5px 4px;
+  border-radius: var(--radius-xs);
+  font-weight: 500;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.global-status-badge .status-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* 交易中 - Green */
+.global-status-badge.status-open {
+  background: var(--status-trading-bg);
+  color: var(--status-trading);
+  border: 1px solid var(--status-trading-border);
+}
+.global-status-badge.status-open .status-dot {
+  background: var(--status-trading);
+  box-shadow: 0 0 3px var(--status-trading);
+}
+
+/* 盘前 / 盘后 - Amber */
+.global-status-badge.status-pre {
+  background: var(--status-prepost-bg);
+  color: var(--status-prepost);
+  border: 1px solid var(--status-prepost-border);
+}
+.global-status-badge.status-pre .status-dot {
+  background: var(--status-prepost);
+}
+
+/* 午休 - Yellow */
+.global-status-badge.status-break {
+  background: var(--status-break-bg);
+  color: var(--status-break);
+  border: 1px solid var(--status-break-border);
+}
+.global-status-badge.status-break .status-dot {
+  background: var(--status-break);
+}
+
+/* 已收盘 / 周末休市 - Neutral Gray */
+.global-status-badge.status-closed {
+  background: var(--status-closed-bg);
+  color: var(--status-closed);
+  border: 1px solid var(--status-closed-border);
+}
+.global-status-badge.status-closed .status-dot {
+  background: var(--status-closed);
+}
+
+.hours-hint {
+  opacity: 0.65;
+  font-size: 7.5px;
+  margin-left: 2px;
+}

@@ -1,0 +1,128 @@
+/* StockHeader - Meta line, large price, badges and hover tags */
+.mini-meta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  gap: 8px;
+}
+.mini-meta .meta-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  min-width: 0;
+}
+.mini-meta .meta-left .name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mini-meta .meta-left .code {
+  font-size: 11px;
+  opacity: 0.6;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mini-meta .meta-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mini-meta .stats-text {
+  display: flex;
+  gap: 6px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.hover-time-tag {
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.09);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  line-height: 1.2;
+  align-self: center;
+}
+
+.mini-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.mini-price-row .big-price {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-family: var(--font-mono);
+}
+.mini-price-row .big-pct {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.mini-pnl-group {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.profit-badge {
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+/* 竞价诊断徽标 */
+.auction-diagnosis-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  line-height: 1.2;
+  cursor: help;
+  user-select: none;
+  border: 1px solid transparent;
+}
+.auction-diagnosis-badge.bull_trap {
+  color: var(--color-warning-light);
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+.auction-diagnosis-badge.bear_trap {
+  color: var(--color-down-subtle);
+  background: var(--color-down-bg);
+  border-color: var(--color-down-border);
+}
+.auction-diagnosis-badge.snatching {
+  color: var(--color-up-subtle);
+  background: var(--color-up-bg);
+  border-color: var(--color-up-border);
+}
+.auction-diagnosis-badge.dumping {
+  color: var(--color-accent-light);
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+}
+.auction-diagnosis-badge.normal {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.08);
+}

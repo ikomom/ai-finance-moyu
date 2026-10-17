@@ -1,0 +1,66 @@
+/* Settings AppearanceTab - Layout & Visibility Option Cards */
+.grid-options {
+  display: grid;
+  gap: 10px;
+}
+.grid-options.col-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.grid-options.col-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.opt-card {
+  border: 1px solid var(--surface-border-subtle);
+  background: var(--surface-card-bg);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  cursor: pointer;
+  transition: all var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.opt-card:hover {
+  background: var(--surface-card-hover);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.opt-card.active {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+  box-shadow: 0 0 16px var(--color-accent-bg);
+}
+
+.opt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.opt-icon {
+  font-size: 16px;
+}
+
+.opt-badge {
+  font-size: 10px;
+  background: var(--color-accent-bg);
+  color: var(--color-accent-light);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+}
+
+.opt-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.opt-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}

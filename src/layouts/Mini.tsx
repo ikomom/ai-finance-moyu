@@ -1,20 +1,25 @@
-import { createEffect, createSignal, For, Show } from 'solid-js'
+import { createEffect, createSignal, Show } from 'solid-js'
+import './Mini.css'
 
 import { AuctionBadge } from '../components/AuctionBadge'
 import { AuctionCanvas } from '../components/AuctionCanvas'
 import { Chart } from '../components/Chart'
+import { FooterControls } from '../components/FooterControls'
 import { Grip } from '../components/Grip'
 import { KLineBadge } from '../components/KLineBadge'
 import { KlineCanvas } from '../components/KlineCanvas'
+import { PillTabs } from '../components/PillTabs'
 import { StatusLine } from '../components/StatusLine'
+import { StockHeader } from '../components/StockHeader'
 import { TrendBadge } from '../components/TrendBadge'
+import { useSubchartMode } from '../hooks/useSubchartMode'
 import { miniModeOverride, selectedIndex, setMiniModeOverride, setSelected, snapshot } from '../store'
 import { fetchKLine, setTrendTargets } from '../tauri'
 import {
   fmtHHMM,
   fmtMoney,
   fmtPct,
-  fmtPrice,
+  fmtVol,
   isIndexCode,
   profitAmount,
   profitPct,
@@ -25,12 +30,6 @@ import {
   type KLineData,
   type TrendPoint,
 } from '../types'
-
-function fmtVol(v: number): string {
-  if (v >= 100000000) return `${(v / 100000000).toFixed(1)}亿`
-  if (v >= 10000) return `${(v / 10000).toFixed(1)}万`
-  return `${Math.round(v)}`
-}
 
 /**
  * Layout 2 — 迷你图.
@@ -44,6 +43,7 @@ export function Mini(props: { flash: boolean }) {
   const [hoveredKBar, setHoveredKBar] = createSignal<KLineBar | null>(null)
   const [hoveredKExtra, setHoveredKExtra] = createSignal<{ ma5?: number | null; ma10?: number | null; ma20?: number | null; dif?: number | null; dea?: number | null; macd?: number | null; chgPct?: number | null } | null>(null)
   const [manualMode, setManualMode] = createSignal<'trend' | 'kline' | 'auction' | null>(null)
+
   createEffect(() => {
     const override = miniModeOverride()
     if (override) {
@@ -51,17 +51,10 @@ export function Mini(props: { flash: boolean }) {
       setMiniModeOverride(null)
     }
   })
+
   const [klineCache, setKlineCache] = createSignal<Record<string, KLineData>>({})
   const [klineLoading, setKlineLoading] = createSignal(false)
-  const [subchartMode, setSubchartMode] = createSignal<'vol' | 'macd'>(
-    (typeof localStorage !== 'undefined' && (localStorage.getItem('moyu_subchart_mode') as 'vol' | 'macd')) || 'vol'
-  )
-  const toggleSubchartMode = (mode: 'vol' | 'macd') => {
-    setSubchartMode(mode)
-    try {
-      localStorage.setItem('moyu_subchart_mode', mode)
-    } catch {}
-  }
+  const { subchartMode, setSubchartMode: toggleSubchartMode } = useSubchartMode()
 
   const quotes = () => s()?.quotes ?? []
   const item = () => {
@@ -84,6 +77,7 @@ export function Mini(props: { flash: boolean }) {
   const isIndex = () => isIndexCode(quote()?.code ?? '')
   const isAuctionSession = () =>
     ['CallAuctionCancelable', 'CallAuctionLocked', 'PreTrade'].includes(s()?.status?.session ?? '')
+
   const activeMode = () => {
     const m = manualMode()
     if (m === 'kline') return 'kline'
@@ -110,40 +104,13 @@ export function Mini(props: { flash: boolean }) {
     }
   })
 
-  let tabsContainerRef: HTMLDivElement | undefined
-  const tabRefs: (HTMLButtonElement | undefined)[] = []
-
-  const scrollToActiveTab = (idx: number, smooth: boolean = true) => {
-    if (!tabsContainerRef) return
-    const el = tabRefs[idx]
-    if (!el) return
-
-    const containerRect = tabsContainerRef.getBoundingClientRect()
-    const elRect = el.getBoundingClientRect()
-
-    if (elRect.left < containerRect.left) {
-      const diff = containerRect.left - elRect.left + 8
-      tabsContainerRef.scrollBy({
-        left: -diff,
-        behavior: smooth ? 'smooth' : 'auto',
-      })
-    } else if (elRect.right > containerRect.right) {
-      const diff = elRect.right - containerRect.right + 8
-      tabsContainerRef.scrollBy({
-        left: diff,
-        behavior: smooth ? 'smooth' : 'auto',
-      })
-    }
-  }
-
+  // Clear hover state on item switch
   createEffect(() => {
-    const idx = selectedIndex()
+    selectedIndex()
     setHoveredPoint(null)
     setHoveredAuctionPoint(null)
-    quotes()
-    requestAnimationFrame(() => {
-      scrollToActiveTab(idx, true)
-    })
+    setHoveredKBar(null)
+    setHoveredKExtra(null)
   })
 
   createEffect(() => {
@@ -173,22 +140,11 @@ export function Mini(props: { flash: boolean }) {
     >
       {/* Top stock pill tabs */}
       <Show when={quotes().length > 1}>
-        <div class="mini-tabs" ref={tabsContainerRef} data-tauri-drag-region>
-          <For each={quotes()}>
-            {(q, i) => (
-              <button
-                ref={(el) => (tabRefs[i()] = el)}
-                type="button"
-                class="mini-tab"
-                classList={{ active: i() === selectedIndex() }}
-                onClick={() => setSelected(i())}
-                title={`${q.name} (${q.code})`}
-              >
-                {q.name}
-              </button>
-            )}
-          </For>
-        </div>
+        <PillTabs
+          items={quotes().map((q) => ({ id: q.code, label: q.name, title: `${q.name} (${q.code})` }))}
+          selectedIndex={selectedIndex()}
+          onSelect={setSelected}
+        />
       </Show>
 
       <Show
@@ -315,10 +271,17 @@ export function Mini(props: { flash: boolean }) {
 
           return (
             <>
-              <div class="mini-meta" data-tauri-drag-region>
-                <div class="meta-left">
-                  <span class="name">{q().name}</span>
-                  <span class="code">{q().code.replace(/^(sh|sz|bj)/, '')}</span>
+              {/* Unified Stock Header */}
+              <StockHeader
+                name={q().name}
+                code={q().code}
+                price={q().price}
+                changePct={q().changePct}
+                activePrice={activePrice()}
+                activePct={activePct()}
+                high={stats().high}
+                low={stats().low}
+                badge={
                   <Show
                     when={activeMode() === 'kline'}
                     fallback={
@@ -336,30 +299,10 @@ export function Mini(props: { flash: boolean }) {
                   >
                     <KLineBadge kline={kline()} quote={q()} />
                   </Show>
-                </div>
-                <div class="meta-right">
-                  <div class="stats-text">
-                    <span>高 <b class="up">{fmtPrice(stats().high)}</b></span>
-                    <span>低 <b class="down">{fmtPrice(stats().low)}</b></span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mini-price-row">
-                <span class={`big-price ${q().price > 0 ? trendClass(activePct()) : 'flat'}`}>
-                  {q().price > 0 ? fmtPrice(activePrice()) : '--'}
-                </span>
-                <span class={`big-pct ${q().price > 0 ? trendClass(activePct()) : 'flat'}`}>
-                  {q().price > 0 ? fmtPct(activePct()) : '--'}
-                </span>
-                <Show when={hoverTime()}>
-                  {(time) => (
-                    <span class="hover-time-tag">
-                      {time()}{hoverExtra() ? ` · ${hoverExtra()}` : ''}
-                    </span>
-                  )}
-                </Show>
-                <Show when={!hoverTime()}>
+                }
+                hoverTime={hoverTime()}
+                hoverExtra={hoverExtra()}
+                extraInfo={
                   <div class="mini-pnl-group">
                     <Show when={cost()}>
                       {(c) => {
@@ -377,9 +320,10 @@ export function Mini(props: { flash: boolean }) {
                       </span>
                     </Show>
                   </div>
-                </Show>
-              </div>
+                }
+              />
 
+              {/* Chart Canvas */}
               <Show
                 when={activeMode() === 'kline'}
                 fallback={
@@ -426,63 +370,17 @@ export function Mini(props: { flash: boolean }) {
                 />
               </Show>
 
+              {/* Unified Footer */}
               <div class="mini-footer">
                 <StatusLine status={s().status} />
-                <div class="mini-footer-actions">
-                  <Show when={activeMode() !== 'auction'}>
-                    <div class="mode-pill-group">
-                      <button
-                        type="button"
-                        class="mode-pill"
-                        classList={{ active: subchartMode() === 'vol' }}
-                        onClick={() => toggleSubchartMode('vol')}
-                        title="切换副图：成交量 (VOL)"
-                      >
-                        量
-                      </button>
-                      <button
-                        type="button"
-                        class="mode-pill"
-                        classList={{ active: subchartMode() === 'macd' }}
-                        onClick={() => toggleSubchartMode('macd')}
-                        title="切换副图：MACD指标"
-                      >
-                        MACD
-                      </button>
-                    </div>
-                  </Show>
-                  <div class="mode-pill-group">
-                    <button
-                      type="button"
-                      class="mode-pill"
-                      classList={{ active: activeMode() === 'trend' }}
-                      onClick={() => setManualMode('trend')}
-                      title="全天分时图"
-                    >
-                      分时
-                    </button>
-                    <button
-                      type="button"
-                      class="mode-pill"
-                      classList={{ active: activeMode() === 'kline' }}
-                      onClick={() => setManualMode('kline')}
-                      title="前复权日K线及均线系统"
-                    >
-                      日K
-                    </button>
-                    <Show when={!isIndex()}>
-                      <button
-                        type="button"
-                        class="mode-pill"
-                        classList={{ active: activeMode() === 'auction' }}
-                        onClick={() => setManualMode('auction')}
-                        title="早盘集合竞价 (09:15-09:25) 走势与诱多/诱空诊断"
-                      >
-                        竞价
-                      </button>
-                    </Show>
-                  </div>
-                </div>
+                <FooterControls
+                  subchartMode={subchartMode()}
+                  onToggleSubchart={toggleSubchartMode}
+                  viewMode={activeMode()}
+                  onToggleView={(m) => setManualMode(m)}
+                  showSubchart={activeMode() !== 'auction'}
+                  showAuction={!isIndex()}
+                />
               </div>
             </>
           )

@@ -19,6 +19,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
     let mini = MenuItemBuilder::with_id("layout:mini", "布局 · 迷你图").build(app)?;
     let list = MenuItemBuilder::with_id("layout:list", "布局 · 列表").build(app)?;
     let market = MenuItemBuilder::with_id("layout:market", "布局 · 大盘全景").build(app)?;
+    let global = MenuItemBuilder::with_id("layout:global", "布局 · 全球股指").build(app)?;
     let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
 
     let mode_sub = SubmenuBuilder::new(app, "显隐模式")
@@ -41,7 +42,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
 
     let menu = MenuBuilder::new(app)
         .items(&[
-            &toggle, &refresh, &sep1, &bar, &mini, &list, &market, &sep2, &mode_sub, &sep_mode, &settings,
+            &toggle, &refresh, &sep1, &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode, &settings,
             &check_update, &sep_settings, &autostart, &sep3, &quit,
         ])
         .build()?;
@@ -105,6 +106,7 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
                 "bar" => crate::config::Layout::Bar,
                 "list" => crate::config::Layout::List,
                 "market" => crate::config::Layout::Market,
+                "global" => crate::config::Layout::Global,
                 _ => crate::config::Layout::Mini,
             };
             crate::apply_layout(app, layout);
@@ -178,6 +180,9 @@ pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::
     let market = CheckMenuItemBuilder::with_id("layout:market", "大盘全景")
         .checked(current_layout == crate::config::Layout::Market)
         .build(app)?;
+    let global = CheckMenuItemBuilder::with_id("layout:global", "全球股指")
+        .checked(current_layout == crate::config::Layout::Global)
+        .build(app)?;
     let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
 
     let mode_sub = SubmenuBuilder::new(app, "显隐模式")
@@ -207,7 +212,7 @@ pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::
 
     let menu = MenuBuilder::new(app)
         .items(&[
-            &refresh, &sep1, &bar, &mini, &list, &market, &sep2, &mode_sub, &sep_mode,
+            &refresh, &sep1, &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode,
             &opacity_sub, &sep_opacity, &settings, &sep_settings, &autostart, &sep3, &quit,
         ])
         .build()?;

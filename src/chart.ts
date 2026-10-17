@@ -11,7 +11,9 @@
 //   * The 均价线 (average price) is mandatory, and the feed only gives
 //     cumulative volume/amount, so it is derived per point.
 
-import { AVG, DOWN, fmtVol, UP, type PriceLine, type Trend, type TrendPoint } from './types'
+import { AVG, DOWN, fmtVol, UP, type PriceLine, type Trend } from './types'
+import { computeMinuteMacd, type MinuteMacd } from './utils/indicators'
+export { computeMinuteMacd, type MinuteMacd }
 
 const MORNING_START = 9 * 60 + 30 // 09:30
 const MORNING_END = 11 * 60 + 30 // 11:30
@@ -23,52 +25,6 @@ const PRE_CLOSE_LINE = 'rgba(255,255,255,0.28)'
 const COST_LINE = '#22d3ee'
 const LINE_COLOR = 'rgba(255,255,255,0.55)'
 const FONT = '9px ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-
-export interface MinuteMacd {
-  dif: number
-  dea: number
-  macd: number
-}
-
-export function computeMinuteMacd(
-  points: TrendPoint[],
-  params?: [number, number, number]
-): MinuteMacd[] {
-  const [fast, slow, signal] = params ?? [12, 26, 9]
-  const n = points.length
-  if (n === 0) return []
-  const res: MinuteMacd[] = new Array(n)
-
-  const kFast = 2 / (fast + 1)
-  const kSlow = 2 / (slow + 1)
-  const kSignal = 2 / (signal + 1)
-
-  let emaFast = points[0].price
-  let emaSlow = points[0].price
-  let dea = 0
-
-  for (let i = 0; i < n; i++) {
-    const p = points[i].price
-    if (i === 0) {
-      emaFast = p
-      emaSlow = p
-      dea = 0
-      res[i] = { dif: 0, dea: 0, macd: 0 }
-    } else {
-      emaFast = emaFast * (1 - kFast) + p * kFast
-      emaSlow = emaSlow * (1 - kSlow) + p * kSlow
-      const dif = emaFast - emaSlow
-      dea = dea * (1 - kSignal) + dif * kSignal
-      const macd = (dif - dea) * 2
-      res[i] = {
-        dif: Math.round(dif * 1000) / 1000,
-        dea: Math.round(dea * 1000) / 1000,
-        macd: Math.round(macd * 1000) / 1000,
-      }
-    }
-  }
-  return res
-}
 
 export interface DrawOptions {
   trend: Trend | undefined
@@ -84,6 +40,7 @@ export interface DrawOptions {
   orbLow?: number | null
   subchartMode?: 'vol' | 'macd'
   macdParams?: [number, number, number]
+  isGlobal?: boolean
 }
 
 export function isValidAvg(avgPrice: number, preClose: number): boolean {
@@ -202,6 +159,14 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const yTop = preClose + maxDev
   const span = yTop - yMin || 1
 
+  const isGlobal = opts.isGlobal ?? false
+  const getSlot = (time: number, idx: number) => {
+    if (isGlobal) {
+      return (idx / Math.max(1, points.length - 1)) * SLOTS
+    }
+    return slotOf(time)
+  }
+
   const xOf = (slot: number) => plotL + (slot / SLOTS) * plotW
   const yOf = (price: number) => plotT + (1 - (price - yMin) / span) * priceH
 
@@ -264,12 +229,25 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     }
   }
 
+  const fmtHhmm = (t: number): string => {
+    const h = Math.floor(t / 100).toString().padStart(2, '0')
+    const m = (t % 100).toString().padStart(2, '0')
+    return `${h}:${m}`
+  }
+
   ctx.textAlign = 'center'
-  const timeLabels: Array<[number, string]> = [
-    [0, '9:30'],
-    [120, '11:30/13:00'],
-    [240, '15:00'],
-  ]
+  const timeLabels: Array<[number, string]> =
+    isGlobal && points.length > 0
+      ? [
+          [0, fmtHhmm(points[0].time)],
+          [120, fmtHhmm(points[Math.floor(points.length / 2)].time)],
+          [240, fmtHhmm(points[points.length - 1].time)],
+        ]
+      : [
+          [0, '9:30'],
+          [120, '11:30/13:00'],
+          [240, '15:00'],
+        ]
   for (const [slot, label] of timeLabels) {
     let x = xOf(slot)
     if (slot === 0) {
@@ -298,7 +276,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const path = new Path2D()
   const fill = new Path2D()
   points.forEach((p, i) => {
-    const x = xOf(slotOf(p.time))
+    const x = xOf(getSlot(p.time, i))
     const y = yOf(p.price)
     if (i === 0) {
       path.moveTo(x, y)
@@ -309,7 +287,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       fill.lineTo(x, y)
     }
   })
-  const lastX = xOf(slotOf(points[points.length - 1].time))
+  const lastX = xOf(getSlot(points[points.length - 1].time, points.length - 1))
   fill.lineTo(lastX, yPre)
   fill.closePath()
 
@@ -329,7 +307,8 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   if (validAvgPoints.length >= Math.max(1, Math.floor(points.length * 0.4))) {
     const avgPath = new Path2D()
     validAvgPoints.forEach((p, i) => {
-      const x = xOf(slotOf(p.time))
+      const idx = points.indexOf(p)
+      const x = xOf(getSlot(p.time, idx >= 0 ? idx : i))
       const y = yOf(p.avgPrice)
       if (i === 0) avgPath.moveTo(x, y)
       else avgPath.lineTo(x, y)
@@ -365,7 +344,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       for (let i = 0; i < points.length; i++) {
         const v = minuteVols[i]
         if (v <= 0) continue
-        const slot = slotOf(points[i].time)
+        const slot = getSlot(points[i].time, i)
         const cx = xOf(slot)
         const barH = Math.max(1, (Math.sqrt(v) / sqrtMax) * subPlotH)
         const isUp = i === 0 ? points[0].price >= preClose : points[i].price >= points[i - 1].price
@@ -378,7 +357,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       if (opts.hoverSlot != null) {
         let minDiff = 999
         for (let i = 0; i < points.length; i++) {
-          const diff = Math.abs(slotOf(points[i].time) - opts.hoverSlot)
+          const diff = Math.abs(getSlot(points[i].time, i) - opts.hoverSlot)
           if (diff < minDiff) {
             minDiff = diff
             activeIdx = i
@@ -438,7 +417,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       const histW = Math.max(1, (plotW / SLOTS) * 0.72)
       for (let i = 0; i < points.length; i++) {
         const m = minuteMacd[i].macd
-        const slot = slotOf(points[i].time)
+        const slot = getSlot(points[i].time, i)
         const cx = xOf(slot)
         const my = yOfMacd(m)
         const barTop = Math.min(zeroY, my)
@@ -452,7 +431,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       ctx.lineWidth = 1.1
       ctx.beginPath()
       points.forEach((p, i) => {
-        const cx = xOf(slotOf(p.time))
+        const cx = xOf(getSlot(p.time, i))
         const cy = yOfMacd(minuteMacd[i].dif)
         if (i === 0) ctx.moveTo(cx, cy)
         else ctx.lineTo(cx, cy)
@@ -464,7 +443,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       ctx.lineWidth = 1.1
       ctx.beginPath()
       points.forEach((p, i) => {
-        const cx = xOf(slotOf(p.time))
+        const cx = xOf(getSlot(p.time, i))
         const cy = yOfMacd(minuteMacd[i].dea)
         if (i === 0) ctx.moveTo(cx, cy)
         else ctx.lineTo(cx, cy)
@@ -476,7 +455,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       if (opts.hoverSlot != null) {
         let minDiff = 999
         for (let i = 0; i < points.length; i++) {
-          const diff = Math.abs(slotOf(points[i].time) - opts.hoverSlot)
+          const diff = Math.abs(getSlot(points[i].time, i) - opts.hoverSlot)
           if (diff < minDiff) {
             minDiff = diff
             activeIdx = i
@@ -547,15 +526,18 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   if (opts.hoverSlot != null && points.length > 0) {
     const targetSlot = opts.hoverSlot
     let closest = points[0]
+    let closestIdx = 0
     let minDiff = 999
-    for (const p of points) {
-      const diff = Math.abs(slotOf(p.time) - targetSlot)
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i]
+      const diff = Math.abs(getSlot(p.time, i) - targetSlot)
       if (diff < minDiff) {
         minDiff = diff
         closest = p
+        closestIdx = i
       }
     }
-    const hx = xOf(slotOf(closest.time))
+    const hx = xOf(getSlot(closest.time, closestIdx))
     const hy = yOf(closest.price)
 
     ctx.save()

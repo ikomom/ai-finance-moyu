@@ -150,6 +150,7 @@ export function demoSnapshot(): Snapshot {
         layoutMini: 'ctrl+alt+2',
         layoutList: 'ctrl+alt+3',
         layoutMarket: 'ctrl+alt+4',
+        layoutGlobal: 'ctrl+alt+5',
       },
       alertPct: 3,
       pollQuotesMs: 3000,

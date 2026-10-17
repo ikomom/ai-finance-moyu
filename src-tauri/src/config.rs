@@ -26,6 +26,8 @@ pub enum Layout {
     List,
     /// Macro market overview & sector sentiment.
     Market,
+    /// Global stock indices & international market trends.
+    Global,
 }
 
 /// Which upstream quote provider to use.
@@ -94,6 +96,8 @@ pub struct LayoutSizes {
     pub list: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub market: Option<[f64; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub global: Option<[f64; 2]>,
 }
 
 /// True when no layout has a user-set size, so the whole map can be left out of
@@ -104,7 +108,11 @@ fn sizes_are_empty(s: &LayoutSizes) -> bool {
 
 impl LayoutSizes {
     pub fn is_empty(&self) -> bool {
-        self.bar.is_none() && self.mini.is_none() && self.list.is_none() && self.market.is_none()
+        self.bar.is_none()
+            && self.mini.is_none()
+            && self.list.is_none()
+            && self.market.is_none()
+            && self.global.is_none()
     }
 
     pub fn get(&self, layout: Layout) -> Option<(f64, f64)> {
@@ -113,6 +121,7 @@ impl LayoutSizes {
             Layout::Mini => self.mini,
             Layout::List => self.list,
             Layout::Market => self.market,
+            Layout::Global => self.global,
         };
         v.map(|[w, h]| (w, h))
     }
@@ -124,6 +133,7 @@ impl LayoutSizes {
             Layout::Mini => self.mini = v,
             Layout::List => self.list = v,
             Layout::Market => self.market = v,
+            Layout::Global => self.global = v,
         }
     }
 
@@ -134,6 +144,7 @@ impl LayoutSizes {
             Layout::Mini => self.mini = None,
             Layout::List => self.list = None,
             Layout::Market => self.market = None,
+            Layout::Global => self.global = None,
         }
     }
 }
@@ -229,6 +240,7 @@ pub struct Hotkeys {
     pub layout_mini: String,
     pub layout_list: String,
     pub layout_market: String,
+    pub layout_global: String,
 }
 
 impl Default for Hotkeys {
@@ -239,6 +251,7 @@ impl Default for Hotkeys {
             layout_mini: "ctrl+alt+2".into(),
             layout_list: "ctrl+alt+3".into(),
             layout_market: "ctrl+alt+4".into(),
+            layout_global: "ctrl+alt+5".into(),
         }
     }
 }
@@ -369,7 +382,7 @@ impl Config {
         self.window.height = self.window.height.clamp(28.0, 1200.0);
 
         // A hand-edited, snapped or corrupted size must not make the widget unusable.
-        for layout in [Layout::Bar, Layout::Mini, Layout::List, Layout::Market] {
+        for layout in [Layout::Bar, Layout::Mini, Layout::List, Layout::Market, Layout::Global] {
             if let Some((w, h)) = self.layout_sizes.get(layout) {
                 if layout == Layout::Bar {
                     if w < 140.0 || w > 1400.0 || !w.is_finite() {
@@ -385,6 +398,7 @@ impl Config {
                     Layout::Mini => (1200.0, 900.0),
                     Layout::List => (1400.0, 1200.0),
                     Layout::Market => (1200.0, 900.0),
+                    Layout::Global => (1200.0, 900.0),
                 };
                 if !w.is_finite() || !h.is_finite() || w < 140.0 || h < 24.0 || w > max_w || h > max_h {
                     self.layout_sizes.clear(layout);
@@ -608,6 +622,7 @@ mod tests {
         assert_eq!(serde_json::to_string(&Layout::Mini).unwrap(), "\"mini\"");
         assert_eq!(serde_json::to_string(&Layout::List).unwrap(), "\"list\"");
         assert_eq!(serde_json::to_string(&Layout::Market).unwrap(), "\"market\"");
+        assert_eq!(serde_json::to_string(&Layout::Global).unwrap(), "\"global\"");
     }
 
     #[test]

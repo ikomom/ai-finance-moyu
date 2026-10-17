@@ -1,5 +1,6 @@
 import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
+import './List.css'
 
 import { Grip } from '../components/Grip'
 import { Sparkline } from '../components/Sparkline'

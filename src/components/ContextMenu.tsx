@@ -1,5 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
+import './ContextMenu.css'
 
 import { snapshot } from '../store'
 import type { Layout, VisibilityMode } from '../types'
@@ -8,6 +9,8 @@ const LAYOUTS: Array<[Layout, string]> = [
   ['bar', '数字条'],
   ['mini', '迷你图'],
   ['list', '列表'],
+  ['market', '大盘全景'],
+  ['global', '全球股指'],
 ]
 
 const VISIBILITY_MODES: Array<[VisibilityMode, string]> = [

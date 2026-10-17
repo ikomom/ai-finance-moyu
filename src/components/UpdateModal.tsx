@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { relaunch } from '@tauri-apps/plugin-process'
 import type { Update } from '@tauri-apps/plugin-updater'
+import './UpdateModal.css'
 
 export interface DownloadProgress {
   status: 'idle' | 'downloading' | 'finished' | 'error'

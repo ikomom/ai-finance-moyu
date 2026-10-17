@@ -1,0 +1,23 @@
+/* Settings SystemTab - Global Hotkeys */
+.hotkey-field {
+  align-items: flex-start;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.hotkey-label-group {
+  flex: 0 0 210px;
+  display: flex;
+  flex-direction: column;
+}
+
+.hotkey-label-group label {
+  color: #fff;
+  font-weight: 500;
+  font-size: 12.5px;
+}
+
+.hotkey-sub-desc {
+  color: var(--text-muted);
+  font-size: 11px;
+}

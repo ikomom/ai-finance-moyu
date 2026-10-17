@@ -44,6 +44,7 @@ fn natural_size(layout: Layout, rows: usize) -> (f64, f64) {
             (360.0, h)
         }
         Layout::Market => (345.0, 275.0),
+        Layout::Global => (350.0, 280.0),
     }
 }
 
@@ -61,6 +62,7 @@ fn size_for(layout: Layout, rows: usize, sizes: &config::LayoutSizes) -> (f64, f
         Layout::Mini => sizes.get(Layout::Mini).unwrap_or_else(|| natural_size(Layout::Mini, rows)),
         Layout::List => sizes.get(Layout::List).unwrap_or_else(|| natural_size(Layout::List, rows)),
         Layout::Market => sizes.get(Layout::Market).unwrap_or_else(|| natural_size(Layout::Market, rows)),
+        Layout::Global => sizes.get(Layout::Global).unwrap_or_else(|| natural_size(Layout::Global, rows)),
     }
 }
 
@@ -161,7 +163,7 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
         let _ = win.show();
     }
 
-    if layout == Layout::Market {
+    if layout == Layout::Market || layout == Layout::Global {
         let handle = app.clone();
         tauri::async_runtime::spawn(async move {
             let _ = poller::poll_market_overview(&handle).await;
@@ -273,6 +275,7 @@ fn on_resized(app: &AppHandle, size: tauri::PhysicalSize<u32>, scale: f64) {
                 Layout::Mini => (1200.0, 900.0),
                 Layout::List => (1400.0, 1200.0),
                 Layout::Market => (1200.0, 900.0),
+                Layout::Global => (1200.0, 900.0),
             };
             if w <= max_w && h <= max_h {
                 cfg.layout_sizes.set(layout, w, h);
@@ -876,6 +879,18 @@ async fn get_kline(app: AppHandle, code: String) -> Result<quote::KLineData, Str
     state.fetcher.fetch_kline(&norm_code).await.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn get_global_kline(app: AppHandle, code: String) -> Result<quote::KLineData, String> {
+    let state = app.state::<AppState>();
+    state.fetcher.fetch_global_kline(&code).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_global_trend(app: AppHandle, code: String) -> Result<quote::Trend, String> {
+    let state = app.state::<AppState>();
+    state.fetcher.fetch_global_trend(&code).await.map_err(|e| e.to_string())
+}
+
 // ------------------------------------------------------------------- setup
 
 /// Register the global shortcuts plugin and sync active chords.
@@ -898,6 +913,8 @@ fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
                     apply_layout(app, Layout::List);
                 } else if bindings.market.as_ref() == Some(shortcut) {
                     apply_layout(app, Layout::Market);
+                } else if bindings.global.as_ref() == Some(shortcut) {
+                    apply_layout(app, Layout::Global);
                 }
             })
             .build(),
@@ -925,6 +942,7 @@ pub fn sync_hotkeys(app: &AppHandle, keys: &Hotkeys) {
     let mini = parse(&keys.layout_mini);
     let list = parse(&keys.layout_list);
     let market = parse(&keys.layout_market);
+    let global = parse(&keys.layout_global);
 
     let shortcuts = app.global_shortcut();
     let _ = shortcuts.unregister_all();
@@ -935,6 +953,7 @@ pub fn sync_hotkeys(app: &AppHandle, keys: &Hotkeys) {
         mini,
         list,
         market,
+        global,
     };
 
     for (name, chord, opt_s) in [
@@ -943,6 +962,7 @@ pub fn sync_hotkeys(app: &AppHandle, keys: &Hotkeys) {
         ("迷你图", keys.layout_mini.as_str(), new_bindings.mini),
         ("列表", keys.layout_list.as_str(), new_bindings.list),
         ("大盘全景", keys.layout_market.as_str(), new_bindings.market),
+        ("全球股指", keys.layout_global.as_str(), new_bindings.global),
     ] {
         if let Some(s) = opt_s {
             if let Err(e) = shortcuts.register(s) {
@@ -1178,6 +1198,8 @@ pub fn run() {
             search_securities,
             set_trend_targets,
             get_kline,
+            get_global_kline,
+            get_global_trend,
             get_recent_logs,
             open_log_dir,
             open_url,
@@ -1200,12 +1222,14 @@ mod hotkey_tests {
         let mini = keys.layout_mini.parse::<Shortcut>();
         let list = keys.layout_list.parse::<Shortcut>();
         let market = keys.layout_market.parse::<Shortcut>();
+        let global = keys.layout_global.parse::<Shortcut>();
 
         assert!(toggle.is_ok(), "toggle chord must be valid");
         assert!(bar.is_ok(), "bar chord must be valid");
         assert!(mini.is_ok(), "mini chord must be valid");
         assert!(list.is_ok(), "list chord must be valid");
         assert!(market.is_ok(), "market chord must be valid");
+        assert!(global.is_ok(), "global chord must be valid");
 
         let set = [
             toggle.unwrap(),
@@ -1213,6 +1237,7 @@ mod hotkey_tests {
             mini.unwrap(),
             list.unwrap(),
             market.unwrap(),
+            global.unwrap(),
         ];
         // Ensure no chords overlap
         for i in 0..set.len() {

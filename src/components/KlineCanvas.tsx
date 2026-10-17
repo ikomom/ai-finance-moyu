@@ -3,13 +3,22 @@ import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import {
   DOWN,
   fmtPrice,
+  fmtVol,
   UP,
   type KLineBar,
   type KLineData,
   type PriceLine,
   type Quote,
 } from '../types'
+import { computeKLineMacd, computeKLineMovingAverages } from '../utils/indicators'
 
+const GRID = 'rgba(255, 255, 255, 0.07)'
+const AXIS_TEXT = 'rgba(255, 255, 255, 0.42)'
+const COST_LINE = '#22d3ee'
+const FONT = '9px ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+const COLOR_MA5 = '#f59e0b'
+const COLOR_MA10 = '#c084fc'
+const COLOR_MA20 = '#38bdf8'
 export interface KlineCanvasProps {
   kline?: KLineData | null
   quote?: Quote | null
@@ -32,20 +41,6 @@ export interface KlineCanvasProps {
     } | null
   ) => void
 }
-
-function fmtVol(v: number): string {
-  if (v >= 100000000) return `${(v / 100000000).toFixed(1)}亿`
-  if (v >= 10000) return `${(v / 10000).toFixed(1)}万`
-  return `${Math.round(v)}`
-}
-
-const GRID = 'rgba(255, 255, 255, 0.07)'
-const AXIS_TEXT = 'rgba(255, 255, 255, 0.42)'
-const COST_LINE = '#22d3ee'
-const FONT = '9px ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-const COLOR_MA5 = '#f59e0b'
-const COLOR_MA10 = '#c084fc'
-const COLOR_MA20 = '#38bdf8'
 
 export function KlineCanvas(props: KlineCanvasProps) {
   let canvasRef!: HTMLCanvasElement
@@ -104,64 +99,9 @@ export function KlineCanvas(props: KlineCanvasProps) {
       })
     }
 
-    // Recalculate moving averages using configured periods
-    const [p1, p2, p3] = props.maPeriods ?? [5, 10, 20]
-    const n = list.length
-    for (let i = 0; i < n; i++) {
-      if (i + 1 >= p1) {
-        let sum = 0
-        for (let k = i - p1 + 1; k <= i; k++) sum += list[k].close
-        list[i].ma5 = Math.round((sum / p1) * 100) / 100
-      } else {
-        list[i].ma5 = null
-      }
-      if (i + 1 >= p2) {
-        let sum = 0
-        for (let k = i - p2 + 1; k <= i; k++) sum += list[k].close
-        list[i].ma10 = Math.round((sum / p2) * 100) / 100
-      } else {
-        list[i].ma10 = null
-      }
-      if (i + 1 >= p3) {
-        let sum = 0
-        for (let k = i - p3 + 1; k <= i; k++) sum += list[k].close
-        list[i].ma20 = Math.round((sum / p3) * 100) / 100
-      } else {
-        list[i].ma20 = null
-      }
-    }
-
-    // Recalculate MACD(fast, slow, signal) so live ticks update DIF/DEA/MACD in real time
-    if (n > 0) {
-      const [fast, slow, signal] = props.macdParams ?? [12, 26, 9]
-      const kFast = 2 / (fast + 1)
-      const kSlow = 2 / (slow + 1)
-      const kSignal = 2 / (signal + 1)
-
-      let emaFast = list[0].close
-      let emaSlow = list[0].close
-      let dea = 0
-      for (let i = 0; i < n; i++) {
-        const c = list[i].close
-        if (i === 0) {
-          emaFast = c
-          emaSlow = c
-          dea = 0
-          list[i].dif = 0
-          list[i].dea = 0
-          list[i].macd = 0
-        } else {
-          emaFast = emaFast * (1 - kFast) + c * kFast
-          emaSlow = emaSlow * (1 - kSlow) + c * kSlow
-          const dif = emaFast - emaSlow
-          dea = dea * (1 - kSignal) + dif * kSignal
-          const macd = (dif - dea) * 2
-          list[i].dif = Math.round(dif * 1000) / 1000
-          list[i].dea = Math.round(dea * 1000) / 1000
-          list[i].macd = Math.round(macd * 1000) / 1000
-        }
-      }
-    }
+    // Recalculate moving averages and MACD using configured periods
+    computeKLineMovingAverages(list, props.maPeriods)
+    computeKLineMacd(list, props.macdParams)
 
     return list
   }
