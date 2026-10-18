@@ -245,7 +245,7 @@ async function main() {
     console.log(`${colors.cyan}--------------------------------${colors.reset}\n`);
 
     const confirmChangelog = await ask('Use this changelog entry? (Y/n)', 'Y');
-    if (confirmChangelog.toLowerCase() !== 'n') {
+    if (confirmChangelog.toLowerCase() === 'n') {
       log.warn('Release aborted. You can modify CHANGELOG.md manually and re-run.');
       process.exit(0);
     }

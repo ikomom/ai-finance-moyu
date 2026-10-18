@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-10-18
+
+### 🚀 新增功能与体验革新
+- **全链路应用内更新与多节点极速下载**：
+  - 集成国内高可用加速镜像（`ghfast.top`、`gh-proxy.com`），安装包下载提速至数秒内完成；
+  - 备用更新全面对齐原生模式：应用内流式下载、实时 `0%~100%` 进度条与已下载/总 MB，下载后自动静默拉起安装包并重启；
+  - 新增「取消下载」支持，弹窗右上角 `×`、背景遮罩或底部取消按钮可随时安全终止下载并清理临时文件。
+- **更新日志 Markdown 富文本深度渲染**：
+  - 集成 `marked` 引擎，更新日志由原始纯文本升级为排版优雅的深色 GitHub Release 风格 Markdown（标题高亮、重点发光、嵌套列表与代码微标）。
+- **全自动后台静默探测与非侵入提醒**：
+  - 主挂件启动 8 秒后及每 4 小时在后台静默轮询新版，发现新版时底部弹出可交互 Toast 且右键菜单置顶「更新到新版」快捷项；
+  - 设置中心打开时若发现新版且未跳过则自动呼出更新弹窗；支持「跳过此版本」，且手动检测时自动重置跳过记录。
+- **设置中心体验优化（解除强制置顶）**：
+  - 彻底移除设置窗口的 `always_on_top` 强制置顶，使设置中心恢复为标准桌面应用窗口，支持层级自然切换、最小化与正常遮挡。
+
+### 🛠️ 优化与架构改进
+- **自动签名与 `latest.json` 自动化构建**：
+  - 启用 `bundle.createUpdaterArtifacts: true`，GitHub Actions CI 发版时自动生成数字签名清单与 `latest.json`。
+- **后端容灾命令 `fetch_latest_release`**：
+  - 抽离 Rust 后端专用请求命令，配置标准 `User-Agent` 与 `.no_proxy()`，彻底解决前端 WebView fetch 限制与 404 误报。
+
+---
+
 ## [0.2.0] - 2026-10-18
 
 ### 🚀 新增功能与体验革新
