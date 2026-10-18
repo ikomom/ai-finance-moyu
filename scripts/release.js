@@ -293,6 +293,18 @@ async function main() {
     filesToCommit.push('src-tauri/Cargo.toml');
   }
 
+  // src-tauri/Cargo.lock
+  const cargoLockPath = path.resolve('src-tauri/Cargo.lock');
+  if (fs.existsSync(cargoLockPath)) {
+    if (!isDryRun) {
+      try {
+        run('cargo check --manifest-path src-tauri/Cargo.toml', { silent: true, ignoreError: true });
+      } catch {}
+    }
+    log.info(`Updated src-tauri/Cargo.lock -> ${targetVersion}`);
+    filesToCommit.push('src-tauri/Cargo.lock');
+  }
+
   // src-tauri/tauri.conf.json
   const tauriConfPath = path.resolve('src-tauri/tauri.conf.json');
   if (fs.existsSync(tauriConfPath)) {

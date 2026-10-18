@@ -1,15 +1,17 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
-    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: write
     strategy:
@@ -27,7 +29,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.ref }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -54,7 +56,7 @@ jobs:
 
       - name: Extract Release Notes
         id: release_notes
-        run: node scripts/extract-changelog.js ${{ github.event.workflow_run.head_branch || github.ref_name }}
+        run: node scripts/extract-changelog.js ${{ github.ref_name }}
 
       - name: Build and Publish Release
         uses: tauri-apps/tauri-action@v0
@@ -63,7 +65,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ (startsWith(github.event.workflow_run.head_branch, 'v') && github.event.workflow_run.head_branch) || (startsWith(github.ref_name, 'v') && github.ref_name) || 'v__VERSION__' }}
+          tagName: ${{ github.ref_name }}
           releaseName: 'ai-finance-moyu v__VERSION__'
           releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
