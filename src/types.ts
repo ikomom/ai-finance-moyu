@@ -242,10 +242,30 @@ export interface TrendSignal {
   sectorLinkage?: SectorLinkage | null
 }
 
+export type ThemePreset = 'dark' | 'light' | 'transparent' | 'ocean' | 'cyberpunk'
+
+export interface ThemeOption {
+  value: ThemePreset
+  name: string
+  badge: string
+  desc: string
+  icon: string
+  palette: {
+    bg: string
+    card: string
+    border: string
+    accent: string
+    text: string
+    up: string
+    down: string
+  }
+}
+
 export interface Config {
   watchlist: WatchItem[]
   layout: Layout
   opacity: number
+  theme?: ThemePreset
   dataSource: DataSource
   layoutSizes?: LayoutSizes
   hotkeys: Hotkeys

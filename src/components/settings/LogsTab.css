@@ -43,23 +43,23 @@
 .log-filter-pill {
   padding: 4px 10px;
   font-size: 11.5px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(120, 120, 128, 0.1);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  color: var(--text-muted);
+  color: var(--muted);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .log-filter-pill:hover {
   background: var(--surface-card-hover);
-  color: var(--text-primary);
+  color: var(--fg);
 }
 
 .log-filter-pill.active {
   background: var(--color-accent-bg);
-  border-color: var(--color-accent-border);
-  color: #60a5fa;
+  border-color: var(--color-accent);
+  color: var(--color-accent-light);
   font-weight: 600;
 }
 
@@ -73,9 +73,9 @@
   padding: 5px 26px 5px 10px;
   font-size: 11.5px;
   background: var(--surface-input-bg);
-  border: 1px solid var(--surface-border-subtle);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  color: var(--text-primary);
+  color: var(--fg);
   outline: none;
   transition: border-color var(--transition-fast);
 }
@@ -91,22 +91,22 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 14px;
   cursor: pointer;
   padding: 0 4px;
 }
 
 .search-clear-btn:hover {
-  color: var(--text-primary);
+  color: var(--fg);
 }
 
 .log-list-container {
   flex: 1;
   min-height: 280px;
   max-height: 420px;
-  background: rgba(10, 12, 17, 0.7);
-  border: 1px solid var(--surface-border-subtle);
+  background: var(--surface-input-bg);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   overflow-y: auto;
   font-family: var(--font-mono);

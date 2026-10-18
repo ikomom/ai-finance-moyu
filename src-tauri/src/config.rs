@@ -269,6 +269,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_theme() -> String {
+    "dark".to_string()
+}
+
 /// Configurable switches for intraday real-time anomaly alerts.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -301,6 +305,9 @@ pub struct Config {
     pub layout: Layout,
     /// Whole-window opacity, 0.2–1.0.
     pub opacity: f64,
+    /// Visual theme skin preset: "dark" | "light" | "transparent" | "ocean" | "cyberpunk"
+    #[serde(default = "default_theme")]
+    pub theme: String,
     /// Default 涨跌提醒 threshold in percent, used when a security sets none.
     pub alert_pct: f64,
     pub poll_quotes_ms: u64,
@@ -343,6 +350,7 @@ impl Default for Config {
             ],
             layout: Layout::default(),
             opacity: 0.92,
+            theme: default_theme(),
             alert_pct: 3.0,
             poll_quotes_ms: 3000,
             poll_trend_ms: 30_000,
@@ -371,6 +379,13 @@ impl Config {
             } else {
                 *key = trimmed.to_string();
             }
+        }
+
+        if !matches!(
+            self.theme.as_str(),
+            "dark" | "light" | "transparent" | "ocean" | "cyberpunk"
+        ) {
+            self.theme = "dark".into();
         }
 
         self.opacity = self.opacity.clamp(0.2, 1.0);
@@ -761,5 +776,21 @@ mod tests {
         assert_eq!(c.indicator_config.ma, [1, 250, 10]);
         assert_eq!(c.watchlist[0].indicator_mode, None);
         assert_eq!(c.watchlist[0].custom_ma, Some([1, 250, 5]));
+    }
+
+    #[test]
+    fn theme_defaults_and_round_trips() {
+        let mut c = Config::default();
+        assert_eq!(c.theme, "dark");
+
+        c.theme = "light".into();
+        let json = serde_json::to_string(&c).unwrap();
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.theme, "light");
+
+        // Invalid theme gets sanitized back to dark
+        c.theme = "unknown_theme".into();
+        c.sanitize();
+        assert_eq!(c.theme, "dark");
     }
 }

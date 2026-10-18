@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #161922;
+  background: var(--surface-input-bg);
   border: 1px solid var(--surface-input-border);
   border-radius: var(--radius-lg);
   padding: 6px 12px;
@@ -37,7 +37,7 @@
   min-width: 0;
   background: transparent !important;
   border: none !important;
-  color: #fff !important;
+  color: var(--fg) !important;
   font-size: 12.5px;
   padding: 0 !important;
   box-shadow: none !important;
@@ -413,7 +413,7 @@
 
 .watch-head input.code {
   flex: 1 1 120px;
-  background: #191d26;
+  background: var(--surface-input-bg);
   border: 1px solid var(--surface-input-border);
   color: var(--text-primary);
   border-radius: var(--radius-md);
@@ -439,7 +439,7 @@
 
 .watch-head .num input {
   width: 70px;
-  background: #191d26;
+  background: var(--surface-input-bg);
   border: 1px solid var(--surface-input-border);
   color: var(--text-primary);
   border-radius: var(--radius-md);
@@ -580,7 +580,7 @@
 
 .drawer-row .num input {
   width: 85px;
-  background: #191d26;
+  background: var(--surface-input-bg);
   border: 1px solid var(--surface-input-border);
   color: var(--text-primary);
   border-radius: var(--radius-md);
@@ -590,7 +590,7 @@
 }
 
 .indicator-select {
-  background: #191d26;
+  background: var(--surface-input-bg);
   border: 1px solid var(--surface-input-border);
   color: var(--text-primary);
   border-radius: var(--radius-md);
@@ -631,7 +631,7 @@
 }
 
 .line-row input {
-  background: #191d26;
+  background: var(--surface-input-bg);
   border: 1px solid var(--surface-input-border);
   color: var(--text-primary);
   border-radius: var(--radius-md);

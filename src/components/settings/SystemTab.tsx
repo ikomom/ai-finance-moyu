@@ -18,7 +18,10 @@ export function SystemTab() {
       {/* 1. 全局热键设置 */}
       <div class="card">
         <div class="card-title-row">
-          <h2>全局热键设置</h2>
+          <h2>
+            <span class="title-icon">⌨️</span>
+            <span>全局热键设置</span>
+          </h2>
         </div>
         <p class="hint">
           推荐使用 <code>Ctrl+Alt</code> 组合键（避免与 Windows 中文输入法 <code>Ctrl+Shift</code> 冲突）。
@@ -45,22 +48,32 @@ export function SystemTab() {
       {/* 2. 系统环境行为 */}
       <div class="card">
         <div class="card-title-row">
-          <h2>系统环境行为</h2>
+          <h2>
+            <span class="title-icon">⚙️</span>
+            <span>系统环境行为</span>
+          </h2>
         </div>
-        <label class="check">
-          <input
-            type="checkbox"
-            checked={form.autostart}
-            onChange={(e) => setForm('autostart', e.currentTarget.checked)}
-          />
-          <span>开机自动在后台启动挂件</span>
-        </label>
+        <div style="margin-top: 10px;">
+          <label class="switch-label">
+            <input
+              type="checkbox"
+              class="switch-input"
+              checked={form.autostart}
+              onChange={(e) => setForm('autostart', e.currentTarget.checked)}
+            />
+            <span class="switch-slider" />
+            <span>开机自动在后台启动挂件</span>
+          </label>
+        </div>
       </div>
 
       {/* 3. 版本与自动更新 */}
       <div class="card">
         <div class="card-title-row">
-          <h2>版本与自动更新</h2>
+          <h2>
+            <span class="title-icon">🚀</span>
+            <span>版本与自动更新</span>
+          </h2>
           <span class="card-badge">正式发布通道</span>
         </div>
         <p class="hint">

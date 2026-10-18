@@ -1,6 +1,6 @@
 import { computeMinuteMacd } from '../../utils/indicators'
 import { drawCrosshair, drawHorizontalLevel, setupCanvasDpi } from '../canvasUtils'
-import { AXIS_TEXT, COST_LINE, FONT, GRID, LINE_COLOR, PRE_CLOSE_LINE } from '../theme'
+import { FONT, getChartTheme } from '../theme'
 import type { DrawOptions } from '../types'
 import { isValidAvg, SLOTS, slotOf } from '../scale'
 import { drawMacdSubchart } from './macdRenderer'
@@ -11,6 +11,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const dpi = setupCanvasDpi(canvas)
   if (!dpi) return
   const { ctx, cssW, cssH } = dpi
+  const theme = getChartTheme()
 
   ctx.font = FONT
   ctx.textBaseline = 'middle'
@@ -87,7 +88,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const yOf = (price: number) => plotT + (1 - (price - yMin) / span) * priceH
 
   // --- grid ---------------------------------------------------------------
-  ctx.strokeStyle = GRID
+  ctx.strokeStyle = theme.grid
   ctx.lineWidth = 1
   for (let i = 0; i <= 4; i++) {
     const y = Math.round(plotT + (i / 4) * priceH) + 0.5
@@ -115,7 +116,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const yPre = yOf(preClose)
   ctx.save()
   ctx.setLineDash([3, 3])
-  ctx.strokeStyle = PRE_CLOSE_LINE
+  ctx.strokeStyle = theme.preCloseLine
   ctx.beginPath()
   ctx.moveTo(plotL, yPre)
   ctx.lineTo(plotL + plotW, yPre)
@@ -123,7 +124,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   ctx.restore()
 
   // --- axis labels --------------------------------------------------------
-  ctx.fillStyle = AXIS_TEXT
+  ctx.fillStyle = theme.axisText
   const fmtP = (v: number) => (preClose >= 1000 ? v.toFixed(1) : v.toFixed(2))
   const step = maxDev / 2
 
@@ -180,7 +181,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
 
   if (points.length === 0) {
     ctx.textAlign = 'center'
-    ctx.fillStyle = AXIS_TEXT
+    ctx.fillStyle = theme.axisText
     ctx.fillText('暂无分时数据', plotL + plotW / 2, plotT + priceH / 2)
     return
   }
@@ -290,7 +291,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     plotW,
     plotT,
     plotH: priceH,
-    color: COST_LINE,
+    color: theme.costLine,
     dash: [5, 2, 1, 2],
     label: opts.costPrice && opts.costPrice > 0 ? '成本' : undefined,
   })
@@ -305,7 +306,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       plotW,
       plotT,
       plotH: priceH,
-      color: LINE_COLOR,
+      color: theme.lineColor,
       dash: [2, 3],
       label: pl.label ?? undefined,
     })

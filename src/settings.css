@@ -1,22 +1,5 @@
-/* Settings Window - Modern Ambient Dark Theme & 2-Column Sidebar Layout */
+/* Settings Window - Modern Fluent & macOS Ambient Glass Aesthetic */
 @import "./styles/tokens.css";
-
-:root {
-  color-scheme: dark;
-  --bg: #0d0f14;
-  --bg-gradient: radial-gradient(circle at 10% 8%, rgba(75, 142, 247, 0.08) 0%, transparent 45%),
-                 radial-gradient(circle at 90% 92%, rgba(139, 92, 246, 0.06) 0%, transparent 45%);
-  --sidebar-bg: rgba(16, 19, 26, 0.75);
-  --card: rgba(22, 26, 35, 0.75);
-  --card-hover: rgba(28, 33, 44, 0.9);
-  --line: var(--surface-border-subtle);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --fg: var(--text-primary);
-  --muted: var(--text-muted);
-  --accent: var(--color-accent);
-  --accent-glow: rgba(75, 142, 247, 0.25);
-  --danger: var(--color-danger);
-}
 
 * {
   box-sizing: border-box;
@@ -32,6 +15,7 @@ body {
   height: 100vh;
   overflow: hidden;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 #settings-root {
@@ -58,14 +42,16 @@ body {
 
 /* ----------------------------------------------------------- Left Sidebar */
 #sidebar {
-  width: 195px;
+  width: 200px;
   flex-shrink: 0;
   background: var(--sidebar-bg);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   padding: 16px 10px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .sidebar-header {
@@ -79,15 +65,15 @@ body {
 
 .brand-badge {
   font-size: 18px;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-accent-bg);
   border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 0 10px rgba(75, 142, 247, 0.2);
+  border-radius: 9px;
+  box-shadow: 0 0 12px var(--color-accent-bg);
 }
 
 .brand-text {
@@ -98,27 +84,30 @@ body {
 .brand-title {
   font-size: 13.5px;
   font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.2px;
+  color: var(--fg);
+  letter-spacing: 0.3px;
 }
 
 .brand-sub {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .nav-tab-btn {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-lg);
+  padding: 8px 12px;
+  border-radius: 9px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--muted);
@@ -129,7 +118,7 @@ body {
 }
 
 .nav-tab-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(120, 120, 128, 0.08);
   color: var(--fg);
 }
 
@@ -137,7 +126,7 @@ body {
   background: var(--color-accent-bg);
   border-color: var(--color-accent-border);
   color: var(--color-accent-light);
-  box-shadow: 0 2px 10px var(--color-accent-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px var(--color-accent-bg);
 }
 
 .nav-tab-btn .tab-icon {
@@ -158,12 +147,12 @@ body {
 }
 
 .nav-tab-btn.active .tab-label {
-  color: #fff;
+  color: var(--fg);
 }
 
 .nav-tab-btn .tab-desc {
   font-size: 10px;
-  opacity: 0.7;
+  opacity: 0.75;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -183,28 +172,31 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 24px 20px;
+  padding: 20px 26px 24px;
 }
 
 .content-body::-webkit-scrollbar {
   width: 6px;
 }
 .content-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(120, 120, 128, 0.25);
   border-radius: 3px;
+}
+.content-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 128, 0.45);
 }
 
 .tab-pane {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: fadeIn 0.18s ease;
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fadeIn {
   from {
-    opacity: 0.4;
-    transform: translateY(3px);
+    opacity: 0.3;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -215,11 +207,17 @@ body {
 /* ----------------------------------------------------------------- Cards */
 .card {
   background: var(--card);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  padding: 16px 18px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-card);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--line-strong);
 }
 
 .card-title-row {
@@ -230,53 +228,75 @@ body {
 }
 
 h2 {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   margin: 0;
-  color: #fff;
+  color: var(--fg);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.title-icon {
+  font-size: 16px;
+}
+
 .card-badge {
   font-size: 10.5px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(120, 120, 128, 0.12);
   color: var(--muted);
-  padding: 1px 7px;
-  border-radius: 10px;
+  padding: 2px 8px;
+  border-radius: 12px;
   border: 1px solid var(--line);
+  font-weight: 500;
+}
+
+.card-badge.highlight {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+  color: var(--color-accent-light);
 }
 
 .hint {
   color: var(--muted);
   font-size: 11.5px;
-  margin: 0 0 12px;
-  line-height: 1.65;
+  margin: 0 0 14px;
+  line-height: 1.6;
 }
 
 .hint code {
-  background: rgba(255, 255, 255, 0.08);
-  padding: 1px 5px;
-  border-radius: var(--radius-xs);
+  background: var(--color-accent-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--color-accent-light);
+  border: 1px solid var(--color-accent-border);
 }
 
 /* ------------------------------------------------------------- Controls */
 .field {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 14px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
 .field > label {
-  flex: 0 0 190px;
-  color: var(--muted);
-  font-size: 12px;
+  flex: 0 0 180px;
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field > label output {
+  color: var(--color-accent-light);
+  font-family: var(--font-mono);
+  font-weight: 600;
 }
 
 .field input[type="text"],
@@ -286,23 +306,22 @@ h2 {
 select {
   flex: 1 1 160px;
   min-width: 0;
-  background: #191d26 !important;
-  border: 1px solid var(--line-strong) !important;
-  color: #f3f4f6 !important;
-  border-radius: var(--radius-md);
-  padding: 6px 10px;
+  background: var(--surface-input-bg) !important;
+  border: 1px solid var(--surface-input-border) !important;
+  color: var(--fg) !important;
+  border-radius: 8px;
+  padding: 7px 12px;
   font-size: 12.5px;
   font-family: inherit;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
-/* Native Select Styling & Option Illegibility Fix */
 select {
   appearance: none;
-  padding-right: 28px !important;
+  padding-right: 30px !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa1ad' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important;
-  background-position: right 9px center !important;
+  background-position: right 10px center !important;
   cursor: pointer;
 }
 
@@ -310,13 +329,12 @@ select:focus,
 .field input:focus {
   outline: none;
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px var(--accent-glow) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
 }
 
-/* Fix Windows WebView2 option text/background contrast */
 select option {
-  background-color: #161922 !important;
-  color: #f3f4f6 !important;
+  background-color: var(--surface-popover-bg) !important;
+  color: var(--fg) !important;
   padding: 8px 12px;
   font-size: 12.5px;
 }
@@ -325,33 +343,101 @@ select option {
   font-family: var(--font-mono);
 }
 
+/* Modern Range Slider */
 .field input[type="range"] {
   flex: 1 1 160px;
-  accent-color: var(--accent);
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(120, 120, 128, 0.25);
+  outline: none;
+  cursor: pointer;
+}
+
+.field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.field input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
 }
 
 .inline {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: 1 1 auto;
   flex-wrap: wrap;
+}
+
+/* Modern Toggle Switch Component */
+.switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12.5px;
+  color: var(--fg);
+}
+
+.switch-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.switch-slider {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  background: rgba(120, 120, 128, 0.28);
+  border-radius: 20px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 1px;
+  bottom: 1px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.switch-input:checked + .switch-slider {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.switch-input:checked + .switch-slider::before {
+  transform: translateX(16px);
 }
 
 .check {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   margin: 10px 0;
   font-size: 12.5px;
   cursor: pointer;
-  color: #e2e8f0;
-}
-
-.check input {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
+  color: var(--fg);
 }
 
 .mono {
@@ -365,20 +451,21 @@ select option {
 
 /* ------------------------------------------------------------- Buttons */
 button {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(120, 120, 128, 0.1);
   border: 1px solid var(--line-strong);
   color: var(--fg);
-  border-radius: var(--radius-md);
-  padding: 5px 12px;
+  border-radius: 8px;
+  padding: 6px 14px;
   font-size: 12px;
   font-family: inherit;
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 button:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(120, 120, 128, 0.18);
+  border-color: var(--color-accent);
 }
 
 button.ghost {
@@ -387,13 +474,13 @@ button.ghost {
   color: var(--muted);
 }
 button.ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  background: rgba(120, 120, 128, 0.1);
+  color: var(--fg);
 }
 
 button.icon {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -401,6 +488,7 @@ button.icon {
   background: transparent;
   border-color: transparent;
   color: var(--muted);
+  border-radius: 6px;
 }
 button.icon:hover {
   background: var(--color-danger-bg);
@@ -411,15 +499,15 @@ button.icon:hover {
 .btn-primary {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: #ffffff;
   font-weight: 600;
-  padding: 7px 18px;
-  border-radius: 7px;
+  padding: 8px 20px;
+  border-radius: 8px;
   box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
 }
 .btn-primary:hover {
-  filter: brightness(1.1);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
+  filter: brightness(1.08);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.45);
 }
 .btn-primary:disabled {
   opacity: 0.5;
@@ -427,36 +515,39 @@ button.icon:hover {
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(120, 120, 128, 0.08);
   border: 1px solid var(--line);
-  color: #cbd5e1;
-  padding: 7px 16px;
-  border-radius: 7px;
+  color: var(--fg);
+  padding: 8px 18px;
+  border-radius: 8px;
 }
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: rgba(120, 120, 128, 0.16);
+  border-color: var(--line-strong);
 }
 
 /* ----------------------------------------------------------- Footer Bar */
 #footer-bar {
-  height: 54px;
+  height: 56px;
   border-top: 1px solid var(--line);
-  background: rgba(13, 16, 22, 0.88);
-  backdrop-filter: blur(16px);
-  padding: 0 24px;
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 0 26px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
 #status-msg {
   font-size: 12px;
   color: var(--muted);
+  font-weight: 500;
 }
 #status-msg.ok {
-  color: #34d399;
+  color: #10b981;
 }
 #status-msg.bad {
   color: var(--danger);
@@ -465,7 +556,7 @@ button.icon:hover {
 .footer-btns {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* ---------------------------------------------------- Sidebar Version Footer */
@@ -482,9 +573,9 @@ button.icon:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 6px;
+  padding: 4px 8px;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(120, 120, 128, 0.06);
   font-size: 11px;
 }
 
@@ -493,12 +584,12 @@ button.icon:hover {
   font-family: var(--font-mono);
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .update-available-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #38bdf8;
   box-shadow: 0 0 8px #38bdf8;
@@ -513,10 +604,10 @@ button.icon:hover {
 
 .btn-check-update-sidebar {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
   color: var(--fg);
   font-size: 10.5px;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);

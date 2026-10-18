@@ -10,7 +10,7 @@
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
-  border: 1px solid var(--surface-border-subtle);
+  border: 1px solid var(--line);
   background: var(--surface-card-bg);
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -19,20 +19,21 @@
 
 .source-pill:hover {
   background: var(--surface-card-hover);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
 }
 
 .source-pill.active {
   background: var(--color-accent-bg);
-  border-color: var(--color-accent-border);
-  box-shadow: 0 0 14px var(--color-accent-bg);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent), 0 3px 12px var(--accent-glow);
 }
 
 .pill-radio-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--text-muted);
+  border: 2px solid var(--muted);
   flex-shrink: 0;
   transition: all var(--transition-normal);
 }
@@ -51,12 +52,12 @@
 .pill-title {
   font-size: 12.5px;
   font-weight: 600;
-  color: #fff;
+  color: var(--fg);
 }
 
 .pill-desc {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 /* Custom Indicator Inputs */
@@ -72,24 +73,26 @@
   align-items: center;
   gap: 6px;
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .custom-group input {
   width: 48px;
-  background: #191d26;
+  background: var(--surface-input-bg);
   border: 1px solid var(--surface-input-border);
-  color: var(--text-primary);
+  color: var(--fg);
   border-radius: var(--radius-sm);
   padding: 3px 6px;
   font-size: 12px;
   font-family: var(--font-mono);
   text-align: center;
+  transition: all var(--transition-fast);
 }
 
 .custom-group input:focus {
   outline: none;
   border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 .quick-fill-row {
@@ -98,21 +101,21 @@
   gap: 6px;
   flex-wrap: wrap;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(120, 120, 128, 0.08);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
 
 .quick-fill-label {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--muted);
   font-weight: 500;
 }
 
 .quick-fill-chip {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
+  background: rgba(120, 120, 128, 0.12);
+  border: 1px solid var(--line);
+  color: var(--fg);
   font-size: 11px;
   padding: 2.5px 8px;
   border-radius: var(--radius-sm);
@@ -125,5 +128,6 @@
 .quick-fill-chip:hover {
   background: var(--color-accent-bg);
   border-color: var(--color-accent-border);
-  color: #93c5fd;
+  color: var(--color-accent-light);
 }
+

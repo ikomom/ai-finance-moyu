@@ -1,5 +1,6 @@
 import {
   createContext,
+  createEffect,
   createSignal,
   onCleanup,
   onMount,
@@ -14,7 +15,7 @@ import { listen } from '@tauri-apps/api/event'
 import { getVersion } from '@tauri-apps/api/app'
 
 import { checkAppUpdate, type CheckResult } from '../../services/updater'
-import type { Config, DataSource, Layout, PriceLine, Snapshot, VisibilityMode, WatchItem } from '../../types'
+import type { Config, DataSource, Layout, PriceLine, Snapshot, ThemeOption, VisibilityMode, WatchItem } from '../../types'
 
 export type TabKey = 'watchlist' | 'appearance' | 'alerts' | 'system' | 'logs'
 
@@ -37,6 +38,89 @@ export const SOURCE_NOTES: Record<string, string> = {
   tencent: '批量高效报价，分时接口直接提供精准累计量额（推荐）',
   sina: '老牌行情源，需带 Referer 校验，分时每分钟量额由本地累加',
 }
+
+export const THEMES: ThemeOption[] = [
+  {
+    value: 'dark',
+    name: '深邃暗黑',
+    badge: '经典默认',
+    desc: '低调深灰暗黑毛玻璃材质，夜间与深色壁纸绝佳搭配',
+    icon: '🌙',
+    palette: {
+      bg: '#0d0f14',
+      card: '#161a23',
+      border: 'rgba(255,255,255,0.12)',
+      accent: '#4b8ef7',
+      text: '#f3f4f6',
+      up: '#eb4d4b',
+      down: '#2ecc71',
+    },
+  },
+  {
+    value: 'light',
+    name: '办公浅色',
+    badge: '防窥摸鱼',
+    desc: '白底极简高仿 Excel/Word/办公软件，白天办公不显突兀',
+    icon: '☀️',
+    palette: {
+      bg: '#f1f5f9',
+      card: '#ffffff',
+      border: 'rgba(0,0,0,0.12)',
+      accent: '#2563eb',
+      text: '#0f172a',
+      up: '#dc2626',
+      down: '#16a34a',
+    },
+  },
+  {
+    value: 'transparent',
+    name: '极致透明',
+    badge: '无界桌面',
+    desc: '超高透度极简无界悬浮，文字若隐若现贴合桌面壁纸',
+    icon: '🪟',
+    palette: {
+      bg: 'rgba(10,14,22,0.4)',
+      card: 'rgba(255,255,255,0.04)',
+      border: 'rgba(255,255,255,0.14)',
+      accent: '#38bdf8',
+      text: '#ffffff',
+      up: '#eb4d4b',
+      down: '#2ecc71',
+    },
+  },
+  {
+    value: 'ocean',
+    name: '科技曜青',
+    badge: '深海曜蓝',
+    desc: '深邃藏青底色搭配冰晶天蓝微光与青色点缀，精致现代',
+    icon: '🌊',
+    palette: {
+      bg: '#070d1a',
+      card: '#0c1834',
+      border: 'rgba(56,189,248,0.25)',
+      accent: '#0ea5e9',
+      text: '#f0f9ff',
+      up: '#f43f5e',
+      down: '#10b981',
+    },
+  },
+  {
+    value: 'cyberpunk',
+    name: '赛博终端',
+    badge: '极客荧光',
+    desc: '纯黑极客底色搭配高对比度荧光绿，交易员硬核风格',
+    icon: '⚡',
+    palette: {
+      bg: '#030507',
+      card: '#060e0b',
+      border: 'rgba(0,255,136,0.35)',
+      accent: '#00ff88',
+      text: '#e6fffa',
+      up: '#ff3366',
+      down: '#00ff88',
+    },
+  },
+]
 
 export const LAYOUTS: Array<{ value: Layout; name: string; badge: string; desc: string; icon: string }> = [
   {
@@ -199,12 +283,18 @@ export function SettingsProvider(props: { children: JSX.Element }) {
 
   const say = (text: string, kind: '' | 'ok' | 'bad' = '') => setMsg({ text, kind })
 
+  createEffect(() => {
+    const theme = form.theme ?? 'dark'
+    document.documentElement.setAttribute('data-theme', theme)
+  })
+
   onMount(async () => {
     try {
       const snapshot = await invoke<Snapshot>('get_snapshot')
       setSources(await invoke<Array<[DataSource, string]>>('data_sources'))
       setForm({
         ...snapshot.config,
+        theme: snapshot.config.theme ?? 'dark',
         hotkeys: {
           ...snapshot.config.hotkeys,
           layoutMarket: snapshot.config.hotkeys.layoutMarket ?? 'ctrl+alt+4',

@@ -11,9 +11,9 @@ export interface AuctionCanvasProps {
 
 import {
   AUCTION_SLOTS,
-  AXIS_TEXT,
   DIVIDER_LINE,
   FONT,
+  getChartTheme,
   GRID,
   PRE_CLOSE_LINE,
   setupCanvasDpi,
@@ -294,7 +294,8 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
     }
 
     // 9. Scales & Axis Labels
-    ctx.fillStyle = AXIS_TEXT
+    const chartTheme = getChartTheme()
+    ctx.fillStyle = chartTheme.axisText
     ctx.textAlign = 'right'
     // Left price ticks
     if (priceH >= 40) {
@@ -318,11 +319,11 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
 
     // Bottom timeline labels: 09:15, 09:20, 09:25
     ctx.textAlign = 'center'
-    ctx.fillStyle = AXIS_TEXT
+    ctx.fillStyle = chartTheme.axisText
     ctx.fillText('09:15', plotL + 8, volT + volH + 7)
     ctx.fillStyle = 'rgba(245, 158, 11, 0.85)'
     ctx.fillText('09:20', dividerX, volT + volH + 7)
-    ctx.fillStyle = AXIS_TEXT
+    ctx.fillStyle = chartTheme.axisText
     ctx.fillText('09:25', plotL + plotW - 10, volT + volH + 7)
   }
 

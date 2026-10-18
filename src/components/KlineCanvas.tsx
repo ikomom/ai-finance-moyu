@@ -13,14 +13,13 @@ import {
 import { computeKLineMacd, computeKLineMovingAverages } from '../utils/indicators'
 
 import {
-  AXIS_TEXT,
   COLOR_MA10,
   COLOR_MA20,
   COLOR_MA5,
   COST_LINE,
   diagnoseMacd,
   FONT,
-  GRID,
+  getChartTheme,
   setupCanvasDpi,
 } from '../chart'
 
@@ -214,8 +213,10 @@ export function KlineCanvas(props: KlineCanvasProps) {
     const slotW = plotW / slice.length
     const xOfIdx = (i: number) => plotL + i * slotW + slotW / 2
 
+    const chartTheme = getChartTheme()
+
     // 1. Grid & Price Axis
-    ctx.strokeStyle = GRID
+    ctx.strokeStyle = chartTheme.grid
     ctx.lineWidth = 1
     ctx.beginPath()
 
@@ -233,7 +234,7 @@ export function KlineCanvas(props: KlineCanvasProps) {
 
     // Price labels on the right
     ctx.font = FONT
-    ctx.fillStyle = AXIS_TEXT
+    ctx.fillStyle = chartTheme.axisText
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     ctx.fillText(fmtPrice(maxP), plotL + plotW + 4, priceT + 5)
@@ -471,7 +472,7 @@ export function KlineCanvas(props: KlineCanvasProps) {
 
     // 6. Timeline Labels (e.g. 3 date stamps at bottom)
     ctx.font = FONT
-    ctx.fillStyle = AXIS_TEXT
+    ctx.fillStyle = chartTheme.axisText
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
 

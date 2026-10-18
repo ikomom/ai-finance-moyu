@@ -2,6 +2,8 @@
  * Design Tokens - AI Finance Moyu
  * 统一金融配色、暗黑毛玻璃材质、字阶、圆角与阴影变量
  */
+@import "./themes.css";
+
 :root {
   /* ------------------------------------------------ Financial Semantic Colors */
   /* A-share: Red Up, Green Down, Gray Flat */

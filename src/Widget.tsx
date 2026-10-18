@@ -28,6 +28,11 @@ export function Widget() {
   const isCollapsed = () => snapshot()?.dock?.collapsed ?? false
   const visibilityMode = () => snapshot()?.config.visibilityMode ?? 'always'
 
+  createEffect(() => {
+    const theme = snapshot()?.config.theme ?? 'dark'
+    document.documentElement.setAttribute('data-theme', theme)
+  })
+
   const handleMouseEnter = () => {
     clearLeaveTimer()
     const mode = visibilityMode()
