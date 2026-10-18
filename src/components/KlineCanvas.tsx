@@ -12,13 +12,18 @@ import {
 } from '../types'
 import { computeKLineMacd, computeKLineMovingAverages } from '../utils/indicators'
 
-const GRID = 'rgba(255, 255, 255, 0.07)'
-const AXIS_TEXT = 'rgba(255, 255, 255, 0.42)'
-const COST_LINE = '#22d3ee'
-const FONT = '9px ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-const COLOR_MA5 = '#f59e0b'
-const COLOR_MA10 = '#c084fc'
-const COLOR_MA20 = '#38bdf8'
+import {
+  AXIS_TEXT,
+  COLOR_MA10,
+  COLOR_MA20,
+  COLOR_MA5,
+  COST_LINE,
+  diagnoseMacd,
+  FONT,
+  GRID,
+  setupCanvasDpi,
+} from '../chart'
+
 export interface KlineCanvasProps {
   kline?: KLineData | null
   quote?: Quote | null
@@ -109,24 +114,16 @@ export function KlineCanvas(props: KlineCanvasProps) {
   const draw = () => {
     const canvas = canvasRef
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
 
-    const dpr = window.devicePixelRatio || 1
     const rect = canvas.getBoundingClientRect()
     const w = rect.width
     const h = rect.height
 
     if (w < 10 || h < 10) return
 
-    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-      canvas.width = Math.round(w * dpr)
-      canvas.height = Math.round(h * dpr)
-    }
-
-    ctx.save()
-    ctx.scale(dpr, dpr)
-    ctx.clearRect(0, 0, w, h)
+    const dpi = setupCanvasDpi(canvas, w, h)
+    if (!dpi) return
+    const { ctx } = dpi
 
     const allBars = effectiveBars()
     if (allBars.length === 0) {
@@ -134,7 +131,6 @@ export function KlineCanvas(props: KlineCanvasProps) {
       ctx.font = FONT
       ctx.textAlign = 'center'
       ctx.fillText('日K线加载中...', w / 2, h / 2)
-      ctx.restore()
       return
     }
 
@@ -166,7 +162,6 @@ export function KlineCanvas(props: KlineCanvasProps) {
     const slice = allBars.slice(startIdx, endIdx)
 
     if (slice.length === 0) {
-      ctx.restore()
       return
     }
 
@@ -575,41 +570,15 @@ export function KlineCanvas(props: KlineCanvasProps) {
       }
 
       if (activeBar.dif != null && activeBar.dea != null) {
-        const dif = activeBar.dif
-        const dea = activeBar.dea
-        const prevDif = prevActiveBar?.dif ?? dif
-        const prevDea = prevActiveBar?.dea ?? dea
-
-        let diagText = ''
-        let diagColor = ''
-
-        if (prevDif <= prevDea && dif > dea) {
-          if (dif >= 0) {
-            diagText = '水上金叉'
-            diagColor = UP
-          } else {
-            diagText = '低位金叉'
-            diagColor = '#fb923c'
-          }
-        } else if (prevDif >= prevDea && dif < dea) {
-          if (dif >= 0) {
-            diagText = '高位死叉'
-            diagColor = '#a855f7'
-          } else {
-            diagText = '水下死叉'
-            diagColor = DOWN
-          }
-        } else if (dif >= dea) {
-          diagText = dif >= 0 ? '水上多头' : '水下反弹'
-          diagColor = dif >= 0 ? 'rgba(239, 68, 68, 0.85)' : 'rgba(251, 146, 60, 0.85)'
-        } else {
-          diagText = dif < 0 ? '水下空头' : '高位回调'
-          diagColor = dif < 0 ? 'rgba(34, 197, 94, 0.85)' : 'rgba(168, 85, 247, 0.85)'
-        }
-
-        if (diagText) {
-          ctx.fillStyle = diagColor
-          ctx.fillText(diagText, subLx, subLy)
+        const diag = diagnoseMacd(
+          activeBar.dif,
+          activeBar.dea,
+          prevActiveBar?.dif,
+          prevActiveBar?.dea
+        )
+        if (diag.text) {
+          ctx.fillStyle = diag.color
+          ctx.fillText(diag.text, subLx, subLy)
         }
       }
     }
@@ -657,8 +626,6 @@ export function KlineCanvas(props: KlineCanvasProps) {
       ctx.textAlign = 'center'
       ctx.fillText(hBar.date.slice(5), hx, volT + volH + 7)
     }
-
-    ctx.restore()
   }
 
   // Mouse / Wheel Event Handlers

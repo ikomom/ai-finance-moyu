@@ -9,21 +9,16 @@ export interface AuctionCanvasProps {
   onHover?: (point: AuctionPoint | null) => void
 }
 
-const AUCTION_START_MIN = 9 * 60 + 15 // 09:15 (555)
-const AUCTION_SLOTS = 10 // 09:15 to 09:25 is 10 minutes (indices 0..10)
-const FONT = '9px ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-const GRID = 'rgba(255,255,255,0.08)'
-const AXIS_TEXT = 'rgba(255,255,255,0.45)'
-const PRE_CLOSE_LINE = 'rgba(255,255,255,0.25)'
-const DIVIDER_LINE = 'rgba(245, 158, 11, 0.75)'
-
-function slotOfAuctionTime(hhmm: number): number {
-  const h = Math.floor(hhmm / 100)
-  const m = hhmm % 100
-  const totalMin = h * 60 + m
-  const diff = totalMin - AUCTION_START_MIN
-  return Math.min(AUCTION_SLOTS, Math.max(0, diff))
-}
+import {
+  AUCTION_SLOTS,
+  AXIS_TEXT,
+  DIVIDER_LINE,
+  FONT,
+  GRID,
+  PRE_CLOSE_LINE,
+  setupCanvasDpi,
+  slotOfAuctionTime,
+} from '../chart'
 
 function fmtVol(vol: number): string {
   if (vol >= 10000) return `${(vol / 10000).toFixed(1)}万`
@@ -38,22 +33,9 @@ export function AuctionCanvas(props: AuctionCanvasProps) {
 
   const draw = () => {
     if (!canvas) return
-    const dpr = window.devicePixelRatio || 1
-    const cssW = canvas.clientWidth
-    const cssH = canvas.clientHeight
-    if (cssW <= 0 || cssH <= 0) return
-
-    const pxW = Math.round(cssW * dpr)
-    const pxH = Math.round(cssH * dpr)
-    if (canvas.width !== pxW || canvas.height !== pxH) {
-      canvas.width = pxW
-      canvas.height = pxH
-    }
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, cssW, cssH)
+    const dpi = setupCanvasDpi(canvas)
+    if (!dpi) return
+    const { ctx, cssW, cssH } = dpi
     ctx.font = FONT
     ctx.textBaseline = 'middle'
 

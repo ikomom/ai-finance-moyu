@@ -1,4 +1,5 @@
 pub mod auction_engine;
+pub mod commands;
 mod config;
 mod crossing;
 pub mod logger;
@@ -10,1064 +11,22 @@ mod search;
 mod state;
 mod tray;
 mod trend_engine;
+pub mod window;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use tauri::{AppHandle, Emitter, Manager, WindowEvent};
-use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
+use tauri::{Manager, WindowEvent};
 
-use config::{Config, DataSource, Hotkeys, Layout, VisibilityMode};
 use quote::Fetcher;
-use state::{AppState, DockEdge, Snapshot};
-
-/// Label of the floating display window, and of the settings window.
-const DISPLAY: &str = "main";
-const SETTINGS: &str = "settings";
-
-/// Distance from screen edge to snap and enable dock collapse (in logical px).
-const DOCK_SNAP_THRESHOLD: f64 = 15.0;
-/// Visible sliver width/thickness when collapsed (in logical px).
-const DOCK_HANDLE_THICKNESS: f64 = 10.0;
-
-/// Natural size for a layout, used until the user resizes that layout.
-///
-/// The bar layout is a horizontal pill, mini is a card chart, list is a compact table, market is a panorama card.
-fn natural_size(layout: Layout, rows: usize) -> (f64, f64) {
-    match layout {
-        Layout::Bar => {
-            let w = ((rows.max(1) as f64) * 125.0 + 30.0).clamp(240.0, 560.0);
-            (w, 32.0)
-        }
-        Layout::Mini => (320.0, 180.0),
-        Layout::List => {
-            let h = ((rows.max(1) as f64) * 30.0 + 72.0).clamp(140.0, 260.0);
-            (360.0, h)
-        }
-        Layout::Market => (345.0, 275.0),
-        Layout::Global => (350.0, 280.0),
-    }
-}
-
-/// The size to apply: whatever the user set for this layout, else the natural
-/// size.
-fn size_for(layout: Layout, rows: usize, sizes: &config::LayoutSizes) -> (f64, f64) {
-    match layout {
-        Layout::Bar => {
-            let w = sizes
-                .get(Layout::Bar)
-                .map(|(w, _)| w)
-                .unwrap_or_else(|| natural_size(Layout::Bar, rows).0);
-            (w.clamp(180.0, 1400.0), 32.0)
-        }
-        Layout::Mini => sizes.get(Layout::Mini).unwrap_or_else(|| natural_size(Layout::Mini, rows)),
-        Layout::List => sizes.get(Layout::List).unwrap_or_else(|| natural_size(Layout::List, rows)),
-        Layout::Market => sizes.get(Layout::Market).unwrap_or_else(|| natural_size(Layout::Market, rows)),
-        Layout::Global => sizes.get(Layout::Global).unwrap_or_else(|| natural_size(Layout::Global, rows)),
-    }
-}
-
-/// Size and position the display window, keeping it inside the monitor's usable
-/// area.
-///
-/// The saved position is a *hint*, not a command. On a display narrower than the
-/// hint assumes, an unclamped window lands partly or wholly off-screen — which
-/// for a widget with `skipTaskbar` and no title bar means it is simply lost, with
-/// no way to drag it back.
-fn place_window(app: &AppHandle, layout: Layout, rows: usize) {
-    let Some(win) = app.get_webview_window(DISPLAY) else {
-        return;
-    };
-
-    let (w, h, mut x, mut y, edge, collapsed) = {
-        let state = app.state::<AppState>();
-        let cfg = state.config.lock().unwrap();
-        let dock = *state.dock_state.lock().unwrap();
-        let (w, h) = size_for(layout, rows, &cfg.layout_sizes);
-        (w, h, cfg.window.x as f64, cfg.window.y as f64, dock.edge, dock.collapsed)
-    };
-
-    let monitor = win
-        .current_monitor()
-        .ok()
-        .flatten()
-        .or_else(|| win.primary_monitor().ok().flatten());
-    if let Some(mon) = monitor {
-        let scale = mon.scale_factor();
-        let mpos = mon.position().to_logical::<f64>(scale);
-        let msize = mon.size().to_logical::<f64>(scale);
-        match edge {
-            DockEdge::Right => {
-                x = mpos.x + msize.width - w;
-                y = y.clamp(mpos.y, (mpos.y + msize.height - h).max(mpos.y));
-            }
-            DockEdge::Left => {
-                x = mpos.x;
-                y = y.clamp(mpos.y, (mpos.y + msize.height - h).max(mpos.y));
-            }
-            DockEdge::Top => {
-                x = x.clamp(mpos.x, (mpos.x + msize.width - w).max(mpos.x));
-                y = mpos.y;
-            }
-            DockEdge::None => {
-                let max_x = (mpos.x + msize.width - w).max(mpos.x);
-                let max_y = (mpos.y + msize.height - h).max(mpos.y);
-                x = x.clamp(mpos.x, max_x);
-                y = y.clamp(mpos.y, max_y);
-            }
-        }
-
-        if collapsed && edge != DockEdge::None {
-            let (cw, ch, cx, cy) = match edge {
-                DockEdge::Right => (
-                    DOCK_HANDLE_THICKNESS,
-                    h,
-                    mpos.x + msize.width - DOCK_HANDLE_THICKNESS,
-                    y,
-                ),
-                DockEdge::Left => (DOCK_HANDLE_THICKNESS, h, mpos.x, y),
-                DockEdge::Top => (w, DOCK_HANDLE_THICKNESS, x, mpos.y),
-                DockEdge::None => (w, h, x, y),
-            };
-            let _ = win.set_resizable(false);
-            let _ = win.set_size(tauri::LogicalSize::new(cw, ch));
-            let _ = win.set_position(tauri::LogicalPosition::new(cx, cy));
-            return;
-        }
-    }
-
-    // Size first, then position: the clamp above already accounts for the new
-    // size, and this order avoids a frame at the wrong shape.
-    let _ = win.set_size(tauri::LogicalSize::new(w, h));
-    let _ = win.set_position(tauri::LogicalPosition::new(x, y));
-    let _ = win.set_resizable(true);
-    disable_maximize(&win);
-}
-
-/// Switch layout: persist it, resize the window, tell the frontend.
-pub fn apply_layout(app: &AppHandle, layout: Layout) {
-    let (rows, snapshot) = {
-        let state = app.state::<AppState>();
-        let mut cfg = state.config.lock().unwrap();
-        cfg.layout = layout;
-        (cfg.watchlist.len(), cfg.clone())
-    };
-    log::info!(target: "USER", "切换布局模式至 {:?}", layout);
-    let _ = config::save(app, &snapshot);
-
-    // 1. Uncollapse dock with the NEW layout dimensions
-    let _ = set_dock_collapsed_inner(app, false);
-
-    // 2. If the window was hidden (e.g. by boss key) or minimized, reveal and show it immediately!
-    if let Some(win) = app.get_webview_window(DISPLAY) {
-        let _ = win.unminimize();
-        let _ = win.show();
-    }
-
-    if layout == Layout::Market || layout == Layout::Global {
-        let handle = app.clone();
-        tauri::async_runtime::spawn(async move {
-            let _ = poller::poll_market_overview(&handle).await;
-        });
-    } else if layout == Layout::Mini {
-        let handle = app.clone();
-        tauri::async_runtime::spawn(async move {
-            let _ = poller::poll_trends(&handle).await;
-        });
-    }
-
-    // The programmatic resize below would otherwise be recorded as a user-chosen
-    // size, pinning a layout that should keep auto-sizing.
-    suppress_resize(app, Duration::from_millis(700));
-
-    // Re-clamp rather than only resizing: the list layout is much taller than the
-    // bar layout, so growing it near the bottom edge would push it off-screen.
-    place_window(app, layout, rows);
-
-    poller::emit_snapshot(app);
-}
-
-/// Navigate to a specific stock in Mini layout (e.g. from notification click).
-/// Uncollapses the dock, switches layout to Mini if not already in Mini, reveals and focuses the window,
-/// and emits `navigate_stock` event to frontend.
-pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
-    let _ = set_dock_collapsed_inner(app, false);
-
-    let current_layout = {
-        let state = app.state::<AppState>();
-        let l = state.config.lock().unwrap().layout;
-        l
-    };
-    if current_layout != Layout::Mini {
-        apply_layout(app, Layout::Mini);
-    }
-
-    if let Some(win) = app.get_webview_window(DISPLAY) {
-        let _ = win.unminimize();
-        let _ = win.show();
-        let _ = win.set_focus();
-    }
-
-    let _ = app.emit("navigate_stock", serde_json::json!({
-        "code": code,
-        "mode": "trend"
-    }));
-}
-
-/// Resize the display window to the current layout's size. Called after the
-/// watchlist length changes.
-fn fit_window_now(app: &AppHandle) {
-    let (layout, rows) = {
-        let state = app.state::<AppState>();
-        let cfg = state.config.lock().unwrap();
-        (cfg.layout, cfg.watchlist.len())
-    };
-    suppress_resize(app, Duration::from_millis(700));
-    place_window(app, layout, rows);
-}
-
-fn suppress_resize(app: &AppHandle, window: Duration) {
-    let state = app.state::<AppState>();
-    *state.suppress_resize_until.lock().unwrap() = Some(Instant::now() + window);
-}
-
-/// Record a user resize against the current layout, debounced.
-///
-/// `Resized` fires continuously while a window edge is dragged, so the write is
-/// deferred and guarded by a generation counter: only the last event in a burst
-/// reaches the config file.
-fn on_resized(app: &AppHandle, size: tauri::PhysicalSize<u32>, scale: f64) {
-    let state = app.state::<AppState>();
-
-    if let Some(win) = app.get_webview_window(DISPLAY) {
-        if win.is_maximized().unwrap_or(false) {
-            let _ = win.unmaximize();
-            return;
-        }
-    }
-
-    // Never record user resize while the window is collapsed or animating!
-    if state.dock_state.lock().unwrap().collapsed {
-        return;
-    }
-
-    if let Some(until) = *state.suppress_resize_until.lock().unwrap() {
-        if Instant::now() < until {
-            return;
-        }
-    }
-
-    let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
-    // Ignore degenerate sizes or OS snap blowout.
-    if w < 140.0 || h < 24.0 || w > 1600.0 || h > 1400.0 {
-        return;
-    }
-
-    // Immediately commit the dragged size to live memory state so any subsequent
-    // edge dock collapse or uncollapse immediately has the fresh size!
-    {
-        let mut cfg = state.config.lock().unwrap();
-        let layout = cfg.layout;
-        if layout == Layout::Bar {
-            cfg.layout_sizes.set(Layout::Bar, w.clamp(180.0, 1400.0), 32.0);
-        } else {
-            let (max_w, max_h) = match layout {
-                Layout::Bar => (1400.0, 32.0),
-                Layout::Mini => (1200.0, 900.0),
-                Layout::List => (1400.0, 1200.0),
-                Layout::Market => (1200.0, 900.0),
-                Layout::Global => (1200.0, 900.0),
-            };
-            if w <= max_w && h <= max_h {
-                cfg.layout_sizes.set(layout, w, h);
-            }
-        }
-    }
-
-    let generation = state.resize_gen.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(300)).await;
-
-        let state = app.state::<AppState>();
-        if state.resize_gen.load(std::sync::atomic::Ordering::SeqCst) != generation {
-            return;
-        }
-        let cfg = {
-            let cfg = state.config.lock().unwrap();
-            cfg.clone()
-        };
-        if let Err(e) = config::save(&app, &cfg) {
-            log::warn!(target: "SYSTEM", "保存窗口尺寸失败: {e}");
-        }
-    });
-}
-
-fn suppress_move(app: &AppHandle, window: Duration) {
-    let state = app.state::<AppState>();
-    *state.suppress_move_until.lock().unwrap() = Some(Instant::now() + window);
-}
-
-/// Handle window move: detects if user dragged near top/left/right screen edges,
-/// snaps position if within threshold, and updates DockState.
-fn on_moved(app: &AppHandle, pos: tauri::PhysicalPosition<i32>, scale: f64) {
-    let state = app.state::<AppState>();
-
-    // While collapsed, the window is sitting in its edge handle; ignore move events!
-    if state.dock_state.lock().unwrap().collapsed {
-        return;
-    }
-
-    if let Some(until) = *state.suppress_move_until.lock().unwrap() {
-        if Instant::now() < until {
-            return;
-        }
-    }
-
-    let generation = state.move_gen.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(150)).await;
-
-        let state = app.state::<AppState>();
-        if state.dock_state.lock().unwrap().collapsed {
-            return;
-        }
-        if state.move_gen.load(std::sync::atomic::Ordering::SeqCst) != generation {
-            return;
-        }
-
-        let Some(win) = app.get_webview_window(DISPLAY) else {
-            return;
-        };
-
-        let monitor = win
-            .current_monitor()
-            .ok()
-            .flatten()
-            .or_else(|| win.primary_monitor().ok().flatten());
-        let Some(mon) = monitor else {
-            return;
-        };
-
-        let mscale = mon.scale_factor();
-        let mpos = mon.position().to_logical::<f64>(mscale);
-        let msize = mon.size().to_logical::<f64>(mscale);
-
-        // Fetch the fresh position directly from the window at the moment debounce settles
-        let (pos_x, pos_y) = match win.outer_position() {
-            Ok(p) => (p.x as f64 / mscale, p.y as f64 / mscale),
-            Err(_) => (pos.x as f64 / scale, pos.y as f64 / scale),
-        };
-
-        let (w, h) = win
-            .inner_size()
-            .map(|s| (s.width as f64 / mscale, s.height as f64 / mscale))
-            .unwrap_or_else(|_| {
-                let cfg = state.config.lock().unwrap();
-                size_for(cfg.layout, cfg.watchlist.len(), &cfg.layout_sizes)
-            });
-
-        let left_delta = pos_x - mpos.x;
-        let right_delta = (mpos.x + msize.width) - (pos_x + w);
-        let top_delta = pos_y - mpos.y;
-
-        // Allow snap even if dragged past the monitor edge
-        let near_left = left_delta <= DOCK_SNAP_THRESHOLD && left_delta >= -w * 0.7;
-        let near_right = right_delta <= DOCK_SNAP_THRESHOLD && right_delta >= -w * 0.7;
-        let near_top = top_delta <= DOCK_SNAP_THRESHOLD && top_delta >= -h * 0.7;
-
-        let edge = if near_left || near_right || near_top {
-            let mut candidates = Vec::new();
-            if near_left {
-                candidates.push((DockEdge::Left, left_delta.abs()));
-            }
-            if near_right {
-                candidates.push((DockEdge::Right, right_delta.abs()));
-            }
-            if near_top {
-                candidates.push((DockEdge::Top, top_delta.abs()));
-            }
-            candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-            candidates.first().map(|c| c.0).unwrap_or(DockEdge::None)
-        } else {
-            DockEdge::None
-        };
-
-        let (snap_x, snap_y) = match edge {
-            DockEdge::Left => (
-                mpos.x,
-                pos_y.clamp(mpos.y, (mpos.y + msize.height - h).max(mpos.y)),
-            ),
-            DockEdge::Right => (
-                mpos.x + msize.width - w,
-                pos_y.clamp(mpos.y, (mpos.y + msize.height - h).max(mpos.y)),
-            ),
-            DockEdge::Top => (
-                pos_x.clamp(mpos.x, (mpos.x + msize.width - w).max(mpos.x)),
-                mpos.y,
-            ),
-            DockEdge::None => (pos_x, pos_y),
-        };
-
-        if edge != DockEdge::None {
-            suppress_move(&app, Duration::from_millis(400));
-            let _ = win.set_position(tauri::LogicalPosition::new(snap_x, snap_y));
-        }
-
-        let cfg = {
-            let mut cfg = state.config.lock().unwrap();
-            cfg.window.x = snap_x.round() as i32;
-            cfg.window.y = snap_y.round() as i32;
-            let mut dock = state.dock_state.lock().unwrap();
-            dock.edge = edge;
-            dock.collapsed = false;
-            cfg.clone()
-        };
-        let _ = config::save(&app, &cfg);
-        poller::emit_snapshot(&app);
-    });
-}
-
-pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), String> {
-    let Some(win) = app.get_webview_window(DISPLAY) else {
-        return Ok(());
-    };
-    let state = app.state::<AppState>();
-    let (cfg, current_dock) = {
-        let cfg = state.config.lock().unwrap().clone();
-        let dock = *state.dock_state.lock().unwrap();
-        (cfg, dock)
-    };
-
-    if current_dock.edge == DockEdge::None || current_dock.collapsed == collapse {
-        return Ok(());
-    }
-
-    let monitor = win
-        .current_monitor()
-        .ok()
-        .flatten()
-        .or_else(|| win.primary_monitor().ok().flatten())
-        .ok_or_else(|| "无法获取显示器".to_string())?;
-    let scale = monitor.scale_factor();
-    let mpos = monitor.position().to_logical::<f64>(scale);
-    let msize = monitor.size().to_logical::<f64>(scale);
-    let (w, h) = size_for(cfg.layout, cfg.watchlist.len(), &cfg.layout_sizes);
-
-    let normal_x = cfg.window.x as f64;
-    let normal_y = cfg.window.y as f64;
-
-    suppress_move(app, Duration::from_millis(500));
-    suppress_resize(app, Duration::from_millis(500));
-
-    if collapse {
-        // On Windows, check physical mouse button & cursor position near resize border
-        #[cfg(windows)]
-        {
-            use windows_sys::Win32::Foundation::POINT;
-            use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
-            use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
-
-            // If mouse button is held down (user dragging to resize or move), do not collapse!
-            unsafe {
-                if (GetAsyncKeyState(VK_LBUTTON as i32) as u16 & 0x8000) != 0 {
-                    return Ok(());
-                }
-            }
-
-            // If cursor is on the window or precisely on the resize border (within 3px), do not collapse!
-            if let (Ok(pos), Ok(size)) = (win.outer_position(), win.inner_size()) {
-                unsafe {
-                    let mut pt = POINT { x: 0, y: 0 };
-                    if GetCursorPos(&mut pt) != 0 {
-                        // Tight 3px margin: only covers the actual resize border.
-                        // Moving 4px outside the visible card edge immediately allows collapse.
-                        let margin = 3;
-                        let left = pos.x - margin;
-                        let right = pos.x + size.width as i32 + margin;
-                        let top = pos.y - margin;
-                        let bottom = pos.y + size.height as i32 + margin;
-                        let inside = pt.x >= left && pt.x <= right && pt.y >= top && pt.y <= bottom;
-                        if inside {
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-
-        let (cw, ch, cx, cy) = match current_dock.edge {
-            DockEdge::Right => (
-                DOCK_HANDLE_THICKNESS,
-                h,
-                mpos.x + msize.width - DOCK_HANDLE_THICKNESS,
-                normal_y,
-            ),
-            DockEdge::Left => (
-                DOCK_HANDLE_THICKNESS,
-                h,
-                mpos.x,
-                normal_y,
-            ),
-            DockEdge::Top => (
-                w,
-                DOCK_HANDLE_THICKNESS,
-                normal_x,
-                mpos.y,
-            ),
-            DockEdge::None => (w, h, normal_x, normal_y),
-        };
-
-        // Disable resize tracking so Windows doesn't clamp width to SM_CXMINTRACK (136px)
-        let _ = win.set_resizable(false);
-        // Shrink size FIRST, then adjust position: guarantees window never spills
-        // across monitor boundaries onto adjacent screens at any point!
-        let _ = win.set_size(tauri::LogicalSize::new(cw, ch));
-        let _ = win.set_position(tauri::LogicalPosition::new(cx, cy));
-
-        {
-            let mut dock = state.dock_state.lock().unwrap();
-            dock.collapsed = true;
-        }
-    } else {
-        let (expanded_x, expanded_y) = match current_dock.edge {
-            DockEdge::Right => (mpos.x + msize.width - w, normal_y),
-            DockEdge::Left => (mpos.x, normal_y),
-            DockEdge::Top => (normal_x, mpos.y),
-            DockEdge::None => (normal_x, normal_y),
-        };
-
-        // When expanding: move position towards interior FIRST, then expand size,
-        // again ensuring coordinates stay strictly within current monitor bounds.
-        let _ = win.set_position(tauri::LogicalPosition::new(expanded_x, expanded_y));
-        let _ = win.set_size(tauri::LogicalSize::new(w, h));
-        let _ = win.set_resizable(true);
-        disable_maximize(&win);
-
-        {
-            let mut dock = state.dock_state.lock().unwrap();
-            dock.collapsed = false;
-        }
-
-        let is_mini = {
-            let cfg = state.config.lock().unwrap();
-            cfg.layout == Layout::Mini
-        };
-        if is_mini {
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = poller::poll_trends(&handle).await;
-            });
-        }
-    }
-
-    poller::emit_snapshot(app);
-    Ok(())
-}
-
-pub fn apply_visibility_mode(app: &AppHandle, mode: VisibilityMode) -> Result<(), String> {
-    let cfg = {
-        let state = app.state::<AppState>();
-        let mut cfg = state.config.lock().unwrap();
-        cfg.visibility_mode = mode;
-        cfg.clone()
-    };
-    config::save(app, &cfg)?;
-    if matches!(mode, VisibilityMode::Always | VisibilityMode::Hotkey) {
-        let _ = set_dock_collapsed_inner(app, false);
-    }
-    poller::emit_snapshot(app);
-    Ok(())
-}
-
-/// The 老板键 / 托盘图标唤出 action.
-pub fn toggle_window(app: &AppHandle) {
-    if let Some(win) = app.get_webview_window(DISPLAY) {
-        let is_visible = win.is_visible().unwrap_or(false);
-        let is_collapsed = {
-            let state = app.state::<AppState>();
-            let c = state.dock_state.lock().unwrap().collapsed;
-            c
-        };
-
-        if is_visible && !is_collapsed {
-            // 窗口当前可见且处于完全展开状态 -> 老板键执行彻底隐藏
-            let _ = win.hide();
-        } else {
-            // 窗口处于隐藏状态或当前已贴边折叠 -> 强制展开并显示
-            let _ = set_dock_collapsed_inner(app, false);
-            let _ = win.show();
-        }
-    }
-}
-
-/// Open the settings window, creating it on first use.
-///
-/// Deliberately a real decorated window: it needs focus for its inputs, it wants
-/// a native close button, and it should appear in the taskbar so it can be found
-/// again. The display widget is the opposite of all three.
-pub fn open_settings(app: &AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window(SETTINGS) {
-        let _ = win.show();
-        let _ = win.unminimize();
-        let _ = win.set_always_on_top(true);
-        let _ = win.set_focus();
-        return Ok(());
-    }
-
-    let win = tauri::WebviewWindowBuilder::new(
-        app,
-        SETTINGS,
-        tauri::WebviewUrl::App("settings.html".into()),
-    )
-    .title("设置 · A股摸鱼")
-    .inner_size(760.0, 620.0)
-    .min_inner_size(680.0, 480.0)
-    .center()
-    .resizable(true)
-    .decorations(true)
-    .transparent(false)
-    .always_on_top(true)
-    .skip_taskbar(false)
-    .focused(true)
-    .build()
-    .map_err(|e| format!("打开设置窗口失败: {e}"))?;
-
-    let _ = win.set_focus();
-    Ok(())
-}
-
-/// Flip the autostart registration and mirror it into the config file.
-pub fn toggle_autostart(app: &AppHandle) -> Result<bool, String> {
-    use tauri_plugin_autostart::ManagerExt;
-
-    let mut cfg = config::load(app);
-    let next = !cfg.autostart;
-    let manager = app.autolaunch();
-    if next {
-        manager.enable().map_err(|e| format!("开启自启失败: {e}"))?;
-    } else {
-        manager.disable().map_err(|e| format!("关闭自启失败: {e}"))?;
-    }
-    cfg.autostart = next;
-    config::save(app, &cfg)?;
-    Ok(next)
-}
-
-// ---------------------------------------------------------------- commands
-
-#[tauri::command]
-fn get_snapshot(state: tauri::State<AppState>) -> Snapshot {
-    state.snapshot()
-}
-
-/// Persist a config edited in the settings window. Codes are normalized and
-/// out-of-range numbers clamped before anything is written.
-#[tauri::command]
-fn save_config(app: AppHandle, mut cfg: Config) -> Result<(), String> {
-    for item in cfg.watchlist.iter_mut() {
-        item.code = market::normalize_code(&item.code)?;
-    }
-
-    // Preserve live dragged layout sizes from state unless user explicitly reset sizes
-    if !cfg.layout_sizes.is_empty() {
-        let live_sizes = {
-            let state = app.state::<AppState>();
-            let sizes = state.config.lock().unwrap().layout_sizes.clone();
-            sizes
-        };
-        cfg.layout_sizes = live_sizes;
-    }
-
-    cfg.sanitize();
-
-    // Autostart lives in the OS, not in the file, so a change made in the
-    // settings form has to be pushed out to the registry here.
-    {
-        use tauri_plugin_autostart::ManagerExt;
-        let manager = app.autolaunch();
-        let currently = manager.is_enabled().unwrap_or(false);
-        if cfg.autostart != currently {
-            let result = if cfg.autostart { manager.enable() } else { manager.disable() };
-            if let Err(e) = result {
-                return Err(format!("设置开机自启失败: {e}"));
-            }
-        }
-    }
-
-    let hotkeys_changed = {
-        let state = app.state::<AppState>();
-        let current_keys = state.config.lock().unwrap().hotkeys.clone();
-        current_keys != cfg.hotkeys
-    };
-
-    log::info!(target: "USER", "保存系统配置，自选股共 {} 只", cfg.watchlist.len());
-    config::save(&app, &cfg)?;
-    {
-        let state = app.state::<AppState>();
-        *state.config.lock().unwrap() = cfg.clone();
-        state.market_fetcher.reset_quota_circuit_breaker();
-    }
-
-    if hotkeys_changed {
-        sync_hotkeys(&app, &cfg.hotkeys);
-        log::info!(target: "SYSTEM", "全局热键已动态同步更新");
-    }
-
-    if matches!(cfg.visibility_mode, VisibilityMode::Always | VisibilityMode::Hotkey) {
-        let _ = set_dock_collapsed_inner(&app, false);
-    }
-
-    // Re-lay-out and refetch: the watchlist or source may have changed.
-    apply_layout(&app, cfg.layout);
-    let handle = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let _ = poller::poll_once(&handle).await;
-    });
-    Ok(())
-}
-
-#[tauri::command]
-fn set_layout(app: AppHandle, layout: Layout) {
-    apply_layout(&app, layout);
-}
-
-#[tauri::command]
-async fn refresh_now(app: AppHandle) -> Result<(), String> {
-    poller::poll_once(&app).await
-}
-
-#[tauri::command]
-fn fit_window(app: AppHandle) {
-    fit_window_now(&app);
-}
-
-#[tauri::command]
-fn open_settings_window(app: AppHandle) -> Result<(), String> {
-    open_settings(&app)
-}
-
-#[tauri::command]
-fn quit_app(app: AppHandle) {
-    app.exit(0);
-}
-
-/// Let a window write into the process log.
-///
-/// A transparent widget can fail in ways that are invisible on screen, and the
-/// webview console is not reachable from the terminal. This bridge makes the
-/// frontend's own view of what it rendered observable from the dev log.
-#[tauri::command]
-fn frontend_log(msg: String) {
-    log::info!(target: "FRONTEND", "{msg}");
-}
-
-#[tauri::command]
-fn get_recent_logs(target_filter: Option<String>, level_filter: Option<String>) -> Vec<logger::LogEntry> {
-    logger::get_recent_entries(target_filter.as_deref(), level_filter.as_deref())
-}
-
-#[tauri::command]
-fn open_log_dir(app: AppHandle) -> Result<(), String> {
-    logger::open_log_directory(&app)
-}
-
-#[tauri::command]
-fn open_url(url: String) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(["/c", "start", "", &url])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn clear_memory_logs() {
-    logger::clear_memory_entries();
-}
-
-#[tauri::command]
-fn set_log_level(level: String) {
-    logger::set_level(&level);
-}
-
-/// Report the provider list so the settings UI stays in sync with the backend.
-#[tauri::command]
-fn data_sources() -> Vec<(&'static str, &'static str)> {
-    vec![
-        ("tencent", DataSource::Tencent.label()),
-        ("sina", DataSource::Sina.label()),
-    ]
-}
-
-#[tauri::command]
-fn set_dock_collapsed(app: AppHandle, collapsed: bool) -> Result<(), String> {
-    set_dock_collapsed_inner(&app, collapsed)
-}
-
-#[tauri::command]
-fn set_visibility_mode(app: AppHandle, mode: VisibilityMode) -> Result<(), String> {
-    apply_visibility_mode(&app, mode)
-}
-
-#[tauri::command]
-fn show_context_menu(app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window(DISPLAY) {
-        tray::show_context_menu(&app, &win).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-async fn search_securities(query: String) -> Result<Vec<search::SearchResult>, String> {
-    let client = search::SearchClient::new()?;
-    client.search(&query).await
-}
-
-#[tauri::command]
-async fn set_trend_targets(app: AppHandle, targets: Vec<String>) -> Result<(), String> {
-    let state = app.state::<AppState>();
-    let (changed, has_cached) = {
-        let mut guard = state.active_trend_targets.lock().unwrap();
-        let changed = guard.as_ref() != Some(&targets);
-        *guard = Some(targets.clone());
-        if changed && !targets.is_empty() {
-            let trends = state.trends.lock().unwrap();
-            let has_cached = targets.iter().all(|c| trends.contains_key(c));
-            (true, has_cached)
-        } else {
-            (false, false)
-        }
-    };
-
-    if changed {
-        // If we already have cached trend points in memory, push snapshot immediately
-        // so the frontend renders with 0ms blank-screen delay
-        if has_cached {
-            poller::emit_snapshot(&app);
-        }
-        // Always trigger an immediate background poll to fetch the freshest real-time ticks
-        tauri::async_runtime::spawn(async move {
-            let _ = poller::poll_trends(&app).await;
-        });
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn get_kline(app: AppHandle, code: String) -> Result<quote::KLineData, String> {
-    let state = app.state::<AppState>();
-    let norm_code = market::normalize_code(&code)?;
-    state.fetcher.fetch_kline(&norm_code).await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_global_kline(app: AppHandle, code: String) -> Result<quote::KLineData, String> {
-    let state = app.state::<AppState>();
-    state.fetcher.fetch_global_kline(&code).await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_global_trend(app: AppHandle, code: String) -> Result<quote::Trend, String> {
-    let state = app.state::<AppState>();
-    state.fetcher.fetch_global_trend(&code).await.map_err(|e| e.to_string())
-}
-
-// ------------------------------------------------------------------- setup
-
-/// Register the global shortcuts plugin and sync active chords.
-fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
-    app.plugin(
-        tauri_plugin_global_shortcut::Builder::new()
-            .with_handler(move |app, shortcut, event| {
-                if event.state != ShortcutState::Pressed {
-                    return;
-                }
-                let state = app.state::<AppState>();
-                let bindings = state.hotkey_bindings.lock().unwrap().clone();
-                if bindings.toggle.as_ref() == Some(shortcut) {
-                    toggle_window(app);
-                } else if bindings.bar.as_ref() == Some(shortcut) {
-                    apply_layout(app, Layout::Bar);
-                } else if bindings.mini.as_ref() == Some(shortcut) {
-                    apply_layout(app, Layout::Mini);
-                } else if bindings.list.as_ref() == Some(shortcut) {
-                    apply_layout(app, Layout::List);
-                } else if bindings.market.as_ref() == Some(shortcut) {
-                    apply_layout(app, Layout::Market);
-                } else if bindings.global.as_ref() == Some(shortcut) {
-                    apply_layout(app, Layout::Global);
-                }
-            })
-            .build(),
-    )
-    .map_err(|e| format!("加载快捷键插件失败: {e}"))?;
-
-    sync_hotkeys(app, keys);
-    Ok(())
-}
-
-/// Dynamically sync and register hotkeys without restarting the app.
-pub fn sync_hotkeys(app: &AppHandle, keys: &Hotkeys) {
-    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-
-    fn parse(chord: &str) -> Option<Shortcut> {
-        let trimmed = chord.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-        trimmed.parse::<Shortcut>().ok()
-    }
-
-    let toggle = parse(&keys.toggle);
-    let bar = parse(&keys.layout_bar);
-    let mini = parse(&keys.layout_mini);
-    let list = parse(&keys.layout_list);
-    let market = parse(&keys.layout_market);
-    let global = parse(&keys.layout_global);
-
-    let shortcuts = app.global_shortcut();
-    let _ = shortcuts.unregister_all();
-
-    let new_bindings = state::HotkeyBindings {
-        toggle,
-        bar,
-        mini,
-        list,
-        market,
-        global,
-    };
-
-    for (name, chord, opt_s) in [
-        ("老板键", keys.toggle.as_str(), new_bindings.toggle),
-        ("数字条", keys.layout_bar.as_str(), new_bindings.bar),
-        ("迷你图", keys.layout_mini.as_str(), new_bindings.mini),
-        ("列表", keys.layout_list.as_str(), new_bindings.list),
-        ("大盘全景", keys.layout_market.as_str(), new_bindings.market),
-        ("全球股指", keys.layout_global.as_str(), new_bindings.global),
-    ] {
-        if let Some(s) = opt_s {
-            if let Err(e) = shortcuts.register(s) {
-                log::warn!(target: "SYSTEM", "快捷键 {name}（{chord}）注册失败，可能已被别的程序占用: {e}");
-            }
-        } else if !chord.trim().is_empty() {
-            log::warn!(target: "SYSTEM", "快捷键 {name}（\"{chord}\"）格式无效，无法解析");
-        }
-    }
-
-    let state = app.state::<AppState>();
-    *state.hotkey_bindings.lock().unwrap() = new_bindings;
-}
-
-#[cfg(windows)]
-trait WindowHwnd {
-    fn raw_hwnd(&self) -> Option<*mut std::ffi::c_void>;
-}
-
-#[cfg(windows)]
-impl WindowHwnd for tauri::WebviewWindow {
-    fn raw_hwnd(&self) -> Option<*mut std::ffi::c_void> {
-        self.hwnd().ok().map(|h| h.0)
-    }
-}
-
-#[cfg(windows)]
-impl WindowHwnd for tauri::Window {
-    fn raw_hwnd(&self) -> Option<*mut std::ffi::c_void> {
-        self.hwnd().ok().map(|h| h.0)
-    }
-}
-
-/// Strip WS_MAXIMIZEBOX so Windows Aero Snap / Snap Layouts (贴边分屏) does not
-/// Strip WS_MAXIMIZEBOX and delete SC_MAXIMIZE so Windows Aero Snap (贴边分屏) and
-/// titlebar double-click (双击放大) cannot maximize or expand the widget.
-#[cfg(windows)]
-fn disable_maximize(win: &impl WindowHwnd) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetSystemMenu, DeleteMenu, GetWindowLongPtrW, SetWindowLongPtrW, GWL_STYLE, WS_MAXIMIZEBOX,
-        MF_BYCOMMAND, SC_MAXIMIZE,
-    };
-    if let Some(raw) = win.raw_hwnd() {
-        unsafe {
-            let style = GetWindowLongPtrW(raw, GWL_STYLE);
-            if style & (WS_MAXIMIZEBOX as isize) != 0 {
-                SetWindowLongPtrW(raw, GWL_STYLE, style & !(WS_MAXIMIZEBOX as isize));
-            }
-            let sys_menu = GetSystemMenu(raw, 0);
-            if !sys_menu.is_null() {
-                DeleteMenu(sys_menu, SC_MAXIMIZE as u32, MF_BYCOMMAND);
-            }
-        }
-    }
-}
-
-#[cfg(not(windows))]
-fn disable_maximize<T>(_win: &T) {}
-
-/// Take the window out of the Alt+Tab list.
-///
-/// Tauri's `skipTaskbar` drops the taskbar button but leaves the Alt+Tab entry,
-/// so a plain alt-tab would still reveal the widget by name. Leaving both is what
-/// `WS_EX_TOOLWINDOW` does, and the window config has no option for it.
-///
-/// The new style only takes effect on a window that gets re-shown, hence the
-/// hide/show around it. `SW_SHOWNA` shows without activating, so applying this
-/// during startup can't pull focus.
-#[cfg(windows)]
-fn hide_from_alt_tab(win: &tauri::WebviewWindow) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetWindowLongPtrW, ShowWindow, GWL_EXSTYLE, SW_HIDE, SW_SHOWNA,
-        WS_EX_TOOLWINDOW,
-    };
-
-    disable_maximize(win);
-
-    // `tauri` and `windows-sys` both type HWND as a raw pointer, so `.0` bridges
-    // them without either crate having to know about the other.
-    let Ok(hwnd) = win.hwnd() else {
-        log::warn!(target: "SYSTEM", "无法获取窗口句柄，Alt+Tab 隐藏未生效");
-        return;
-    };
-    let raw = hwnd.0;
-
-    unsafe {
-        let ex = GetWindowLongPtrW(raw, GWL_EXSTYLE);
-        if ex & (WS_EX_TOOLWINDOW as isize) != 0 {
-            return; // already tool-windowed
-        }
-        ShowWindow(raw, SW_HIDE);
-        SetWindowLongPtrW(raw, GWL_EXSTYLE, ex | WS_EX_TOOLWINDOW as isize);
-        ShowWindow(raw, SW_SHOWNA);
-    }
-}
-
-#[cfg(not(windows))]
-fn hide_from_alt_tab(_win: &tauri::WebviewWindow) {}
+use state::{AppState, DockEdge};
+pub use window::{apply_layout, apply_visibility_mode, navigate_to_stock_mini, open_settings, toggle_autostart, toggle_window};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Someone launched us again — reveal the window that already exists.
-            if let Some(win) = app.get_webview_window(DISPLAY) {
+            if let Some(win) = app.get_webview_window(window::DISPLAY) {
                 let _ = win.show();
             }
         }))
@@ -1096,18 +55,18 @@ pub fn run() {
             // come from the config file. A failure is reported and survived: the
             // widget is still usable from the tray and the right-click menu, and
             // refusing to start over a hotkey would be far worse.
-            if let Err(e) = register_hotkeys(app.handle(), &hotkeys) {
+            if let Err(e) = window::register_hotkeys(app.handle(), &hotkeys) {
                 log::warn!(target: "SYSTEM", "{e}（其余功能不受影响）");
             }
 
             tray::build(app)?;
 
             // Restore the saved geometry, clamped to the current display.
-            suppress_resize(app.handle(), Duration::from_millis(700));
-            place_window(app.handle(), layout, rows);
+            window::suppress_resize(app.handle(), Duration::from_millis(700));
+            window::place_window(app.handle(), layout, rows);
 
             // Determine initial dock edge from restored position
-            if let Some(win) = app.get_webview_window(DISPLAY) {
+            if let Some(win) = app.get_webview_window(window::DISPLAY) {
                 let mon = win.current_monitor().ok().flatten().or_else(|| win.primary_monitor().ok().flatten());
                 if let Some(mon) = mon {
                     let scale = mon.scale_factor();
@@ -1118,16 +77,16 @@ pub fn run() {
                         let c = state.config.lock().unwrap();
                         (c.window.x as f64, c.window.y as f64, c.layout_sizes.clone())
                     };
-                    let (w, _h) = size_for(layout, rows, &sizes);
+                    let (w, _h) = window::size_for(layout, rows, &sizes);
                     let dist_top = (cfg_y - mpos.y).abs();
                     let dist_left = (cfg_x - mpos.x).abs();
                     let dist_right = (mpos.x + msize.width - (cfg_x + w)).abs();
 
-                    let initial_edge = if dist_top <= DOCK_SNAP_THRESHOLD {
+                    let initial_edge = if dist_top <= window::DOCK_SNAP_THRESHOLD {
                         DockEdge::Top
-                    } else if dist_left <= DOCK_SNAP_THRESHOLD {
+                    } else if dist_left <= window::DOCK_SNAP_THRESHOLD {
                         DockEdge::Left
-                    } else if dist_right <= DOCK_SNAP_THRESHOLD {
+                    } else if dist_right <= window::DOCK_SNAP_THRESHOLD {
                         DockEdge::Right
                     } else {
                         DockEdge::None
@@ -1139,11 +98,10 @@ pub fn run() {
             // `Tauri` defers showing a transparent window until its webview is
             // ready, and a webview that never signals leaves it hidden forever
             // with no taskbar entry to recover from. Show it explicitly.
-            if let Some(win) = app.get_webview_window(DISPLAY) {
+            if let Some(win) = app.get_webview_window(window::DISPLAY) {
                 let _ = win.show();
-                // Must come after `show()`, since the style needs a re-show to
-                // take hold.
-                hide_from_alt_tab(&win);
+                // Must come after `show()`, since the style needs a re-show to take hold.
+                window::hide_from_alt_tab(&win);
             }
 
             let handle = app.handle().clone();
@@ -1154,27 +112,27 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == SETTINGS {
+            if window.label() == window::SETTINGS {
                 if let WindowEvent::Focused(focused) = event {
                     let _ = window.set_always_on_top(*focused);
                 }
                 return;
             }
-            if window.label() != DISPLAY {
+            if window.label() != window::DISPLAY {
                 return;
             }
-            disable_maximize(window);
+            window::disable_maximize(window);
             match event {
                 WindowEvent::Resized(size) => {
                     let scale = window.scale_factor().unwrap_or(1.0);
-                    on_resized(window.app_handle(), *size, scale);
+                    window::on_resized(window.app_handle(), *size, scale);
                 }
                 WindowEvent::Moved(pos) => {
                     let scale = window.scale_factor().unwrap_or(1.0);
-                    on_moved(window.app_handle(), *pos, scale);
+                    window::on_moved(window.app_handle(), *pos, scale);
                 }
                 WindowEvent::ScaleFactorChanged { .. } => {
-                    disable_maximize(window);
+                    window::disable_maximize(window);
                 }
                 _ => {}
             }
@@ -1183,67 +141,29 @@ pub fn run() {
             tray::handle_menu(app, event.id().as_ref());
         })
         .invoke_handler(tauri::generate_handler![
-            get_snapshot,
-            save_config,
-            set_layout,
-            refresh_now,
-            fit_window,
-            open_settings_window,
-            quit_app,
-            frontend_log,
-            data_sources,
-            set_dock_collapsed,
-            set_visibility_mode,
-            show_context_menu,
-            search_securities,
-            set_trend_targets,
-            get_kline,
-            get_global_kline,
-            get_global_trend,
-            get_recent_logs,
-            open_log_dir,
-            open_url,
-            clear_memory_logs,
-            set_log_level,
+            commands::get_snapshot,
+            commands::save_config,
+            commands::set_layout,
+            commands::refresh_now,
+            commands::fit_window,
+            commands::open_settings_window,
+            commands::quit_app,
+            commands::frontend_log,
+            commands::data_sources,
+            commands::set_dock_collapsed,
+            commands::set_visibility_mode,
+            commands::show_context_menu,
+            commands::search_securities,
+            commands::set_trend_targets,
+            commands::get_kline,
+            commands::get_global_kline,
+            commands::get_global_trend,
+            commands::get_recent_logs,
+            commands::open_log_dir,
+            commands::open_url,
+            commands::clear_memory_logs,
+            commands::set_log_level,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-#[cfg(test)]
-mod hotkey_tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_all_hotkeys() {
-        let keys = Hotkeys::default();
-        let toggle = keys.toggle.parse::<Shortcut>();
-        let bar = keys.layout_bar.parse::<Shortcut>();
-        let mini = keys.layout_mini.parse::<Shortcut>();
-        let list = keys.layout_list.parse::<Shortcut>();
-        let market = keys.layout_market.parse::<Shortcut>();
-        let global = keys.layout_global.parse::<Shortcut>();
-
-        assert!(toggle.is_ok(), "toggle chord must be valid");
-        assert!(bar.is_ok(), "bar chord must be valid");
-        assert!(mini.is_ok(), "mini chord must be valid");
-        assert!(list.is_ok(), "list chord must be valid");
-        assert!(market.is_ok(), "market chord must be valid");
-        assert!(global.is_ok(), "global chord must be valid");
-
-        let set = [
-            toggle.unwrap(),
-            bar.unwrap(),
-            mini.unwrap(),
-            list.unwrap(),
-            market.unwrap(),
-            global.unwrap(),
-        ];
-        // Ensure no chords overlap
-        for i in 0..set.len() {
-            for j in (i + 1)..set.len() {
-                assert_ne!(set[i], set[j], "chords must be unique");
-            }
-        }
-    }
 }
