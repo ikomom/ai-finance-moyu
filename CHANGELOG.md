@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-18
+
+### 🚀 新增功能与体验革新
+- **5 套全新全局视觉皮肤预设**：
+  - **深邃暗黑**（经典默认暗黑毛玻璃材质，夜间与深色壁纸绝佳搭配）；
+  - **办公浅色**（白底极简高仿 Excel / Word / 办公软件，白天办公防窥摸鱼）；
+  - **极致透明**（超高透度极简无界桌面贴合，文字若隐若现）；
+  - **科技曜青**（深邃藏青底色搭配冰晶天蓝微光与青色点缀）；
+  - **赛博终端**（纯黑极客底色搭配高对比度荧光绿，硬核交易风格）；
+  - **0ms 实时预览**：设置面板色卡即点即改，设置中心与前台悬浮窗全自适应同步生效。
+- **现代 Fluent / macOS 设置中心大修**：
+  - 侧边栏细腻磨砂玻璃质感、微光 Brand Badge 与精细层级卡片；
+  - 拟真 iOS / macOS 风格 Switch 控件、圆滑滑动轨道与发光 Primary 操作按钮；
+  - Canvas 图表引擎自适应暗黑/浅色模式，动态重算网格与刻度色阶，杜绝浅色模式下文字不可见。
+- **通用一键发版与更新流水线**：
+  - 引入通用交互式发布脚本，集成构建、多端测试、语义化版本升级与 GitHub Releases 自动触发。
+
+### 🛠️ 优化与底层架构重构
+- **前后端全链路模块化解耦**：
+  - 后端拆分为 `quote/`、`crossing/`、`window/`、`commands/` 等高聚合子模块，消除单文件千行代码臃肿；
+  - 前端抽离 `src/chart/` 共享绘图工具库与 `src/components/watch/` 独立子组件，各职责边界彻底厘清。
+- **快捷键唤醒与防窥贴边增强**：
+  - 全局布局快捷键强制唤起并解除折叠贴边，支持热键动态重载即时生效。
+
+---
+
 ## [0.1.1] - 2026-10-16
 
 ### 🚀 新增功能

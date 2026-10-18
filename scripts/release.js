@@ -172,69 +172,83 @@ async function main() {
 
   // 4. Generate Changelog Draft
   log.step('4. Generating Changelog Draft');
-  const latestTag = runOutput('git tag --list --sort=-v:refname').split('\n')[0]?.trim();
-  const gitLogRange = latestTag ? `${latestTag}..HEAD` : 'HEAD';
-  log.info(`Reading commits from range: ${colors.dim}${gitLogRange}${colors.reset}`);
+  const changelogPath = path.resolve('CHANGELOG.md');
+  let hasExistingSection = false;
+  let changelogSection = '';
 
-  const rawCommits = runOutput(`git log ${gitLogRange} --oneline`).split('\n').filter(Boolean);
-  const commits = rawCommits.filter((line) => !line.includes('chore(release):'));
-
-  const feats = [];
-  const fixes = [];
-  const perfs = [];
-  const others = [];
-
-  for (const line of commits) {
-    const text = line.replace(/^[a-f0-9]+\s+/, '');
-    if (/^feat(\(.*?\))?:/i.test(text)) {
-      feats.push(text.replace(/^feat(\(.*?\))?:\s*/i, ''));
-    } else if (/^fix(\(.*?\))?:/i.test(text)) {
-      fixes.push(text.replace(/^fix(\(.*?\))?:\s*/i, ''));
-    } else if (/^perf(\(.*?\))?:/i.test(text)) {
-      perfs.push(text.replace(/^perf(\(.*?\))?:\s*/i, ''));
-    } else {
-      others.push(text);
+  if (fs.existsSync(changelogPath)) {
+    const existing = fs.readFileSync(changelogPath, 'utf8');
+    if (existing.includes(`## [${targetVersion}]`)) {
+      hasExistingSection = true;
+      log.info(`Found pre-defined changelog section for v${targetVersion} in CHANGELOG.md.`);
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  let changelogSection = `## [${targetVersion}] - ${today}\n\n`;
+  if (!hasExistingSection) {
+    const latestTag = runOutput('git tag --list --sort=-v:refname').split('\n')[0]?.trim();
+    const gitLogRange = latestTag ? `${latestTag}..HEAD` : 'HEAD';
+    log.info(`Reading commits from range: ${colors.dim}${gitLogRange}${colors.reset}`);
 
-  if (feats.length > 0) {
-    changelogSection += `### 🚀 新增功能\n`;
-    feats.forEach((f) => {
-      changelogSection += `- ${f}\n`;
-    });
-    changelogSection += `\n`;
-  }
+    const rawCommits = runOutput(`git log ${gitLogRange} --oneline`).split('\n').filter(Boolean);
+    const commits = rawCommits.filter((line) => !line.includes('chore(release):'));
 
-  if (fixes.length > 0 || perfs.length > 0) {
-    changelogSection += `### 🛠️ 优化与修复\n`;
-    fixes.forEach((f) => {
-      changelogSection += `- ${f}\n`;
-    });
-    perfs.forEach((p) => {
-      changelogSection += `- 性能优化: ${p}\n`;
-    });
-    changelogSection += `\n`;
-  }
+    const feats = [];
+    const fixes = [];
+    const perfs = [];
+    const others = [];
 
-  if (feats.length === 0 && fixes.length === 0 && perfs.length === 0 && others.length > 0) {
-    changelogSection += `### 📦 变更记录\n`;
-    others.forEach((o) => {
-      changelogSection += `- ${o}\n`;
-    });
-    changelogSection += `\n`;
-  }
+    for (const line of commits) {
+      const text = line.replace(/^[a-f0-9]+\s+/, '');
+      if (/^feat(\(.*?\))?:/i.test(text)) {
+        feats.push(text.replace(/^feat(\(.*?\))?:\s*/i, ''));
+      } else if (/^fix(\(.*?\))?:/i.test(text)) {
+        fixes.push(text.replace(/^fix(\(.*?\))?:\s*/i, ''));
+      } else if (/^perf(\(.*?\))?:/i.test(text)) {
+        perfs.push(text.replace(/^perf(\(.*?\))?:\s*/i, ''));
+      } else {
+        others.push(text);
+      }
+    }
 
-  console.log(`\n${colors.cyan}--- Changelog Draft Preview ---${colors.reset}`);
-  console.log(changelogSection.trim());
-  console.log(`${colors.cyan}--------------------------------${colors.reset}\n`);
+    const today = new Date().toISOString().slice(0, 10);
+    changelogSection = `## [${targetVersion}] - ${today}\n\n`;
 
-  const confirmChangelog = await ask('Use this changelog entry? (Y/n)', 'Y');
-  if (confirmChangelog.toLowerCase() === 'n') {
-    log.warn('Release aborted. You can modify CHANGELOG.md manually and re-run.');
-    process.exit(0);
+    if (feats.length > 0) {
+      changelogSection += `### 🚀 新增功能\n`;
+      feats.forEach((f) => {
+        changelogSection += `- ${f}\n`;
+      });
+      changelogSection += `\n`;
+    }
+
+    if (fixes.length > 0 || perfs.length > 0) {
+      changelogSection += `### 🛠️ 优化与修复\n`;
+      fixes.forEach((f) => {
+        changelogSection += `- ${f}\n`;
+      });
+      perfs.forEach((p) => {
+        changelogSection += `- 性能优化: ${p}\n`;
+      });
+      changelogSection += `\n`;
+    }
+
+    if (feats.length === 0 && fixes.length === 0 && perfs.length === 0 && others.length > 0) {
+      changelogSection += `### 📦 变更记录\n`;
+      others.forEach((o) => {
+        changelogSection += `- ${o}\n`;
+      });
+      changelogSection += `\n`;
+    }
+
+    console.log(`\n${colors.cyan}--- Changelog Draft Preview ---${colors.reset}`);
+    console.log(changelogSection.trim());
+    console.log(`${colors.cyan}--------------------------------${colors.reset}\n`);
+
+    const confirmChangelog = await ask('Use this changelog entry? (Y/n)', 'Y');
+    if (confirmChangelog.toLowerCase() !== 'n') {
+      log.warn('Release aborted. You can modify CHANGELOG.md manually and re-run.');
+      process.exit(0);
+    }
   }
 
   // 5. Update Version in Files & CHANGELOG.md
@@ -292,9 +306,8 @@ async function main() {
   }
 
   // CHANGELOG.md
-  const changelogPath = path.resolve('CHANGELOG.md');
   if (fs.existsSync(changelogPath)) {
-    if (!isDryRun) {
+    if (!isDryRun && !hasExistingSection && changelogSection) {
       let existingChangelog = fs.readFileSync(changelogPath, 'utf8');
       const firstSectionIndex = existingChangelog.indexOf('## [');
       if (firstSectionIndex !== -1) {
@@ -307,9 +320,11 @@ async function main() {
         existingChangelog += '\n\n' + changelogSection;
       }
       fs.writeFileSync(changelogPath, existingChangelog);
+      filesToCommit.push('CHANGELOG.md');
+      log.info(`Updated CHANGELOG.md`);
+    } else {
+      log.info(`Verified CHANGELOG.md`);
     }
-    log.info(`Updated CHANGELOG.md`);
-    filesToCommit.push('CHANGELOG.md');
   }
 
   log.success('All version references and CHANGELOG updated successfully.');
