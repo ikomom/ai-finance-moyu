@@ -60,6 +60,59 @@ pub fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct ReleaseAsset {
+    pub name: String,
+    pub browser_download_url: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct GitHubReleaseInfo {
+    pub tag_name: String,
+    pub published_at: Option<String>,
+    pub body: Option<String>,
+    #[serde(default)]
+    pub assets: Vec<ReleaseAsset>,
+}
+
+#[tauri::command]
+pub async fn fetch_latest_release() -> Result<GitHubReleaseInfo, String> {
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|e| format!("创建网络客户端失败: {e}"))?;
+
+    let direct_url = "https://api.github.com/repos/ikomom/ai-finance-moyu/releases/latest";
+    let resp = client
+        .get(direct_url)
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", "ai-finance-moyu")
+        .send()
+        .await;
+
+    let response = match resp {
+        Ok(r) if r.status().is_success() => r,
+        _ => {
+            let mirror_url = "https://ghproxy.net/https://api.github.com/repos/ikomom/ai-finance-moyu/releases/latest";
+            client
+                .get(mirror_url)
+                .header("Accept", "application/vnd.github.v3+json")
+                .header("User-Agent", "ai-finance-moyu")
+                .send()
+                .await
+                .map_err(|e| format!("请求 GitHub Release 失败: {e}"))?
+        }
+    };
+
+    if !response.status().is_success() {
+        return Err(format!("Release API 返回状态: {}", response.status()));
+    }
+
+    let text = response.text().await.map_err(|e| format!("读取响应失败: {e}"))?;
+    serde_json::from_str::<GitHubReleaseInfo>(&text).map_err(|e| format!("解析 Release 信息失败: {e}"))
+}
+
 #[derive(Clone, serde::Serialize)]
 pub struct DownloadProgressPayload {
     pub downloaded: u64,

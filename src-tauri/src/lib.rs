@@ -162,6 +162,7 @@ pub fn run() {
             commands::open_log_dir,
             commands::open_url,
             commands::download_and_install_package,
+            commands::fetch_latest_release,
             commands::clear_memory_logs,
             commands::set_log_level,
         ])

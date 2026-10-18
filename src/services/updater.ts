@@ -1,5 +1,6 @@
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { getVersion } from '@tauri-apps/api/app'
+import { invoke } from '@tauri-apps/api/core'
 
 const SKIPPED_VERSION_KEY = 'moyu_skipped_version'
 
@@ -99,58 +100,54 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
     }
   }
 
-  // 2. Fallback to GitHub Releases API (when latest.json not found, 404, or check returns null)
+  // 2. Fallback to GitHub Releases API via Rust backend (immune to browser CORS/User-Agent quirks)
   try {
-    const res = await fetch('https://api.github.com/repos/ikomom/ai-finance-moyu/releases/latest', {
-      headers: { Accept: 'application/vnd.github.v3+json' },
-    })
-    if (res.ok) {
-      const data = (await res.json()) as {
-        tag_name?: string
-        published_at?: string
-        body?: string
-        assets?: Array<{ name: string; browser_download_url: string }>
-      }
-      const tagName = (data.tag_name || '').replace(/^v/, '')
-      if (tagName && compareSemVer(tagName, currentVersion) > 0) {
-        if (!isManual && skipped && compareSemVer(tagName, skipped) <= 0) {
-          return {
-            hasUpdate: false,
-            update: null,
-            currentVersion,
-            newVersion: tagName,
-          }
-        }
+    const data = await invoke<{
+      tag_name: string
+      published_at?: string
+      body?: string
+      assets?: Array<{ name: string; browser_download_url: string }>
+    }>('fetch_latest_release')
 
-        const isWin = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
-        const isMac =
-          typeof navigator !== 'undefined' &&
-          (navigator.userAgent.includes('Mac') || (navigator as { platform?: string }).platform?.includes('Mac'))
-
-        const matchedAsset = data.assets?.find((a) => {
-          if (isWin) return a.name.endsWith('-setup.exe') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
-          if (isMac) return a.name.endsWith('.dmg')
-          return false
-        })
-
-        return {
-          hasUpdate: true,
-          update: null,
-          currentVersion,
-          newVersion: tagName,
-          date: data.published_at,
-          body: data.body,
-          isFallback: true,
-          installerUrl: matchedAsset?.browser_download_url,
-          installerFileName: matchedAsset?.name,
-        }
-      } else {
-        // GitHub confirms latest release is <= currentVersion: we are up to date!
+    const tagName = (data.tag_name || '').replace(/^v/, '')
+    if (tagName && compareSemVer(tagName, currentVersion) > 0) {
+      if (!isManual && skipped && compareSemVer(tagName, skipped) <= 0) {
         return {
           hasUpdate: false,
           update: null,
           currentVersion,
+          newVersion: tagName,
         }
+      }
+
+      const isWin = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
+      const isMac =
+        typeof navigator !== 'undefined' &&
+        (navigator.userAgent.includes('Mac') || (navigator as { platform?: string }).platform?.includes('Mac'))
+
+      const matchedAsset = data.assets?.find((a) => {
+        if (isWin) return a.name.endsWith('-setup.exe') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
+        if (isMac) return a.name.endsWith('.dmg')
+        return false
+      })
+
+      return {
+        hasUpdate: true,
+        update: null,
+        currentVersion,
+        newVersion: tagName,
+        date: data.published_at,
+        body: data.body,
+        isFallback: true,
+        installerUrl: matchedAsset?.browser_download_url,
+        installerFileName: matchedAsset?.name,
+      }
+    } else {
+      // GitHub confirms latest release is <= currentVersion: we are up to date!
+      return {
+        hasUpdate: false,
+        update: null,
+        currentVersion,
       }
     }
   } catch (fallbackErr) {
@@ -159,7 +156,11 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
 
   if (isManual && tauriErr) {
     const errText = tauriErr instanceof Error ? tauriErr.message : String(tauriErr)
-    if (!errText.includes('404') && !errText.includes('Could not fetch a valid release JSON')) {
+    const isHarmless404 =
+      errText.includes('404') ||
+      errText.includes('successful status code') ||
+      errText.includes('Could not fetch a valid release JSON')
+    if (!isHarmless404) {
       throw new Error(`连接更新服务器失败：${errText.replace(/^error:\s*/i, '')}`)
     }
   }
