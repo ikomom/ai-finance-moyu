@@ -71,96 +71,95 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
   const skipped = getSkippedVersion()
 
   // 1. Try official Tauri updater first
+  let update: Awaited<ReturnType<typeof check>> = null
+  let tauriErr: unknown = null
   try {
-    const update = await check({ timeout: 10000 })
-    if (update) {
-      if (!isManual && skipped && compareSemVer(update.version, skipped) <= 0) {
-        return {
-          hasUpdate: false,
-          update: null,
-          currentVersion,
-          newVersion: update.version,
-        }
-      }
-      return {
-        hasUpdate: true,
-        update,
-        currentVersion: update.currentVersion || currentVersion,
-        newVersion: update.version,
-        date: update.date,
-        body: update.body,
-      }
-    }
-  } catch (tauriErr) {
-    console.warn('[Updater] Tauri plugin updater check failed:', tauriErr)
-    const errText = tauriErr instanceof Error ? tauriErr.message : String(tauriErr)
+    update = await check({ timeout: 10000 })
+  } catch (err) {
+    tauriErr = err
+    console.warn('[Updater] Tauri plugin updater check failed:', err)
+  }
 
-    // Attempt lightweight fallback check via GitHub API
-    try {
-      const res = await fetch('https://api.github.com/repos/ikomom/ai-finance-moyu/releases/latest', {
-        headers: { Accept: 'application/vnd.github.v3+json' },
-      })
-      if (res.ok) {
-        const data = (await res.json()) as {
-          tag_name?: string
-          published_at?: string
-          body?: string
-          assets?: Array<{ name: string; browser_download_url: string }>
-        }
-        const tagName = (data.tag_name || '').replace(/^v/, '')
-        if (tagName && compareSemVer(tagName, currentVersion) > 0) {
-          if (!isManual && skipped && compareSemVer(tagName, skipped) <= 0) {
-            return {
-              hasUpdate: false,
-              update: null,
-              currentVersion,
-              newVersion: tagName,
-            }
-          }
-
-          const isWin = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
-          const isMac = typeof navigator !== 'undefined' && (navigator.userAgent.includes('Mac') || (navigator as { platform?: string }).platform?.includes('Mac'))
-
-          const matchedAsset = data.assets?.find((a) => {
-            if (isWin) return a.name.endsWith('-setup.exe') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
-            if (isMac) return a.name.endsWith('.dmg')
-            return false
-          })
-
-          return {
-            hasUpdate: true,
-            update: null,
-            currentVersion,
-            newVersion: tagName,
-            date: data.published_at,
-            body: data.body,
-            isFallback: true,
-            installerUrl: matchedAsset?.browser_download_url,
-            installerFileName: matchedAsset?.name,
-          }
-        } else {
-          // GitHub confirms latest release is <= currentVersion: we are up to date!
-          return {
-            hasUpdate: false,
-            update: null,
-            currentVersion,
-          }
-        }
-      }
-    } catch (fallbackErr) {
-      console.warn('[Updater] Fallback GitHub release check failed:', fallbackErr)
-    }
-
-    // If remote release exists but does not have latest.json manifest yet (e.g. initial v0.1.0 without signed manifest)
-    if (errText.includes('Could not fetch a valid release JSON') || errText.includes('404')) {
+  if (update) {
+    if (!isManual && skipped && compareSemVer(update.version, skipped) <= 0) {
       return {
         hasUpdate: false,
         update: null,
         currentVersion,
+        newVersion: update.version,
       }
     }
+    return {
+      hasUpdate: true,
+      update,
+      currentVersion: update.currentVersion || currentVersion,
+      newVersion: update.version,
+      date: update.date,
+      body: update.body,
+    }
+  }
 
-    if (isManual) {
+  // 2. Fallback to GitHub Releases API (when latest.json not found, 404, or check returns null)
+  try {
+    const res = await fetch('https://api.github.com/repos/ikomom/ai-finance-moyu/releases/latest', {
+      headers: { Accept: 'application/vnd.github.v3+json' },
+    })
+    if (res.ok) {
+      const data = (await res.json()) as {
+        tag_name?: string
+        published_at?: string
+        body?: string
+        assets?: Array<{ name: string; browser_download_url: string }>
+      }
+      const tagName = (data.tag_name || '').replace(/^v/, '')
+      if (tagName && compareSemVer(tagName, currentVersion) > 0) {
+        if (!isManual && skipped && compareSemVer(tagName, skipped) <= 0) {
+          return {
+            hasUpdate: false,
+            update: null,
+            currentVersion,
+            newVersion: tagName,
+          }
+        }
+
+        const isWin = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
+        const isMac =
+          typeof navigator !== 'undefined' &&
+          (navigator.userAgent.includes('Mac') || (navigator as { platform?: string }).platform?.includes('Mac'))
+
+        const matchedAsset = data.assets?.find((a) => {
+          if (isWin) return a.name.endsWith('-setup.exe') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
+          if (isMac) return a.name.endsWith('.dmg')
+          return false
+        })
+
+        return {
+          hasUpdate: true,
+          update: null,
+          currentVersion,
+          newVersion: tagName,
+          date: data.published_at,
+          body: data.body,
+          isFallback: true,
+          installerUrl: matchedAsset?.browser_download_url,
+          installerFileName: matchedAsset?.name,
+        }
+      } else {
+        // GitHub confirms latest release is <= currentVersion: we are up to date!
+        return {
+          hasUpdate: false,
+          update: null,
+          currentVersion,
+        }
+      }
+    }
+  } catch (fallbackErr) {
+    console.warn('[Updater] Fallback GitHub release check failed:', fallbackErr)
+  }
+
+  if (isManual && tauriErr) {
+    const errText = tauriErr instanceof Error ? tauriErr.message : String(tauriErr)
+    if (!errText.includes('404') && !errText.includes('Could not fetch a valid release JSON')) {
       throw new Error(`连接更新服务器失败：${errText.replace(/^error:\s*/i, '')}`)
     }
   }

@@ -14,7 +14,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getVersion } from '@tauri-apps/api/app'
 
-import { checkAppUpdate, type CheckResult } from '../../services/updater'
+import { checkAppUpdate, clearSkippedVersion, type CheckResult } from '../../services/updater'
 import type { Config, DataSource, Layout, PriceLine, Snapshot, ThemeOption, VisibilityMode, WatchItem } from '../../types'
 
 export type TabKey = 'watchlist' | 'appearance' | 'alerts' | 'system' | 'logs'
@@ -365,6 +365,7 @@ export function SettingsProvider(props: { children: JSX.Element }) {
     setIsCheckingUpdate(true)
     setUpdateCheckMsg('正在检查更新…')
     try {
+      clearSkippedVersion()
       const res = await checkAppUpdate(true)
       setUpdateResult(res)
       if (res.hasUpdate) {
