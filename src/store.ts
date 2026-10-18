@@ -16,6 +16,7 @@ export interface ToastAlert {
   message: string
   code?: string
   name?: string
+  onClick?: () => void
 }
 
 const [snapshot, setSnapshot] = createSignal<Snapshot | null>(null)
@@ -26,6 +27,8 @@ const [alertTick, setAlertTick] = createSignal(0)
 /** Transient structured message shown at the bottom of the widget. */
 const [toastAlert, setToastAlert] = createSignal<ToastAlert | null>(null)
 const toastMsg = () => toastAlert()?.message ?? null
+/** Discovered update version for non-intrusive notification */
+const [newVersionAvailable, setNewVersionAvailable] = createSignal<string | null>(null)
 /** Force mini layout to switch subchart mode on navigation */
 const [miniModeOverride, setMiniModeOverride] = createSignal<'trend' | 'kline' | 'auction' | null>(null)
 
@@ -97,8 +100,10 @@ export function navigateLayoutForward(): void {
 export {
   alertTick,
   miniModeOverride,
+  newVersionAvailable,
   selected,
   setMiniModeOverride,
+  setNewVersionAvailable,
   setSelected,
   setSnapshot,
   snapshot,
@@ -107,9 +112,9 @@ export {
 }
 
 /** Show a message briefly, then clear it (unless a newer one replaced it). */
-export function showToast(msg: string, code?: string, name?: string): void {
-  setToastAlert({ message: msg, code, name })
-  window.setTimeout(() => setToastAlert((curr) => (curr?.message === msg ? null : curr)), 3200)
+export function showToast(msg: string, code?: string, name?: string, onClick?: () => void): void {
+  setToastAlert({ message: msg, code, name, onClick })
+  window.setTimeout(() => setToastAlert((curr) => (curr?.message === msg ? null : curr)), 5000)
 }
 
 /** Clear active toast immediately. */

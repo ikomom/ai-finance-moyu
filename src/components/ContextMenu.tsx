@@ -1,8 +1,9 @@
 import { createSignal, For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
+import { emit } from '@tauri-apps/api/event'
 import './ContextMenu.css'
 
-import { snapshot } from '../store'
+import { newVersionAvailable, snapshot } from '../store'
 import type { Layout, VisibilityMode } from '../types'
 
 const LAYOUTS: Array<[Layout, string]> = [
@@ -113,6 +114,20 @@ export function ContextMenu() {
         </div>
 
         <div class="menu-sep" />
+
+        <Show when={newVersionAvailable()}>
+          <div
+            class="menu-item"
+            style={{ color: '#38bdf8', 'font-weight': '600' }}
+            onClick={() => act(async () => {
+              await invoke('open_settings_window')
+              await emit('trigger-check-update')
+            })}
+          >
+            <span class="check">🚀</span>
+            更新到 v{newVersionAvailable()}…
+          </div>
+        </Show>
 
         <div class="menu-item" onClick={() => act(() => invoke('refresh_now'))}>
           <span class="check" />

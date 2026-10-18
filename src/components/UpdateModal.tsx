@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { marked } from 'marked'
 import type { CheckResult } from '../services/updater'
 import './UpdateModal.css'
 
@@ -41,6 +42,14 @@ export function UpdateModal(props: UpdateModalProps) {
   const newVersion = () => props.result?.newVersion || props.result?.update?.version || ''
   const releaseDate = () => props.result?.date || props.result?.update?.date || ''
   const changelog = () => props.result?.body || props.result?.update?.body || '本次更新包含性能提升、算法优化及已知问题修复。'
+  const renderedMarkdown = () => {
+    const raw = changelog().trim()
+    try {
+      return marked.parse(raw, { async: false, breaks: true, gfm: true }) as string
+    } catch {
+      return raw
+    }
+  }
 
   const handleOpenReleasePage = async () => {
     try {
@@ -208,9 +217,7 @@ export function UpdateModal(props: UpdateModalProps) {
           <div class="update-modal-body">
             <div class="update-changelog-label">更新日志与改进特性：</div>
             <div class="update-changelog-box">
-              <pre class="update-changelog-text">
-                {changelog().trim()}
-              </pre>
+              <div class="update-changelog-markdown" innerHTML={renderedMarkdown()} />
             </div>
 
             {/* Download Progress Indicator */}

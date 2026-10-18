@@ -11,17 +11,19 @@ export function Toast() {
       {(item) => (
         <div
           class="toast"
-          classList={{ clickable: !!item().code }}
-          title={item().code ? '点击查看分时图' : undefined}
+          classList={{ clickable: !!item().code || !!item().onClick }}
+          title={item().code ? '点击查看分时图' : item().onClick ? '点击查看' : undefined}
           onClick={() => {
-            if (item().code) {
+            if (item().onClick) {
+              item().onClick!()
+            } else if (item().code) {
               navigateToStock(item().code!, 'trend')
             }
             clearToast()
           }}
         >
           <span class="toast-msg">{item().message}</span>
-          <Show when={item().code}>
+          <Show when={item().code || item().onClick}>
             <span class="toast-hint">查看 ➔</span>
           </Show>
         </div>

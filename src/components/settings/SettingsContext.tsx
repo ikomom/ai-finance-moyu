@@ -342,11 +342,12 @@ export function SettingsProvider(props: { children: JSX.Element }) {
         setUpdateResult(res)
         if (res.hasUpdate) {
           setUpdateCheckMsg(`发现新版本 v${res.newVersion}`)
+          setIsUpdateModalOpen(true)
         }
       } catch {
         // 静默检查网络故障不打扰用户
       }
-    }, 5000)
+    }, 1500)
     onCleanup(() => clearTimeout(bgTimer))
   })
 

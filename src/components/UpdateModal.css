@@ -133,9 +133,118 @@
   background: rgba(10, 12, 17, 0.7);
   border: 1px solid var(--surface-border-subtle);
   border-radius: var(--radius-lg);
-  padding: 12px 14px;
-  max-height: 180px;
+  padding: 14px 16px;
+  max-height: 240px;
   overflow-y: auto;
+}
+
+.update-changelog-markdown {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #e2e8f0;
+  word-break: break-word;
+}
+
+.update-changelog-markdown h1,
+.update-changelog-markdown h2,
+.update-changelog-markdown h3,
+.update-changelog-markdown h4 {
+  color: #f8fafc;
+  font-weight: 600;
+  margin: 12px 0 6px 0;
+  line-height: 1.4;
+}
+
+.update-changelog-markdown h1:first-child,
+.update-changelog-markdown h2:first-child,
+.update-changelog-markdown h3:first-child,
+.update-changelog-markdown h4:first-child {
+  margin-top: 0;
+}
+
+.update-changelog-markdown h1 {
+  font-size: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+}
+
+.update-changelog-markdown h2 {
+  font-size: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 3px;
+}
+
+.update-changelog-markdown h3 {
+  font-size: 14px;
+  color: #38bdf8;
+}
+
+.update-changelog-markdown h4 {
+  font-size: 13px;
+}
+
+.update-changelog-markdown p {
+  margin: 6px 0;
+}
+
+.update-changelog-markdown ul,
+.update-changelog-markdown ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.update-changelog-markdown li {
+  margin: 4px 0;
+}
+
+.update-changelog-markdown li > ul,
+.update-changelog-markdown li > ol {
+  margin: 3px 0;
+  padding-left: 18px;
+}
+
+.update-changelog-markdown strong,
+.update-changelog-markdown b {
+  color: #7dd3fc;
+  font-weight: 600;
+}
+
+.update-changelog-markdown code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #f1f5f9;
+}
+
+.update-changelog-markdown pre {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #f1f5f9;
+  margin: 8px 0;
+}
+
+.update-changelog-markdown blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  color: #94a3b8;
+  border-radius: 0 4px 4px 0;
+}
+
+.update-changelog-markdown a {
+  color: #38bdf8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .update-changelog-text {

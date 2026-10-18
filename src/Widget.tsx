@@ -1,5 +1,6 @@
 import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
+import { emit } from '@tauri-apps/api/event'
 
 import { ContextMenu, closeMenu, isContextMenuOpen, setContextMenuOpen } from './components/ContextMenu'
 import { Toast } from './components/Toast'
@@ -8,7 +9,16 @@ import { Global } from './layouts/Global'
 import { List } from './layouts/List'
 import { Market } from './layouts/Market'
 import { Mini } from './layouts/Mini'
-import { alertTick, initStore, navigateLayoutBack, navigateLayoutForward, snapshot } from './store'
+import { checkAppUpdate } from './services/updater'
+import {
+  alertTick,
+  initStore,
+  navigateLayoutBack,
+  navigateLayoutForward,
+  setNewVersionAvailable,
+  showToast,
+  snapshot,
+} from './store'
 import { logToBackend } from './tauri'
 
 /** The display widget: layout routing, right-click menu and alert flash. */
@@ -171,12 +181,33 @@ export function Widget() {
       report()
     })
 
+    // Background auto-check for updates (delayed 8s after boot, and every 4 hours thereafter)
+    const checkUpdateSilently = async () => {
+      try {
+        const res = await checkAppUpdate(false)
+        if (res.hasUpdate && res.newVersion) {
+          setNewVersionAvailable(res.newVersion)
+          showToast(`🚀 发现新版本 v${res.newVersion}`, undefined, undefined, async () => {
+            await invoke('open_settings_window')
+            await emit('trigger-check-update')
+          })
+        }
+      } catch {
+        // Silent background check: ignore network errors
+      }
+    }
+
+    const initialUpdateTimer = window.setTimeout(checkUpdateSilently, 8000)
+    const periodicUpdateTimer = window.setInterval(checkUpdateSilently, 4 * 60 * 60 * 1000)
+
     onCleanup(() => {
       document.removeEventListener('contextmenu', handleContextMenu)
       document.removeEventListener('mousedown', handleMouseDownOutside)
       document.removeEventListener('mousedown', preventDefaultSideButtons)
       document.removeEventListener('mouseup', handleMouseSideButtons)
       document.removeEventListener('auxclick', preventDefaultSideButtons)
+      window.clearTimeout(initialUpdateTimer)
+      window.clearInterval(periodicUpdateTimer)
     })
   })
 
