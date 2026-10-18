@@ -7,8 +7,10 @@ export function SystemTab() {
     form,
     setForm,
     currentAppVersion,
+    updateResult,
     updateCheckMsg,
     isCheckingUpdate,
+    setIsUpdateModalOpen,
     handleOpenReleasePage,
     handleManualCheckUpdate,
   } = useSettings()
@@ -103,9 +105,19 @@ export function SystemTab() {
                 class="btn-primary"
                 style={{ "padding": "5px 12px", "font-size": "12px" }}
                 disabled={isCheckingUpdate()}
-                onClick={() => void handleManualCheckUpdate()}
+                onClick={() => {
+                  if (updateResult()?.hasUpdate) {
+                    setIsUpdateModalOpen(true)
+                  } else {
+                    void handleManualCheckUpdate()
+                  }
+                }}
               >
-                {isCheckingUpdate() ? '🔄 检查中…' : '🔄 检查更新'}
+                {isCheckingUpdate()
+                  ? '🔄 检查中…'
+                  : updateResult()?.hasUpdate
+                    ? '🚀 查看新版'
+                    : '🔄 检查更新'}
               </button>
             </div>
           </div>

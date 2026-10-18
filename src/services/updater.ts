@@ -11,6 +11,8 @@ export interface CheckResult {
   date?: string
   body?: string
   isFallback?: boolean
+  installerUrl?: string
+  installerFileName?: string
   error?: string
 }
 
@@ -99,7 +101,12 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
         headers: { Accept: 'application/vnd.github.v3+json' },
       })
       if (res.ok) {
-        const data = (await res.json()) as { tag_name?: string; published_at?: string; body?: string }
+        const data = (await res.json()) as {
+          tag_name?: string
+          published_at?: string
+          body?: string
+          assets?: Array<{ name: string; browser_download_url: string }>
+        }
         const tagName = (data.tag_name || '').replace(/^v/, '')
         if (tagName && compareSemVer(tagName, currentVersion) > 0) {
           if (!isManual && skipped && compareSemVer(tagName, skipped) <= 0) {
@@ -110,6 +117,16 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
               newVersion: tagName,
             }
           }
+
+          const isWin = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
+          const isMac = typeof navigator !== 'undefined' && (navigator.userAgent.includes('Mac') || (navigator as { platform?: string }).platform?.includes('Mac'))
+
+          const matchedAsset = data.assets?.find((a) => {
+            if (isWin) return a.name.endsWith('-setup.exe') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
+            if (isMac) return a.name.endsWith('.dmg')
+            return false
+          })
+
           return {
             hasUpdate: true,
             update: null,
@@ -118,6 +135,8 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
             date: data.published_at,
             body: data.body,
             isFallback: true,
+            installerUrl: matchedAsset?.browser_download_url,
+            installerFileName: matchedAsset?.name,
           }
         } else {
           // GitHub confirms latest release is <= currentVersion: we are up to date!

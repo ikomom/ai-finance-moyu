@@ -73,7 +73,13 @@ function SettingsContent() {
                   type="button"
                   class="btn-check-update-sidebar"
                   disabled={isCheckingUpdate()}
-                  onClick={() => void handleManualCheckUpdate()}
+                  onClick={() => {
+                    if (updateResult()?.hasUpdate) {
+                      setIsUpdateModalOpen(true)
+                    } else {
+                      void handleManualCheckUpdate()
+                    }
+                  }}
                 >
                   {isCheckingUpdate() ? '检查中…' : updateResult()?.hasUpdate ? '发现新版' : '检查更新'}
                 </button>
@@ -121,7 +127,7 @@ function SettingsContent() {
 
       <UpdateModal
         isOpen={isUpdateModalOpen()}
-        update={updateResult()?.update ?? null}
+        result={updateResult()}
         currentVersion={currentAppVersion()}
         onClose={() => setIsUpdateModalOpen(false)}
         onSkipVersion={(v) => {
