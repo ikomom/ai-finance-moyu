@@ -82,16 +82,14 @@ pub async fn download_and_install_package(
         .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
     // Try primary URL, fallback to mirror if GitHub direct fails
-    let mut target_url = url.clone();
-    let mut resp = client.get(&target_url).send().await;
+    let mut resp = client.get(&url).send().await;
 
     if resp.is_err() || !resp.as_ref().unwrap().status().is_success() {
-        if target_url.contains("github.com") {
-            let mirror_url = format!("https://ghproxy.net/{}", target_url);
+        if url.contains("github.com") {
+            let mirror_url = format!("https://ghproxy.net/{}", url);
             if let Ok(mirror_resp) = client.get(&mirror_url).send().await {
                 if mirror_resp.status().is_success() {
                     resp = Ok(mirror_resp);
-                    target_url = mirror_url;
                 }
             }
         }
