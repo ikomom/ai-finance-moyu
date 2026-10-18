@@ -101,6 +101,7 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
   }
 
   // 2. Fallback to GitHub Releases API via Rust backend (immune to browser CORS/User-Agent quirks)
+  let fallbackErr: unknown = null
   try {
     const data = await invoke<{
       tag_name: string
@@ -143,26 +144,24 @@ export async function checkAppUpdate(isManual = false): Promise<CheckResult> {
         installerFileName: matchedAsset?.name,
       }
     } else {
-      // GitHub confirms latest release is <= currentVersion: we are up to date!
+      // Remote server successfully contacted: latest release is <= currentVersion!
       return {
         hasUpdate: false,
         update: null,
         currentVersion,
       }
     }
-  } catch (fallbackErr) {
-    console.warn('[Updater] Fallback GitHub release check failed:', fallbackErr)
+  } catch (err) {
+    fallbackErr = err
+    console.warn('[Updater] Fallback GitHub release check failed:', err)
   }
 
-  if (isManual && tauriErr) {
-    const errText = tauriErr instanceof Error ? tauriErr.message : String(tauriErr)
-    const isHarmless404 =
-      errText.includes('404') ||
-      errText.includes('successful status code') ||
-      errText.includes('Could not fetch a valid release JSON')
-    if (!isHarmless404) {
-      throw new Error(`连接更新服务器失败：${errText.replace(/^error:\s*/i, '')}`)
-    }
+  // If both Tauri updater and GitHub fallback failed:
+  if (isManual) {
+    const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr || '')
+    const tauriMsg = tauriErr instanceof Error ? tauriErr.message : String(tauriErr || '')
+    const reason = fallbackMsg || tauriMsg || '无法连接到更新服务器，请检查网络连接'
+    throw new Error(`连接更新服务器失败：${reason.replace(/^error:\s*/i, '')}`)
   }
 
   return {
