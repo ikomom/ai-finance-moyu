@@ -153,6 +153,15 @@ export function UpdateModal(props: UpdateModalProps) {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('下载已取消')) {
+          setDownloadState({
+            status: 'idle',
+            pct: 0,
+            downloaded: 0,
+            total: 0,
+          })
+          return
+        }
         setDownloadState({
           status: 'error',
           pct: 0,
@@ -162,6 +171,18 @@ export function UpdateModal(props: UpdateModalProps) {
         })
       }
     }
+  }
+
+  const handleCancelDownload = async () => {
+    try {
+      await invoke('cancel_package_download')
+    } catch {}
+    setDownloadState({
+      status: 'idle',
+      pct: 0,
+      downloaded: 0,
+      total: 0,
+    })
   }
 
   const handleSkip = () => {
@@ -176,8 +197,11 @@ export function UpdateModal(props: UpdateModalProps) {
     <Show when={props.isOpen && (props.result?.update || props.result?.hasUpdate)}>
       <div
         class="update-modal-backdrop"
-        onClick={(e) => {
-          if (e.target === e.currentTarget && downloadState().status !== 'downloading') {
+        onClick={async (e) => {
+          if (e.target === e.currentTarget) {
+            if (downloadState().status === 'downloading') {
+              await handleCancelDownload()
+            }
             props.onClose()
           }
         }}
@@ -201,16 +225,19 @@ export function UpdateModal(props: UpdateModalProps) {
                 </div>
               </div>
             </div>
-            <Show when={downloadState().status !== 'downloading'}>
-              <button
-                type="button"
-                class="update-close-btn"
-                title="关闭"
-                onClick={props.onClose}
-              >
-                ×
-              </button>
-            </Show>
+            <button
+              type="button"
+              class="update-close-btn"
+              title={downloadState().status === 'downloading' ? '取消下载并关闭' : '关闭'}
+              onClick={async () => {
+                if (downloadState().status === 'downloading') {
+                  await handleCancelDownload()
+                }
+                props.onClose()
+              }}
+            >
+              ×
+            </button>
           </div>
 
           {/* Body: Changelog */}
@@ -302,6 +329,13 @@ export function UpdateModal(props: UpdateModalProps) {
               </Show>
 
               <Show when={downloadState().status === 'downloading'}>
+                <button
+                  type="button"
+                  class="btn-sm btn-ghost btn-cancel-download"
+                  onClick={() => void handleCancelDownload()}
+                >
+                  取消下载
+                </button>
                 <button
                   type="button"
                   class="btn-sm btn-primary"

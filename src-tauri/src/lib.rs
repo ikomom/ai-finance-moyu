@@ -113,9 +113,6 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if window.label() == window::SETTINGS {
-                if let WindowEvent::Focused(focused) = event {
-                    let _ = window.set_always_on_top(*focused);
-                }
                 return;
             }
             if window.label() != window::DISPLAY {
@@ -162,6 +159,7 @@ pub fn run() {
             commands::open_log_dir,
             commands::open_url,
             commands::download_and_install_package,
+            commands::cancel_package_download,
             commands::fetch_latest_release,
             commands::clear_memory_logs,
             commands::set_log_level,

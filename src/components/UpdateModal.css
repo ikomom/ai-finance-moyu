@@ -361,3 +361,16 @@
   animation: spin 0.8s linear infinite;
   margin-right: 6px;
 }
+
+.btn-cancel-download {
+  color: #f87171 !important;
+  border: 1px solid rgba(248, 113, 113, 0.35) !important;
+  background: rgba(248, 113, 113, 0.08) !important;
+  transition: all var(--transition-fast);
+}
+
+.btn-cancel-download:hover {
+  background: rgba(248, 113, 113, 0.18) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(248, 113, 113, 0.5) !important;
+}

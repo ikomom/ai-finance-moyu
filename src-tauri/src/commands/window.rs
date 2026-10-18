@@ -113,6 +113,15 @@ pub async fn fetch_latest_release() -> Result<GitHubReleaseInfo, String> {
     serde_json::from_str::<GitHubReleaseInfo>(&text).map_err(|e| format!("解析 Release 信息失败: {e}"))
 }
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static CANCEL_DOWNLOAD: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+pub fn cancel_package_download() {
+    CANCEL_DOWNLOAD.store(true, Ordering::SeqCst);
+}
+
 #[derive(Clone, serde::Serialize)]
 pub struct DownloadProgressPayload {
     pub downloaded: u64,
@@ -129,29 +138,36 @@ pub async fn download_and_install_package(
     use std::io::Write;
     use tauri::Emitter;
 
+    CANCEL_DOWNLOAD.store(false, Ordering::SeqCst);
+
     let client = reqwest::Client::builder()
         .no_proxy()
+        .timeout(std::time::Duration::from_secs(300))
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
-    // Try primary URL, fallback to mirror if GitHub direct fails
-    let mut resp = client.get(&url).send().await;
+    // Try accelerated GitHub proxy mirrors first, fallback to direct URL
+    let mut candidate_urls = Vec::new();
+    if url.contains("github.com") {
+        candidate_urls.push(format!("https://ghfast.top/{}", url));
+        candidate_urls.push(format!("https://gh-proxy.com/{}", url));
+    }
+    candidate_urls.push(url.clone());
 
-    if resp.is_err() || !resp.as_ref().unwrap().status().is_success() {
-        if url.contains("github.com") {
-            let mirror_url = format!("https://ghproxy.net/{}", url);
-            if let Ok(mirror_resp) = client.get(&mirror_url).send().await {
-                if mirror_resp.status().is_success() {
-                    resp = Ok(mirror_resp);
-                }
+    let mut response_opt = None;
+    for target in candidate_urls {
+        if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+            return Err("下载已取消".to_string());
+        }
+        if let Ok(resp) = client.get(&target).send().await {
+            if resp.status().is_success() {
+                response_opt = Some(resp);
+                break;
             }
         }
     }
 
-    let mut response = resp.map_err(|e| format!("下载安装包失败: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!("下载服务器返回异常状态: {}", response.status()));
-    }
+    let mut response = response_opt.ok_or_else(|| "下载服务器连接失败，请检查网络".to_string())?;
 
     let total = response.content_length().unwrap_or(0);
     let dest_path = std::env::temp_dir().join(&filename);
@@ -166,6 +182,12 @@ pub async fn download_and_install_package(
         .await
         .map_err(|e| format!("读取下载分块错误: {e}"))?
     {
+        if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+            drop(file);
+            let _ = std::fs::remove_file(&dest_path);
+            return Err("下载已取消".to_string());
+        }
+
         file.write_all(&chunk)
             .map_err(|e| format!("写入文件失败: {e}"))?;
         downloaded += chunk.len() as u64;
@@ -191,6 +213,11 @@ pub async fn download_and_install_package(
     }
 
     drop(file);
+
+    if CANCEL_DOWNLOAD.load(Ordering::SeqCst) {
+        let _ = std::fs::remove_file(&dest_path);
+        return Err("下载已取消".to_string());
+    }
 
     // Final 100% progress
     let _ = app.emit(

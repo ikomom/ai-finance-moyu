@@ -124,7 +124,6 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     if let Some(win) = app.get_webview_window(SETTINGS) {
         let _ = win.show();
         let _ = win.unminimize();
-        let _ = win.set_always_on_top(true);
         let _ = win.set_focus();
         return Ok(());
     }
@@ -141,7 +140,7 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     .resizable(true)
     .decorations(true)
     .transparent(false)
-    .always_on_top(true)
+    .always_on_top(false)
     .skip_taskbar(false)
     .focused(true)
     .build()
