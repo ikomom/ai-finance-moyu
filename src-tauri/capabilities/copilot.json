@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "copilot",
+  "description": "Capability for the AI copilot review window",
+  "windows": [
+    "copilot"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-set-title",
+    "core:window:allow-start-dragging",
+    "core:event:default",
+    "notification:default"
+  ]
+}

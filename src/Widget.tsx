@@ -4,6 +4,7 @@ import { emit } from '@tauri-apps/api/event'
 
 import { ContextMenu, closeMenu, isContextMenuOpen, setContextMenuOpen } from './components/ContextMenu'
 import { Toast } from './components/Toast'
+import { openCopilotWindow } from './services/agent'
 import { Bar } from './layouts/Bar'
 import { Global } from './layouts/Global'
 import { List } from './layouts/List'
@@ -15,6 +16,7 @@ import {
   initStore,
   navigateLayoutBack,
   navigateLayoutForward,
+  selectedIndex,
   setNewVersionAvailable,
   showToast,
   snapshot,
@@ -174,6 +176,7 @@ export function Widget() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === 'a' || e.key === 'A')) {
         e.preventDefault()
+        void openCopilotWindow(snapshot()?.quotes[selectedIndex()]?.code)
       }
     }
     window.addEventListener('keydown', handleKeyDown)

@@ -1,0 +1,204 @@
+/* Financial Card Markdown Body */
+.agent-financial-card h2 {
+  font-size: 14px;
+  margin: 0 0 10px 0;
+  color: #38bdf8;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+  padding-bottom: 4px;
+}
+
+.agent-financial-card h3 {
+  font-size: 12.5px;
+  margin: 12px 0 6px 0;
+  color: #f1f5f9;
+}
+
+.agent-financial-card p,
+.agent-financial-card ul {
+  margin: 4px 0;
+  padding-left: 16px;
+}
+
+.agent-financial-card li {
+  margin-bottom: 3px;
+}
+
+.agent-financial-card hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 10px 0;
+}
+
+.agent-financial-card blockquote {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-left: 3px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  font-size: 11.5px;
+  color: #cbd5e1;
+  border-radius: 0 4px 4px 0;
+}
+
+.agent-financial-card table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 11px;
+}
+
+.agent-financial-card th,
+.agent-financial-card td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.agent-financial-card th {
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+}
+
+.agent-financial-card code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+/* Typing cursor */
+.agent-typing-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 13px;
+  background: #38bdf8;
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: blink 0.8s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* Footer & Actions */
+.agent-drawer-footer {
+  padding: 10px 12px;
+  background: rgba(15, 17, 21, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Capsule Bar */
+.agent-capsule-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.agent-capsule-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-capsule-btn {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  color: #94a3b8;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.agent-capsule-btn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+.agent-capsule-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Input Container */
+.agent-input-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 10px;
+  transition: border-color 0.2s ease;
+}
+
+.agent-input-container:focus-within {
+  border-color: #38bdf8;
+}
+
+.agent-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: none;
+  max-height: 100px;
+  min-height: 20px;
+  font-family: inherit;
+}
+
+.agent-input-field::placeholder {
+  color: #64748b;
+}
+
+.agent-input-actions {
+  display: flex;
+  align-items: center;
+}
+
+.agent-btn-send {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.agent-btn-send:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.agent-btn-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.agent-btn-stop {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}

@@ -9,6 +9,8 @@ import { AppearanceTab } from './components/settings/AppearanceTab'
 import { AlertsTab } from './components/settings/AlertsTab'
 import { SystemTab } from './components/settings/SystemTab'
 import { LogsTab } from './components/settings/LogsTab'
+import { AiSettingsTab } from './components/settings/AiSettingsTab'
+import { MemoryTab } from './components/settings/MemoryTab'
 
 function SettingsContent() {
   const {
@@ -104,6 +106,12 @@ function SettingsContent() {
               </Show>
               <Show when={activeTab() === 'logs'}>
                 <LogsTab />
+              </Show>
+              <Show when={activeTab() === 'ai'}>
+                <AiSettingsTab />
+              </Show>
+              <Show when={activeTab() === 'memory'}>
+                <MemoryTab />
               </Show>
             </div>
 

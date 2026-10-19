@@ -278,7 +278,7 @@ export function List(props: { flash: boolean }) {
         </div>
       </div>
 
-      <StatusLine status={s().status} />
+      <StatusLine status={s().status} showAi />
       <Grip />
     </div>
   )

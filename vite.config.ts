@@ -21,6 +21,7 @@ export default defineConfig(() => ({
       input: {
         index: `${root}index.html`,
         settings: `${root}settings.html`,
+        copilot: `${root}copilot.html`,
       },
     },
   },

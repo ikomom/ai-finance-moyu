@@ -4,7 +4,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::config::VisibilityMode;
 use crate::tray;
-use crate::window::{apply_visibility_mode, open_settings, set_dock_collapsed_inner, DISPLAY};
+use crate::window::{apply_visibility_mode, open_copilot, open_settings, set_dock_collapsed_inner, DISPLAY};
 
 /// Open the settings window from the frontend.
 ///
@@ -20,6 +20,12 @@ pub async fn open_settings_window(app: AppHandle) -> Result<(), String> {
     open_settings(&app)
 }
 
+/// Open the AI copilot window from the frontend (same deadlock note as above).
+#[tauri::command]
+pub async fn open_copilot_window(app: AppHandle, symbol: Option<String>) -> Result<(), String> {
+    tokio::task::yield_now().await;
+    open_copilot(&app, symbol)
+}
 
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {

@@ -8,7 +8,7 @@ use crate::config::{self, Layout, VisibilityMode};
 use crate::poller;
 use crate::state::AppState;
 use super::dock::set_dock_collapsed_inner;
-use super::geometry::{place_window, suppress_resize, DISPLAY, SETTINGS};
+use super::geometry::{place_window, suppress_resize, COPILOT, DISPLAY, SETTINGS};
 
 /// Switch layout: persist it, resize the window, tell the frontend.
 pub fn apply_layout(app: &AppHandle, layout: Layout) {
@@ -117,6 +117,7 @@ pub fn toggle_window(app: &AppHandle) {
 }
 
 static SETTINGS_LOCK: Mutex<()> = Mutex::new(());
+static COPILOT_LOCK: Mutex<()> = Mutex::new(());
 
 /// Open the settings window, creating it on first use.
 pub fn open_settings(app: &AppHandle) -> Result<(), String> {
@@ -222,6 +223,49 @@ fn watch_new_window(win: tauri::WebviewWindow, ready_selector: &'static str) {
     });
 }
 
+/// Open the AI copilot review window, creating it on first use.
+/// Strictly follows AGENTS.md Rule 10: secondary window non-always_on_top.
+pub fn open_copilot(app: &AppHandle, symbol: Option<String>) -> Result<(), String> {
+    let _guard = COPILOT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(win) = app.get_webview_window(COPILOT) {
+        log::info!(target: "USER", "切换到复盘窗口");
+        reveal_secondary(&win, ".copilot-layout");
+        if let Some(sym) = symbol {
+            let _ = win.emit("copilot://select-symbol", sym);
+        }
+        return Ok(());
+    }
+
+    log::info!(target: "USER", "打开复盘窗口");
+    let win = tauri::WebviewWindowBuilder::new(
+        app,
+        COPILOT,
+        tauri::WebviewUrl::App("copilot.html".into()),
+    )
+    .title("智投复盘 · A股摸鱼")
+    .inner_size(860.0, 650.0)
+    .min_inner_size(680.0, 500.0)
+    .center()
+    .resizable(true)
+    .decorations(true)
+    .transparent(false)
+    .always_on_top(false)
+    .skip_taskbar(false)
+    .focused(true)
+    .build()
+    .map_err(|e| format!("打开复盘窗口失败: {e}"))?;
+
+    watch_new_window(win.clone(), ".copilot-layout");
+    let _ = win.set_focus();
+    if let Some(sym) = symbol {
+        let win_clone = win.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            let _ = win_clone.emit("copilot://select-symbol", sym);
+        });
+    }
+    Ok(())
+}
 
 /// Flip the autostart registration and mirror it into the config file.
 ///

@@ -11,6 +11,7 @@ use super::platform_win32::disable_maximize;
 /// Label of the floating display window, and of the settings window.
 pub const DISPLAY: &str = "main";
 pub const SETTINGS: &str = "settings";
+pub const COPILOT: &str = "copilot";
 
 /// Distance from screen edge to snap and enable dock collapse (in logical px).
 pub const DOCK_SNAP_THRESHOLD: f64 = 15.0;

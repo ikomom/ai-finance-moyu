@@ -30,6 +30,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
         .build()?;
     let sep_mode = tauri::menu::PredefinedMenuItem::separator(app)?;
 
+    let copilot = MenuItemBuilder::with_id("copilot", "智投复盘 (AI Copilot)…").build(app)?;
     let settings = MenuItemBuilder::with_id("settings", "设置…").build(app)?;
     let check_update = MenuItemBuilder::with_id("check_update", "检查更新…").build(app)?;
     let sep_settings = tauri::menu::PredefinedMenuItem::separator(app)?;
@@ -42,7 +43,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
 
     let menu = MenuBuilder::new(app)
         .items(&[
-            &toggle, &refresh, &sep1, &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode, &settings,
+            &toggle, &refresh, &sep1, &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode, &copilot, &settings,
             &check_update, &sep_settings, &autostart, &sep3, &quit,
         ])
         .build()?;
@@ -99,6 +100,7 @@ where
 pub fn handle_menu(app: &AppHandle, id: &str) {
     match id {
         "toggle" => crate::toggle_window(app),
+        "copilot" => deferred(app, "复盘", |h| crate::open_copilot(&h, None)),
         "settings" => deferred(app, "设置", |h| crate::open_settings(&h)),
         "check_update" => {
             deferred(app, "设置", |h| crate::open_settings(&h));

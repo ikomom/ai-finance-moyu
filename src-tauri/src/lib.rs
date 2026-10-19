@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod auction_engine;
 pub mod commands;
 mod config;
@@ -19,7 +20,7 @@ use tauri::{Manager, WindowEvent};
 
 use quote::Fetcher;
 use state::{AppState, DockEdge};
-pub use window::{apply_layout, apply_visibility_mode, navigate_to_stock_mini, open_settings, toggle_autostart, toggle_window};
+pub use window::{apply_layout, apply_visibility_mode, navigate_to_stock_mini, open_copilot, open_settings, toggle_autostart, toggle_window};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -163,6 +164,20 @@ pub fn run() {
             commands::fetch_latest_release,
             commands::clear_memory_logs,
             commands::set_log_level,
+            // AI copilot: window opener, chat history, memory and the agent loop.
+            commands::open_copilot_window,
+            commands::get_agent_config,
+            commands::save_agent_config,
+            commands::get_memory_manifest,
+            commands::save_memory_mutation,
+            commands::get_chat_sessions,
+            commands::get_chat_session,
+            commands::save_chat_session,
+            commands::delete_chat_session,
+            commands::clear_chat_sessions,
+            commands::chat_with_agent,
+            commands::check_agent_connection,
+            commands::set_active_profile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

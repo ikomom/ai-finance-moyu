@@ -3,7 +3,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import './ContextMenu.css'
 
-import { newVersionAvailable, snapshot } from '../store'
+import { newVersionAvailable, selectedIndex, snapshot } from '../store'
+import { openCopilotWindow } from '../services/agent'
 import type { Layout, VisibilityMode } from '../types'
 
 const LAYOUTS: Array<[Layout, string]> = [
@@ -132,6 +133,10 @@ export function ContextMenu() {
         <div class="menu-item" onClick={() => act(() => invoke('refresh_now'))}>
           <span class="check" />
           立即刷新
+        </div>
+        <div class="menu-item" onClick={() => act(() => openCopilotWindow(snapshot()?.quotes[selectedIndex()]?.code))}>
+          <span class="check">🤖</span>
+          智投复盘 (AI) [Alt+A]…
         </div>
         <div class="menu-item" onClick={() => act(() => invoke('open_settings_window'))}>
           <span class="check" />

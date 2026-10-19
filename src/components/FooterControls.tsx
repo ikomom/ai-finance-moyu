@@ -1,5 +1,6 @@
 import { Show } from 'solid-js'
 import type { SubchartMode } from '../hooks/useSubchartMode'
+import { openCopilotWindow } from '../services/agent'
 import './FooterControls.css'
 
 export type ViewMode = 'trend' | 'kline' | 'auction'
@@ -80,6 +81,20 @@ export function FooterControls(props: FooterControlsProps) {
         </div>
       </Show>
 
+      {/* 智投复盘快捷入口 */}
+      <div class="mode-pill-group">
+        <button
+          type="button"
+          class="mode-pill ai-mode-pill"
+          onClick={(e) => {
+            e.stopPropagation()
+            void openCopilotWindow()
+          }}
+          title="打开智投复盘工作台 (快捷键: Alt+A)"
+        >
+          ✦ AI
+        </button>
+      </div>
     </div>
   )
 }

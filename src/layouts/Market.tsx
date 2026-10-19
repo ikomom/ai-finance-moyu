@@ -184,7 +184,7 @@ export function Market(props: { flash: boolean }) {
         )}
       </Show>
 
-      <StatusLine status={s().status} />
+      <StatusLine status={s().status} showAi />
       <Grip />
     </div>
   )

@@ -1,0 +1,214 @@
+/* Copilot Standalone Window Aesthetic Styles */
+
+:root {
+  --copilot-bg: #0b0f17;
+  --copilot-sidebar-bg: #111827;
+  --copilot-sidebar-border: rgba(255, 255, 255, 0.08);
+  --copilot-card-bg: rgba(255, 255, 255, 0.04);
+  --copilot-card-hover: rgba(255, 255, 255, 0.08);
+  --copilot-accent: #0284c7;
+  --copilot-accent-light: #38bdf8;
+  --copilot-text: #f1f5f9;
+  --copilot-muted: #94a3b8;
+  --copilot-border: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--copilot-bg);
+  color: var(--copilot-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: text;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.copilot-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: radial-gradient(circle at top right, rgba(14, 116, 144, 0.12), transparent 40%),
+              radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.08), transparent 45%),
+              #090d16;
+}
+
+/* -------------------- 侧边栏 -------------------- */
+.copilot-sidebar {
+  width: 250px;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid var(--copilot-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.copilot-sidebar.sidebar-collapsed {
+  width: 0;
+  margin-left: -250px;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid var(--copilot-border);
+}
+
+.btn-new-session {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 8px;
+  color: #38bdf8;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-new-session:hover {
+  background: rgba(56, 189, 248, 0.26);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+}
+
+.filter-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--copilot-muted);
+  cursor: pointer;
+}
+
+.filter-tag {
+  color: #38bdf8;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.sidebar-session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-empty {
+  padding: 40px 10px;
+  text-align: center;
+  color: var(--copilot-muted);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-card {
+  padding: 9px 10px;
+  background: var(--copilot-card-bg);
+  border: 1px solid var(--copilot-border);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.session-card:hover {
+  background: var(--copilot-card-hover);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.session-card.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+}
+
+.session-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.session-symbol-chip {
+  font-size: 10px;
+  padding: 1px 5px;
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.session-time {
+  font-size: 10px;
+  color: var(--copilot-muted);
+  font-family: monospace;
+}
+
+.btn-delete-session {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--copilot-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+.btn-delete-session:hover {
+  opacity: 1;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.session-card-title {
+  font-size: 12px;
+  color: var(--copilot-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.session-card-footer {
+  display: flex;
+  font-size: 10px;
+  color: var(--copilot-muted);
+}
+

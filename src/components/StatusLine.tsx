@@ -1,6 +1,7 @@
 import { Show } from 'solid-js'
 
 import type { PollStatus } from '../types'
+import { openCopilotWindow } from '../services/agent'
 
 const SESSION_LABEL: Record<string, string> = {
   PreOpen: '未开盘',
@@ -16,7 +17,7 @@ const SESSION_LABEL: Record<string, string> = {
 }
 
 /** Connection health, last update time and which part of the session we're in. */
-export function StatusLine(props: { status: PollStatus }) {
+export function StatusLine(props: { status: PollStatus; showAi?: boolean }) {
   const live = () =>
     props.status.tradingToday &&
     [
@@ -55,6 +56,19 @@ export function StatusLine(props: { status: PollStatus }) {
             <span class="err">{truncate(err(), 40)}</span>
           </>
         )}
+      </Show>
+      <Show when={props.showAi}>
+        <button
+          type="button"
+          class="status-ai-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            void openCopilotWindow()
+          }}
+          title="打开智投复盘工作台 (快捷键: Alt+A)"
+        >
+          ✦ AI
+        </button>
       </Show>
     </div>
   )
