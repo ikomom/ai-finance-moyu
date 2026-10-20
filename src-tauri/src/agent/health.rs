@@ -17,7 +17,6 @@ use serde::Serialize;
 use serde_json::Value;
 
 use super::config::LlmConfig;
-use super::profile::LlmProfile;
 
 /// Sentinel reply we ask for. Short so the probe stays cheap.
 const PROBE_PROMPT: &str = "只回复两个字：就绪";
@@ -230,6 +229,8 @@ fn classify(code: u16, raw: &str) -> (&'static str, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Only the tests build profiles; the probe itself reads the active one.
+    use crate::agent::profile::LlmProfile;
 
     /// The regression that motivated this module: a missing key must never be
     /// reported as a healthy connection.
