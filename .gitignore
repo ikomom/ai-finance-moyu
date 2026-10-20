@@ -27,15 +27,7 @@ dist-ssr
 .omc/
 src-tauri/target/
 
-# Split-module scratch files (intermediate output of scripts/split-module.ps1)
-src/components/_kline_draw_body.txt
-
-# Local audit evidence: screenshots captured while debugging, not source
-audit-evidence/
-
-# Agent workspace memory (local notes, not project source)
+# Agent workspace: scratch output, audit reports, session notes.
+# Nothing generated during a task belongs in the source tree — it goes here,
+# where deleting the directory is always safe.
 .workbuddy/
-
-# One-off analysis docs written during a refactor, not shipped
-AI拆分清单.md
-AUDIT-REPORT-*.md
