@@ -1,33 +1,23 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import './Global.css'
 
-import { Chart } from '../components/Chart'
-import { FooterControls } from '../components/FooterControls'
-import { GlobalStatusBadge } from '../components/GlobalStatusBadge'
 import { Grip } from '../components/Grip'
-import { KlineCanvas } from '../components/KlineCanvas'
 import { PillTabs } from '../components/PillTabs'
-import { StatusLine } from '../components/StatusLine'
-import { StockHeader } from '../components/StockHeader'
+import { GlobalDetail } from './GlobalDetail'
 import { useSubchartMode } from '../hooks/useSubchartMode'
 import { snapshot } from '../store'
-import { fetchGlobalKLine, fetchGlobalTrend } from '../tauri'
 import {
   fmtHHMM,
   fmtVol,
   type KLineBar,
-  type KLineData,
   type Quote,
-  type Trend,
   type TrendPoint,
 } from '../types'
-import { getGlobalMarketStatus } from '../utils/globalMarket'
+import { useGlobalChart } from './useGlobalChart'
 
 // Module-level persistent state across unmount/remount (dock collapse/expand)
 const [selectedGlobalIndex, setSelectedGlobalIndex] = createSignal(0)
 const [persistedChartTab, setPersistedChartTab] = createSignal<'trend' | 'kline'>('trend')
-const [globalKlineMap, setGlobalKlineMap] = createSignal<Record<string, KLineData>>({})
-const [globalTrendMap, setGlobalTrendMap] = createSignal<Record<string, Trend>>({})
 
 /**
  * Layout 5 — 全球股指看板 (复用迷你图通用组件架构，具备胶囊切页、大字行情、副图及分时/日K模式).
@@ -68,50 +58,13 @@ export function Global(props: { flash: boolean }) {
     chgPct?: number | null
   } | null>(null)
 
-  const [globalKlineLoading, setGlobalKlineLoading] = createSignal(false)
-  const [globalTrendLoading, setGlobalTrendLoading] = createSignal(false)
+  const currentCode = () => currentIdx()?.code ?? ''
 
-  // Fetch trend on demand
-  const loadTrend = (code: string, force = false) => {
-    if (!force && globalTrendMap()[code]) return
-    setGlobalTrendLoading(true)
-    fetchGlobalTrend(code)
-      .then((data) => {
-        if (data) {
-          setGlobalTrendMap((prev) => ({ ...prev, [code]: data }))
-        }
-      })
-      .finally(() => {
-        setGlobalTrendLoading(false)
-      })
-  }
+  // Lazy per-index trend / K-line loading lives in its own hook.
+  const globalChart = useGlobalChart(currentCode, activeMode)
+  const trend = () => globalChart.trend()
+  const kline = () => globalChart.kline()
 
-  // Fetch KLine on demand
-  const loadKLine = (code: string, force = false) => {
-    if (!force && globalKlineMap()[code]) return
-    setGlobalKlineLoading(true)
-    fetchGlobalKLine(code)
-      .then((data) => {
-        if (data) {
-          setGlobalKlineMap((prev) => ({ ...prev, [code]: data }))
-        }
-      })
-      .finally(() => {
-        setGlobalKlineLoading(false)
-      })
-  }
-
-  // Trigger fetch when current index or mode changes
-  createEffect(() => {
-    const it = currentIdx()
-    if (!it?.code) return
-    const mode = activeMode()
-    if (mode === 'trend') {
-      loadTrend(it.code)
-    } else {
-      loadKLine(it.code)
-    }
-  })
 
   // Clear hover on index switch
   createEffect(() => {
@@ -134,10 +87,6 @@ export function Global(props: { flash: boolean }) {
       setSelectedIndex((selectedIndex() - 1 + n) % n)
     }
   }
-
-  const currentCode = () => currentIdx()?.code ?? ''
-  const trend = () => globalTrendMap()[currentCode()]
-  const kline = () => globalKlineMap()[currentCode()]
 
   const preClose = () => {
     const it = currentIdx()
@@ -240,6 +189,43 @@ export function Global(props: { flash: boolean }) {
     return null
   }
 
+  // Everything the detail card needs, passed explicitly so it owns no state.
+  const detailProps = {
+    quote,
+    snapshot: s,
+    activePrice,
+    activePct,
+    stats,
+    hoverTime,
+    hoverExtra,
+    activeMode,
+    trend,
+    kline,
+    preClose,
+    loading: globalChart.loading,
+    subchartMode,
+    onReloadTrend: () => globalChart.reload(),
+    onReloadKline: () => globalChart.reload(),
+    onSelectMode: (m: 'trend' | 'kline') => setActiveMode(m),
+    onToggleSubchart: () => toggleSubchartMode(subchartMode() === 'macd' ? 'vol' : 'macd'),
+    onHoverPoint: (p: TrendPoint | null, extra?: { minVol: number; dif?: number; dea?: number; macd?: number } | null) => {
+      setHoveredPoint(p)
+      setHoveredPointExtra(extra ?? null)
+    },
+    onHoverBar: (bar: KLineBar | null, extra?: {
+      ma5?: number | null
+      ma10?: number | null
+      ma20?: number | null
+      dif?: number | null
+      dea?: number | null
+      macd?: number | null
+      chgPct?: number | null
+    } | null) => {
+      setHoveredKBar(bar)
+      setHoveredKExtra(extra ?? null)
+    },
+  }
+
   return (
     <div
       class="card layout-mini-card layout-global"
@@ -265,130 +251,7 @@ export function Global(props: { flash: boolean }) {
           </div>
         }
       >
-        {(idx) => {
-          const st = () => getGlobalMarketStatus(idx().code)
-          return (
-            <>
-              {/* 指数名称、代码、交易时段状态微标、日内高低、大字价格、作息提示 (复用 StockHeader) */}
-              <StockHeader
-                name={idx().name}
-                code={idx().code}
-                price={idx().price}
-                changePct={idx().changePct}
-                activePrice={activePrice()}
-                activePct={activePct()}
-                high={stats().high}
-                low={stats().low}
-                badge={<GlobalStatusBadge status={st()} />}
-                hoverTime={hoverTime()}
-                hoverExtra={hoverExtra()}
-                extraInfo={
-                  <span class="hover-time-tag" style={{ opacity: 0.65, 'margin-left': 'auto' }}>
-                    {st().hoursText}
-                  </span>
-                }
-              />
-
-              {/* 图表展示区：分时 / 日K */}
-              <Show
-                when={activeMode() === 'kline'}
-                fallback={
-                  /* 分时走势图 */
-                  <Show
-                    when={!globalTrendLoading() && trend()}
-                    fallback={
-                      <div class="chart-wrap kline-loading-box">
-                        <Show
-                          when={globalTrendLoading()}
-                          fallback={
-                            <>
-                              <span>⚠️ 暂无分时数据或未在交易时段</span>
-                              <button
-                                type="button"
-                                class="global-retry-btn"
-                                onClick={() => loadTrend(idx().code, true)}
-                              >
-                                重试
-                              </button>
-                            </>
-                          }
-                        >
-                          <span class="loading-spinner">⌛</span>
-                          <span>加载分时数据中…</span>
-                        </Show>
-                      </div>
-                    }
-                  >
-                    <Chart
-                      trend={trend()}
-                      preClose={preClose()}
-                      lastPrice={idx().price}
-                      subchartMode={subchartMode()}
-                      compact={false}
-                      isGlobal={true}
-                      onHover={(point, extra) => {
-                        setHoveredPoint(point)
-                        setHoveredPointExtra(extra ?? null)
-                      }}
-                    />
-                  </Show>
-                }
-              >
-                {/* 日K走势图 */}
-                <Show
-                  when={!globalKlineLoading() && kline()}
-                  fallback={
-                    <div class="chart-wrap kline-loading-box">
-                      <Show
-                        when={globalKlineLoading()}
-                        fallback={
-                          <>
-                            <span>⚠️ 暂无日K数据</span>
-                            <button
-                              type="button"
-                              class="global-retry-btn"
-                              onClick={() => loadKLine(idx().code, true)}
-                            >
-                              重试
-                            </button>
-                          </>
-                        }
-                      >
-                        <span class="loading-spinner">⌛</span>
-                        <span>加载日K数据中…</span>
-                      </Show>
-                    </div>
-                  }
-                >
-                  <KlineCanvas
-                    kline={kline()}
-                    quote={quote()}
-                    subchartMode={subchartMode()}
-                    onHoverBar={(bar, extra) => {
-                      setHoveredKBar(bar)
-                      setHoveredKExtra(extra ?? null)
-                    }}
-                  />
-                </Show>
-              </Show>
-
-              {/* 底部状态条与副图/走势模式切换胶囊 (复用 FooterControls) */}
-              <div class="mini-footer">
-                <StatusLine status={s().status} />
-                <FooterControls
-                  subchartMode={subchartMode()}
-                  onToggleSubchart={toggleSubchartMode}
-                  viewMode={activeMode()}
-                  onToggleView={(m) => {
-                    if (m === 'trend' || m === 'kline') setActiveMode(m)
-                  }}
-                  showSubchart={true}
-                  showAuction={false}
-                />
-              </div>
-            </>
-          )
-        }}
+        {(idx) => <GlobalDetail idx={idx} {...detailProps} />}
       </Show>
 
       <Grip />

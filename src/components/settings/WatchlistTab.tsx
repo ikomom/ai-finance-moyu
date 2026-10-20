@@ -8,6 +8,7 @@ export function WatchlistTab() {
     form,
     setForm,
     sources,
+    hasIwenCaiKey,
     updateItem,
     addItem,
     addItemWith,
@@ -64,13 +65,13 @@ export function WatchlistTab() {
           <input
             id="iwencai-key"
             type="password"
-            placeholder="sk-proj-00-..."
+            placeholder={hasIwenCaiKey() ? '已保存（留空表示不修改）' : 'sk-proj-00-...'}
             value={form.iwencaiApiKey ?? ''}
-            onInput={(e) => setForm('iwencaiApiKey', e.currentTarget.value.trim() || undefined)}
+            onInput={(e) => setForm('iwencaiApiKey', e.currentTarget.value.trim())}
           />
         </div>
         <p class="hint" style={{ "margin-top": "6px", "font-size": "11.5px" }}>
-          💡 提示：同花顺问财对个人免费 Key 设有每日请求调用频次上限。若遇到「您今天的次数已用完」，系统将自动熔断并平滑回退基准缓存，次日自动重置恢复。若需更换 Key，可在此直接覆盖保存。
+          💡 提示：同花顺问财对个人免费 Key 设有每日请求调用频次上限。若遇到「您今天的次数已用完」，系统将自动熔断并平滑回退基准缓存，次日自动重置恢复。留空则保留已保存的 Key；填入新 Key 覆盖保存后会立即重置熔断保护。密钥仅存储于本机，不会回传到界面。
         </p>
       </div>
 

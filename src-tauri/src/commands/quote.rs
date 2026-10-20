@@ -14,20 +14,22 @@ pub async fn refresh_now(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn search_securities(query: String) -> Result<Vec<search::SearchResult>, String> {
-    let client = search::SearchClient::new()?;
-    client.search(&query).await
+pub async fn search_securities(
+    state: tauri::State<'_, AppState>,
+    query: String,
+) -> Result<Vec<search::SearchResult>, String> {
+    state.search.search(&query).await
 }
 
 #[tauri::command]
 pub async fn set_trend_targets(app: AppHandle, targets: Vec<String>) -> Result<(), String> {
     let state = app.state::<AppState>();
     let (changed, has_cached) = {
-        let mut guard = state.active_trend_targets.lock().unwrap();
+        let mut guard = state.active_trend_targets.lock().unwrap_or_else(|e| e.into_inner());
         let changed = guard.as_ref() != Some(&targets);
         *guard = Some(targets.clone());
         if changed && !targets.is_empty() {
-            let trends = state.trends.lock().unwrap();
+            let trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
             let has_cached = targets.iter().all(|c| trends.contains_key(c));
             (true, has_cached)
         } else {

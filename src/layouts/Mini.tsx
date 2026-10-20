@@ -1,30 +1,16 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import './Mini.css'
 
-import { AuctionBadge } from '../components/AuctionBadge'
-import { AuctionCanvas } from '../components/AuctionCanvas'
-import { Chart } from '../components/Chart'
-import { FooterControls } from '../components/FooterControls'
 import { Grip } from '../components/Grip'
-import { KLineBadge } from '../components/KLineBadge'
-import { KlineCanvas } from '../components/KlineCanvas'
+import { MiniBody } from './MiniBody'
 import { PillTabs } from '../components/PillTabs'
 import { StatusLine } from '../components/StatusLine'
-import { StockHeader } from '../components/StockHeader'
-import { TrendBadge } from '../components/TrendBadge'
 import { useSubchartMode } from '../hooks/useSubchartMode'
 import { miniModeOverride, selectedIndex, setMiniModeOverride, setSelected, snapshot } from '../store'
 import { fetchKLine, setTrendTargets } from '../tauri'
 import {
-  fmtHHMM,
-  fmtMoney,
-  fmtPct,
-  fmtVol,
   isIndexCode,
-  profitAmount,
-  profitPct,
   resolveIndicatorParams,
-  trendClass,
   type AuctionPoint,
   type KLineBar,
   type KLineData,
@@ -113,10 +99,14 @@ export function Mini(props: { flash: boolean }) {
     setHoveredKExtra(null)
   })
 
+  // Only report when the *code* changes: `item()` returns a fresh object on
+  // every snapshot, so an unguarded effect fired an IPC call every poll tick.
+  let lastTrendTarget = ''
   createEffect(() => {
-    const cur = item()
-    if (cur?.code) {
-      setTrendTargets([cur.code])
+    const code = item()?.code
+    if (code && code !== lastTrendTarget) {
+      lastTrendTarget = code
+      setTrendTargets([code])
     }
   })
 
@@ -161,230 +151,32 @@ export function Mini(props: { flash: boolean }) {
           </>
         }
       >
-        {(q) => {
-          const cost = () => item()?.costPrice ?? null
-          const shares = () => item()?.shares ?? null
-          const pnl = () => profitAmount(q().price, cost(), shares())
-          const trend = () => s().trends[q().code]
-          const auction = () => s().auctions?.[q().code]
-
-          // High / Low stats from trend points or K-line bar
-          const stats = () => {
-            if (activeMode() === 'kline') {
-              const hk = hoveredKBar()
-              if (hk) return { high: hk.high, low: hk.low }
-            }
-            const pts = trend()?.points ?? []
-            if (pts.length === 0) return { high: q().high || q().price, low: q().low || q().price }
-            let high = pts[0].price
-            let low = pts[0].price
-            for (const p of pts) {
-              if (p.price > high) high = p.price
-              if (p.price > 0 && p.price < low) low = p.price
-            }
-            return { high, low }
-          }
-
-          // Dynamic price & real-time percent when hovering over historical points
-          const activePrice = () => {
-            if (activeMode() === 'kline') {
-              return hoveredKBar()?.close ?? q().price
-            }
-            if (activeMode() === 'auction') {
-              return hoveredAuctionPoint()?.price ?? q().price
-            }
-            return hoveredPoint()?.price ?? q().price
-          }
-
-          const activePct = () => {
-            if (activeMode() === 'kline') {
-              const hk = hoveredKBar()
-              if (hk) {
-                return hoveredKExtra()?.chgPct ?? 0
-              }
-              return q().changePct
-            }
-            if (activeMode() === 'auction') {
-              const ap = hoveredAuctionPoint()
-              if (ap && q().preClose > 0) {
-                return ((ap.price - q().preClose) / q().preClose) * 100
-              }
-            } else {
-              const hp = hoveredPoint()
-              if (hp) {
-                const base = q().preClose > 0 ? q().preClose : (q().open > 0 ? q().open : hp.price)
-                return base > 0 ? ((hp.price - base) / base) * 100 : 0
-              }
-            }
-            return q().changePct
-          }
-
-          const hoverTime = () => {
-            if (activeMode() === 'kline') {
-              const hk = hoveredKBar()
-              return hk ? hk.date : null
-            }
-            if (activeMode() === 'auction') {
-              const ap = hoveredAuctionPoint()
-              return ap ? fmtHHMM(ap.time) : null
-            }
-            const hp = hoveredPoint()
-            return hp ? fmtHHMM(hp.time) : null
-          }
-
-          const hoverExtra = () => {
-            if (activeMode() === 'kline') {
-              const hk = hoveredKBar()
-              const ex = hoveredKExtra()
-              if (!hk) return null
-              if (subchartMode() === 'macd' && ex && ex.dif != null && ex.macd != null) {
-                return `DIF ${ex.dif.toFixed(2)} · MACD ${ex.macd.toFixed(2)}`
-              }
-              return `量 ${fmtVol(hk.volume)}手`
-            }
-            if (activeMode() === 'auction') {
-              const ap = hoveredAuctionPoint()
-              if (!ap) return null
-              const m = ap.matchedVolume ?? ap.volume
-              const u = ap.unmatchedVolume ?? 0
-              const side = ap.unmatchedSide ?? 'none'
-              if (u > 0 && side !== 'none') {
-                const sideText = side === 'buy' ? '买剩' : '卖剩'
-                return `撮合 ${fmtVol(m)}手 · ${sideText} ${fmtVol(u)}手`
-              }
-              if (m > 0) {
-                return `撮合 ${fmtVol(m)}手 (完全撮合)`
-              }
-              return `量 ${fmtVol(ap.volume)}手`
-            }
-            const hpe = hoveredPointExtra()
-            if (hpe) {
-              if (subchartMode() === 'macd' && hpe.dif != null && hpe.macd != null) {
-                return `DIF ${hpe.dif.toFixed(2)} · MACD ${hpe.macd.toFixed(2)}`
-              }
-              if (hpe.minVol > 0) {
-                return `量 ${fmtVol(hpe.minVol)}手`
-              }
-            }
-            return null
-          }
-
-          return (
-            <>
-              {/* Unified Stock Header */}
-              <StockHeader
-                name={q().name}
-                code={q().code}
-                price={q().price}
-                changePct={q().changePct}
-                activePrice={activePrice()}
-                activePct={activePct()}
-                high={stats().high}
-                low={stats().low}
-                badge={
-                  <Show
-                    when={activeMode() === 'kline'}
-                    fallback={
-                      <Show
-                        when={activeMode() === 'auction' && !isIndex()}
-                        fallback={
-                          <Show when={s().config.trendEngine}>
-                            <TrendBadge signal={s().trendSignals?.[q().code]} quote={q()} />
-                          </Show>
-                        }
-                      >
-                        <AuctionBadge auction={auction()} quote={q()} />
-                      </Show>
-                    }
-                  >
-                    <KLineBadge kline={kline()} quote={q()} />
-                  </Show>
-                }
-                hoverTime={hoverTime()}
-                hoverExtra={hoverExtra()}
-                extraInfo={
-                  <div class="mini-pnl-group">
-                    <Show when={cost()}>
-                      {(c) => {
-                        const pct = profitPct(q().price, c())
-                        return pct !== null ? (
-                          <span class={`profit-badge ${trendClass(pct)}`}>
-                            浮盈 {fmtPct(pct)}
-                          </span>
-                        ) : null
-                      }}
-                    </Show>
-                    <Show when={pnl() !== null}>
-                      <span class={`profit-badge ${trendClass(pnl()!)}`}>
-                        {fmtMoney(pnl()!)}
-                      </span>
-                    </Show>
-                  </div>
-                }
-              />
-
-              {/* Chart Canvas */}
-              <Show
-                when={activeMode() === 'kline'}
-                fallback={
-                  <Show
-                    when={activeMode() === 'auction'}
-                    fallback={
-                      <Chart
-                        trend={trend()}
-                        preClose={q().preClose}
-                        costPrice={cost()}
-                        priceLines={item()?.priceLines ?? []}
-                        lastPrice={q().price}
-                        orbHigh={s().trendSignals?.[q().code]?.orbHigh}
-                        orbLow={s().trendSignals?.[q().code]?.orbLow}
-                        subchartMode={subchartMode()}
-                        macdParams={indicatorParams().macd}
-                        onHover={(point, extra) => {
-                          setHoveredPoint(point)
-                          setHoveredPointExtra(extra ?? null)
-                        }}
-                      />
-                    }
-                  >
-                    <AuctionCanvas
-                      auction={auction()}
-                      preClose={q().preClose}
-                      onHover={setHoveredAuctionPoint}
-                    />
-                  </Show>
-                }
-              >
-                <KlineCanvas
-                  kline={kline()}
-                  quote={q()}
-                  costPrice={cost()}
-                  priceLines={item()?.priceLines ?? []}
-                  subchartMode={subchartMode()}
-                  maPeriods={indicatorParams().ma}
-                  macdParams={indicatorParams().macd}
-                  onHoverBar={(bar, extra) => {
-                    setHoveredKBar(bar)
-                    setHoveredKExtra(extra ?? null)
-                  }}
-                />
-              </Show>
-
-              {/* Unified Footer */}
-              <div class="mini-footer">
-                <StatusLine status={s().status} />
-                <FooterControls
-                  subchartMode={subchartMode()}
-                  onToggleSubchart={toggleSubchartMode}
-                  viewMode={activeMode()}
-                  onToggleView={(m) => setManualMode(m)}
-                  showSubchart={activeMode() !== 'auction'}
-                  showAuction={!isIndex()}
-                />
-              </div>
-            </>
-          )
-        }}
+        {(q) => (
+          <MiniBody
+            quote={q}
+            item={item}
+            snapshot={s}
+            activeMode={activeMode}
+            isIndex={isIndex}
+            kline={kline}
+            indicatorParams={indicatorParams}
+            subchartMode={subchartMode}
+            onToggleSubchart={() => toggleSubchartMode(subchartMode() === 'macd' ? 'vol' : 'macd')}
+            onSelectMode={(m) => setManualMode(m)}
+            hover={{
+              point: hoveredPoint,
+              setPoint: setHoveredPoint,
+              pointExtra: hoveredPointExtra,
+              setPointExtra: setHoveredPointExtra,
+              auctionPoint: hoveredAuctionPoint,
+              setAuctionPoint: setHoveredAuctionPoint,
+              kbar: hoveredKBar,
+              setKbar: setHoveredKBar,
+              kbarExtra: hoveredKExtra,
+              setKbarExtra: setHoveredKExtra,
+            }}
+          />
+        )}
       </Show>
       <Grip />
     </div>

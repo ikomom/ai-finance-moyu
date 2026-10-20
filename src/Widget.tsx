@@ -19,7 +19,8 @@ import {
   showToast,
   snapshot,
 } from './store'
-import { logToBackend } from './tauri'
+import { report } from './utils/devReport'
+import { setupWidgetNavigation } from './utils/widgetInteraction'
 
 /** The display widget: layout routing, right-click menu and alert flash. */
 export function Widget() {
@@ -131,54 +132,24 @@ export function Widget() {
 
     document.addEventListener('contextmenu', handleContextMenu)
     document.addEventListener('mousedown', handleMouseDownOutside)
-    // Disable Ctrl + wheel zoom and keyboard zoom
-    document.addEventListener(
-      'wheel',
-      (e) => {
-        if (e.ctrlKey) e.preventDefault()
-      },
-      { passive: false }
-    )
-    document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) {
-        e.preventDefault()
-      }
+
+    const cleanupNav = setupWidgetNavigation({
+      isCollapsed,
+      onExpand: () => void invoke('set_dock_collapsed', { collapsed: false }),
+      onBack: navigateLayoutBack,
+      onForward: navigateLayoutForward,
     })
-    // Mouse side buttons (shoulder keys: X1=Back / X2=Forward) navigation
-    const handleMouseSideButtons = (e: MouseEvent) => {
-      if (e.button === 3) {
-        // Button 3: Browser Back / X1 shoulder button -> Navigate back in layout history
-        e.preventDefault()
-        e.stopPropagation()
-        if (isCollapsed()) {
-          void invoke('set_dock_collapsed', { collapsed: false })
-        }
-        navigateLayoutBack()
-      } else if (e.button === 4) {
-        // Button 4: Browser Forward / X2 shoulder button -> Navigate forward in layout history
-        e.preventDefault()
-        e.stopPropagation()
-        if (isCollapsed()) {
-          void invoke('set_dock_collapsed', { collapsed: false })
-        }
-        navigateLayoutForward()
-      }
-    }
 
-    const preventDefaultSideButtons = (e: MouseEvent) => {
-      if (e.button === 3 || e.button === 4) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
-    }
-
-    document.addEventListener('mousedown', preventDefaultSideButtons)
-    document.addEventListener('mouseup', handleMouseSideButtons)
-    document.addEventListener('auxclick', preventDefaultSideButtons)
-
+    // `report()` walks every canvas and hits the backend bridge; a resize drag
+    // fires dozens of these per second, which AGENTS.md §7 explicitly forbids.
+    let reportTimer: number | null = null
     window.addEventListener('resize', () => {
       clearLeaveTimer()
-      report()
+      if (reportTimer !== null) window.clearTimeout(reportTimer)
+      reportTimer = window.setTimeout(() => {
+        reportTimer = null
+        report()
+      }, 300)
     })
 
     // Background auto-check for updates (delayed 8s after boot, and every 4 hours thereafter)
@@ -200,12 +171,18 @@ export function Widget() {
     const initialUpdateTimer = window.setTimeout(checkUpdateSilently, 8000)
     const periodicUpdateTimer = window.setInterval(checkUpdateSilently, 4 * 60 * 60 * 1000)
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
     onCleanup(() => {
       document.removeEventListener('contextmenu', handleContextMenu)
       document.removeEventListener('mousedown', handleMouseDownOutside)
-      document.removeEventListener('mousedown', preventDefaultSideButtons)
-      document.removeEventListener('mouseup', handleMouseSideButtons)
-      document.removeEventListener('auxclick', preventDefaultSideButtons)
+      cleanupNav()
+      window.removeEventListener('keydown', handleKeyDown)
       window.clearTimeout(initialUpdateTimer)
       window.clearInterval(periodicUpdateTimer)
     })
@@ -305,32 +282,3 @@ export function Widget() {
   )
 }
 
-/**
- * Report what actually rendered.
- *
- * A transparent widget that fails silently shows nothing at all, and the webview
- * console is not reachable from the terminal, so this mirrors the geometry into
- * both the process log and the DOM. Dev only: `getBoundingClientRect` forces a
- * layout, which is not worth doing on every poll in a shipped build.
- */
-function report(): void {
-  if (!import.meta.env.DEV) return
-
-  const s = snapshot()
-  const canvases = Array.from(document.querySelectorAll('canvas')).map((c) => {
-    const r = c.getBoundingClientRect()
-    return (
-      `${c.className} box=${Math.round(r.width)}x${Math.round(r.height)}` +
-      ` attr=${c.width}x${c.height} dpr=${window.devicePixelRatio}` +
-      ` pts=${c.dataset.points ?? 'n/a'} geom=${c.dataset.geom ?? 'n/a'}`
-    )
-  })
-
-  const msg =
-    `layout=${s?.config.layout} quotes=${s?.quotes.length ?? 0} ` +
-    `trends=${s ? Object.keys(s.trends).length : 0} source=${s?.config.dataSource} ` +
-    `viewport=${window.innerWidth}x${window.innerHeight} [${canvases.join(' | ')}]`
-
-  document.body.dataset.diag = msg
-  logToBackend(msg)
-}

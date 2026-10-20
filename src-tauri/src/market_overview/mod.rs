@@ -1,11 +1,14 @@
 //! Market Overview data fetching from Eastmoney, Tencent, and iWenCai public endpoints.
 
+pub mod breadth;
 pub mod fetcher;
+pub mod global;
 pub mod sector_linkage;
 pub mod types;
 pub mod wencai;
 
 pub use fetcher::*;
+pub use global::*;
 pub use sector_linkage::*;
 pub use types::*;
 pub use wencai::*;
@@ -127,7 +130,7 @@ v_gzFTSE="FTSE~英国富时100指数~2026-10-16 16:16:59~10826.96~-13.39~-0.12~E
         let today = crate::market::beijing_now().format("%Y-%m-%d").to_string();
 
         // Manually trigger circuit breaker
-        *fetcher.quota_exhausted_date.lock().unwrap() = Some(today);
+        *fetcher.quota_exhausted_date.lock().unwrap_or_else(|e| e.into_inner()) = Some(today);
 
         // fetch_breadth should return cached without network error
         let breadth = fetcher.fetch_breadth(Some("invalid-token-should-not-hit-network")).await;
@@ -135,6 +138,6 @@ v_gzFTSE="FTSE~英国富时100指数~2026-10-16 16:16:59~10826.96~-13.39~-0.12~E
 
         // Resetting circuit breaker clears it
         fetcher.reset_quota_circuit_breaker();
-        assert!(fetcher.quota_exhausted_date.lock().unwrap().is_none());
+        assert!(fetcher.quota_exhausted_date.lock().unwrap_or_else(|e| e.into_inner()).is_none());
     }
 }

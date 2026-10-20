@@ -15,8 +15,8 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
     };
     let state = app.state::<AppState>();
     let (cfg, current_dock) = {
-        let cfg = state.config.lock().unwrap().clone();
-        let dock = *state.dock_state.lock().unwrap();
+        let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let dock = *state.dock_state.lock().unwrap_or_else(|e| e.into_inner());
         (cfg, dock)
     };
 
@@ -107,7 +107,7 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
         let _ = win.set_position(tauri::LogicalPosition::new(cx, cy));
 
         {
-            let mut dock = state.dock_state.lock().unwrap();
+            let mut dock = state.dock_state.lock().unwrap_or_else(|e| e.into_inner());
             dock.collapsed = true;
         }
     } else {
@@ -126,12 +126,12 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
         disable_maximize(&win);
 
         {
-            let mut dock = state.dock_state.lock().unwrap();
+            let mut dock = state.dock_state.lock().unwrap_or_else(|e| e.into_inner());
             dock.collapsed = false;
         }
 
         let is_mini = {
-            let cfg = state.config.lock().unwrap();
+            let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
             cfg.layout == Layout::Mini
         };
         if is_mini {

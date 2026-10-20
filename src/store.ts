@@ -8,7 +8,6 @@ import { createSignal } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
-import { demoSnapshot } from './demo'
 import { inTauri } from './tauri'
 import type { Layout, Snapshot } from './types'
 
@@ -160,6 +159,9 @@ export function selectedIndex(): number {
 /** Load initial state and subscribe to updates. Resolves to an error message. */
 export async function initStore(): Promise<string | null> {
   if (!inTauri()) {
+    // Loaded on demand so the ~330 lines of sample data never reach the bundle
+    // that runs inside Tauri, where this branch is unreachable.
+    const { demoSnapshot } = await import('./demo')
     const snap = demoSnapshot()
     setSnapshot(snap)
     recordLayoutChange(snap.config.layout)

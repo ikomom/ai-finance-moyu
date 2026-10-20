@@ -26,3 +26,16 @@ dist-ssr
 # Agent & Build Cache
 .omc/
 src-tauri/target/
+
+# Split-module scratch files (intermediate output of scripts/split-module.ps1)
+src/components/_kline_draw_body.txt
+
+# Local audit evidence: screenshots captured while debugging, not source
+audit-evidence/
+
+# Agent workspace memory (local notes, not project source)
+.workbuddy/
+
+# One-off analysis docs written during a refactor, not shipped
+AI拆分清单.md
+AUDIT-REPORT-*.md

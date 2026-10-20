@@ -35,7 +35,7 @@ pub fn disable_maximize(win: &impl WindowHwnd) {
             }
             let sys_menu = GetSystemMenu(raw, 0);
             if !sys_menu.is_null() {
-                DeleteMenu(sys_menu, SC_MAXIMIZE as u32, MF_BYCOMMAND);
+                DeleteMenu(sys_menu, SC_MAXIMIZE, MF_BYCOMMAND);
             }
         }
     }

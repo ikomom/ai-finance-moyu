@@ -1,0 +1,196 @@
+/* ------------------------------------------------------------- Controls */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.field > label {
+  flex: 0 0 180px;
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field > label output {
+  color: var(--color-accent-light);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="number"],
+.field select,
+select {
+  flex: 1 1 160px;
+  min-width: 0;
+  background: var(--surface-input-bg) !important;
+  border: 1px solid var(--surface-input-border) !important;
+  color: var(--fg) !important;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+select {
+  appearance: none;
+  padding-right: 30px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa1ad' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  cursor: pointer;
+}
+
+select:focus,
+.field input:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+}
+
+select option {
+  background-color: var(--surface-popover-bg) !important;
+  color: var(--fg) !important;
+  padding: 8px 12px;
+  font-size: 12.5px;
+}
+
+.field input[type="text"] {
+  font-family: var(--font-mono);
+}
+
+/* Modern Range Slider */
+.field input[type="range"] {
+  flex: 1 1 160px;
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(120, 120, 128, 0.25);
+  outline: none;
+  cursor: pointer;
+}
+
+.field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.field input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+/* Modern Toggle Switch Component */
+.switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12.5px;
+  color: var(--fg);
+}
+
+.switch-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.switch-slider {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  background: rgba(120, 120, 128, 0.28);
+  border-radius: 20px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 1px;
+  bottom: 1px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.switch-input:checked + .switch-slider {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.switch-input:checked + .switch-slider::before {
+  transform: translateX(16px);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--fg);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- Buttons */
+@layer base {
+  button {
+    background: rgba(120, 120, 128, 0.1);
+    border: 1px solid var(--line-strong);
+    color: var(--fg);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  button:hover {
+    background: rgba(120, 120, 128, 0.18);
+    border-color: var(--color-accent);
+  }
+}
+

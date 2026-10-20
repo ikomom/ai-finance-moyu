@@ -1,0 +1,193 @@
+/* AI & Memory Settings Styles */
+.provider-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.btn-preset {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-preset:hover {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+}
+
+.btn-preset.active {
+  background: var(--color-accent);
+  color: #ffffff;
+  border-color: var(--color-accent);
+  font-weight: 500;
+}
+
+.input-with-action {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-toggle-key {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-toggle-key:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+}
+
+.setting-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.test-status-box, .status-tip-box {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.test-status-box.testing {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+.test-status-box.success, .status-tip-box {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+
+.test-status-box.failed {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.setting-footer-tip {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid #38bdf8;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* Memory Tabs & Capacity Meter */
+.memory-subtab-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.btn-subtab {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-subtab:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.btn-subtab.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  font-weight: 500;
+}
+
+.memory-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+}
+
+.meta-count {
+  font-family: var(--font-mono);
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.capacity-meter {
+  width: 140px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.capacity-fill {
+  height: 100%;
+  background: #38bdf8;
+  transition: width 0.2s ease;
+}
+
+.capacity-fill.warning {
+  background: #f59e0b;
+}
+
+.capacity-fill.danger {
+  background: #ef4444;
+}
+
+.memory-editor-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.memory-textarea {
+  width: 100%;
+  height: 220px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  padding: 10px;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.memory-textarea:focus {
+  border-color: #38bdf8;
+}
+
+.memory-textarea.readonly {
+  opacity: 0.75;
+  background: rgba(0, 0, 0, 0.35);
+}
+

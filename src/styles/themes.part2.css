@@ -1,0 +1,58 @@
+/* 5. 赛博终端 (Cyberpunk - 极客高对比荧光绿) */
+:root[data-theme="cyberpunk"] {
+  --theme-name: "cyberpunk";
+  color-scheme: dark;
+
+  /* Surfaces & Glass */
+  --surface-app-bg: #030507;
+  --surface-glass-bg: rgba(4, 9, 7, 0.96);
+  --surface-glass-border: rgba(0, 255, 136, 0.35);
+  --surface-card-bg: rgba(0, 255, 136, 0.04);
+  --surface-card-hover: rgba(0, 255, 136, 0.08);
+  --surface-card-active: rgba(0, 255, 136, 0.12);
+  --surface-border-subtle: rgba(0, 255, 136, 0.18);
+  --surface-border-divider: rgba(0, 255, 136, 0.12);
+  --surface-popover-bg: rgba(3, 8, 6, 0.98);
+  --surface-input-bg: rgba(0, 0, 0, 0.6);
+  --surface-input-border: rgba(0, 255, 136, 0.35);
+
+  /* Typography */
+  --text-primary: #e6fffa;
+  --text-secondary: #a7f3d0;
+  --text-muted: #6ee7b7;
+  --text-dim: #059669;
+
+  /* Accent */
+  --color-accent: #00ff88;
+  --color-accent-light: #5eead4;
+  --color-accent-hover: #99f6e4;
+  --color-accent-bg: rgba(0, 255, 136, 0.18);
+  --color-accent-border: rgba(0, 255, 136, 0.45);
+
+  /* High-voltage Red/Green */
+  --color-up: #ff3366;
+  --color-up-subtle: #ff6688;
+  --color-up-bg: rgba(255, 51, 102, 0.2);
+  --color-up-border: rgba(255, 51, 102, 0.45);
+
+  --color-down: #00ff88;
+  --color-down-subtle: #33ff99;
+  --color-down-bg: rgba(0, 255, 136, 0.2);
+  --color-down-border: rgba(0, 255, 136, 0.45);
+
+  /* Settings Window specifics */
+  --bg: #030507;
+  --bg-gradient: radial-gradient(circle at 10% 8%, rgba(0, 255, 136, 0.1) 0%, transparent 45%),
+                 radial-gradient(circle at 90% 92%, rgba(6, 182, 212, 0.08) 0%, transparent 45%);
+  --sidebar-bg: rgba(4, 9, 7, 0.92);
+  --card: rgba(6, 14, 11, 0.88);
+  --card-hover: rgba(9, 20, 16, 0.98);
+  --line: rgba(0, 255, 136, 0.22);
+  --line-strong: rgba(0, 255, 136, 0.45);
+  --fg: #e6fffa;
+  --muted: #6ee7b7;
+  --accent: var(--color-accent);
+  --accent-glow: rgba(0, 255, 136, 0.45);
+  --dock-handle-bg: rgba(0, 255, 136, 0.4);
+  --dock-handle-hover: rgba(0, 255, 136, 0.95);
+}

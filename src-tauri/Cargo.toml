@@ -18,7 +18,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# `tray-icon` and `image-*` features are required for system tray and icons in Tauri v2
+# `tray-icon` and `image-*` features are required for system tray and icons in Tauri v2.
+# `devtools` is deliberately NOT enabled: it would compile the inspector into
+# release builds, where anyone could open it and read every in-memory secret.
+# Tauri enables the inspector automatically in debug builds.
 tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
@@ -28,7 +31,7 @@ notify-rust = "4"
 # HTTP for quote fetching. `no_proxy()` on the client bypasses the machine's
 # HTTP_PROXY/HTTPS_PROXY env vars, which would otherwise tunnel domestic
 # quote requests through 127.0.0.1:7890.
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "json"] }
 # Tencent's quote endpoints respond in GB18030, NOT UTF-8.
 encoding_rs = "0.8"
 
@@ -57,5 +60,9 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Threading",
 ] }
 
+# Upstream `zip 4.6.1` is pulled from git rather than crates.io (transitive dep of
+# the updater). Pinned to an exact revision, not the `v4.6.1` tag: a git tag is
+# mutable, so `tag = ...` makes builds silently non-reproducible on `cargo update`
+# and turns the tag owner into a supply-chain input. Bump the rev deliberately.
 [patch.crates-io]
-zip = { git = "https://github.com/zip-rs/zip2", tag = "v4.6.1" }
+zip = { git = "https://github.com/zip-rs/zip2", rev = "56fa5f6e1f3e29d747e5875867e7a647aa612b8c" }

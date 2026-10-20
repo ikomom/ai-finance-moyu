@@ -60,7 +60,8 @@ pub fn build(app: &App) -> tauri::Result<()> {
         .tooltip(format!("A股摸鱼 · 数据源 {source}"))
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| handle_menu(app, event.id().as_ref()))
+        // Note: Do not register on_menu_event here. Global builder in lib.rs already handles all menu events;
+        // registering here as well causes Tauri v2 to invoke handle_menu twice for each click.
         .on_tray_icon_event(|tray, event| {
             // Left click toggles the window, the familiar tray behaviour.
             if let TrayIconEvent::Click {
@@ -77,18 +78,30 @@ pub fn build(app: &App) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Run a window-opening call off the native menu callback.
+///
+/// Building a webview window from inside the menu callback means Windows is
+/// still unwinding its modal menu loop, and WebView2 can finish initialising
+/// into a window that never composites (a pure white rectangle). Deferring to
+/// the async runtime moves creation out of that loop.
+fn deferred<F>(app: &AppHandle, what: &'static str, open: F)
+where
+    F: FnOnce(AppHandle) -> Result<(), String> + Send + 'static,
+{
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = open(handle) {
+            log::warn!(target: "SYSTEM", "打开{what}窗口失败: {e}");
+        }
+    });
+}
+
 pub fn handle_menu(app: &AppHandle, id: &str) {
     match id {
         "toggle" => crate::toggle_window(app),
-        "settings" => {
-            if let Err(e) = crate::open_settings(app) {
-                log::warn!(target: "SYSTEM", "打开设置窗口失败: {e}");
-            }
-        }
+        "settings" => deferred(app, "设置", |h| crate::open_settings(&h)),
         "check_update" => {
-            if let Err(e) = crate::open_settings(app) {
-                log::warn!(target: "SYSTEM", "打开设置窗口失败: {e}");
-            }
+            deferred(app, "设置", |h| crate::open_settings(&h));
             let _ = app.emit("trigger-check-update", ());
         }
         "quit" => app.exit(0),
@@ -125,7 +138,7 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
                 let opacity = pct / 100.0;
                 let cfg = {
                     let state = app.state::<crate::state::AppState>();
-                    let mut cfg = state.config.lock().unwrap();
+                    let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
                     cfg.opacity = opacity;
                     cfg.clone()
                 };
@@ -161,7 +174,7 @@ pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::
     let _guard = MenuGuard;
 
     let state = app.state::<crate::state::AppState>();
-    let cfg = state.config.lock().unwrap().clone();
+    let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let current_layout = cfg.layout;
     let current_mode = cfg.visibility_mode;
 
@@ -282,4 +295,3 @@ pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::
 
     result
 }
-

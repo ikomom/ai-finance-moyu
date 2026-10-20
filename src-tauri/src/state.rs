@@ -60,6 +60,10 @@ pub struct Snapshot {
     pub status: PollStatus,
     pub dock: DockState,
     pub market_overview: Option<MarketOverview>,
+    /// Whether an iWenCai key is stored. The key value itself is deliberately
+    /// absent: `config` is stripped before it is serialized to the webview, so a
+    /// single XSS can no longer exfiltrate the user's credentials.
+    pub has_iwencai_key: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -72,6 +76,27 @@ pub struct HotkeyBindings {
     pub global: Option<tauri_plugin_global_shortcut::Shortcut>,
 }
 
+/// The shared state container.
+///
+/// # Lock ordering (MUST hold for every path)
+///
+/// These are plain `std::sync::Mutex`es: no re-entrancy, no timeout, so a cycle
+/// between two threads freezes the whole process permanently. Every acquisition
+/// sequence in the codebase must respect this order:
+///
+/// ```text
+/// config  ->  quotes  ->  trends  ->  trend_signals / market_overview / auction_tracker
+/// ```
+///
+/// Reading a *single* value out of `config` is allowed at any point **only** as a
+/// temporary (`state.config.lock().unwrap_or_else(|e| e.into_inner()).field`), which drops the guard at the
+/// end of the statement. Holding the `config` guard while acquiring a data lock is
+/// `config -> quotes`; holding a data lock while acquiring `config` is the reverse
+/// and deadlocks against `poller::poll_quotes`.
+///
+/// When a function needs a value from `config` *after* reading quote/trend data,
+/// it must clone what it needs out of that data, drop the data guard, and only
+/// then take `config`.
 pub struct AppState {
     pub config: Mutex<Config>,
     pub tracker: Mutex<CrossingTracker>,
@@ -80,6 +105,9 @@ pub struct AppState {
     pub trend_signals: Mutex<HashMap<String, TrendSignal>>,
     pub status: Mutex<PollStatus>,
     pub fetcher: Fetcher,
+    /// Shared HTTP client for the security search endpoints. Building a fresh
+    /// client per keystroke meant a fresh TLS handshake per keystroke.
+    pub search: crate::search::SearchClient,
     /// While set in the future, window-resize events are ignored. Used to keep
     /// our own programmatic resizes (layout switches) from being recorded as a
     /// size the user chose.
@@ -113,6 +141,13 @@ impl AppState {
             trends_map.insert(code, t);
         }
 
+        // A search client that fails to build (TLS init) must not take the app
+        // down with it: the widget is still useful without the search box.
+        let search = crate::search::SearchClient::new().unwrap_or_else(|e| {
+            log::error!(target: "NET", "搜索客户端初始化失败，搜索功能不可用: {e}");
+            crate::search::SearchClient::disabled()
+        });
+
         Self {
             config: Mutex::new(config),
             tracker: Mutex::new(CrossingTracker::new()),
@@ -121,6 +156,7 @@ impl AppState {
             trend_signals: Mutex::new(HashMap::new()),
             status: Mutex::new(PollStatus::default()),
             fetcher,
+            search,
             suppress_resize_until: Mutex::new(None),
             resize_gen: AtomicU64::new(0),
             suppress_move_until: Mutex::new(None),
@@ -138,7 +174,15 @@ impl AppState {
     /// If a quote has not yet arrived or network is disconnected, fallback to
     /// cached/placeholder item so watchlist items NEVER vanish from the UI.
     pub fn snapshot(&self) -> Snapshot {
-        let config = self.config.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let mut config = self.config.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let has_iwencai_key = config
+            .iwencai_api_key
+            .as_deref()
+            .is_some_and(|k| !k.trim().is_empty());
+        // Never ship the secret to the renderer; `has_iwencai_key` is enough for
+        // the settings form to render its state.
+        config.iwencai_api_key = None;
+
         let quotes = self.quotes.lock().unwrap_or_else(|e| e.into_inner());
         let trends = self.trends.lock().unwrap_or_else(|e| e.into_inner());
         let trend_signals = self.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -172,6 +216,7 @@ impl AppState {
             status,
             dock,
             market_overview,
+            has_iwencai_key,
         }
     }
 }

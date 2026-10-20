@@ -1,18 +1,11 @@
 import { createSignal, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
-import { relaunch } from '@tauri-apps/plugin-process'
-import { marked } from 'marked'
+import { renderMarkdown } from '../utils/markdown'
 import type { CheckResult } from '../services/updater'
+import { formatBytes, startUpdateDownload, type DownloadProgress } from './updateDownload'
 import './UpdateModal.css'
 
-export interface DownloadProgress {
-  status: 'idle' | 'downloading' | 'finished' | 'error'
-  pct: number
-  downloaded: number
-  total: number
-  errorMsg?: string
-}
+export type { DownloadProgress }
 
 export interface UpdateModalProps {
   result: CheckResult | null
@@ -21,14 +14,6 @@ export interface UpdateModalProps {
   onClose: () => void
   onSkipVersion: (version: string) => void
 }
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0 || !Number.isFinite(bytes)) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
-}
-
 export function UpdateModal(props: UpdateModalProps) {
   const [downloadState, setDownloadState] = createSignal<DownloadProgress>({
     status: 'idle',
@@ -42,14 +27,9 @@ export function UpdateModal(props: UpdateModalProps) {
   const newVersion = () => props.result?.newVersion || props.result?.update?.version || ''
   const releaseDate = () => props.result?.date || props.result?.update?.date || ''
   const changelog = () => props.result?.body || props.result?.update?.body || '本次更新包含性能提升、算法优化及已知问题修复。'
-  const renderedMarkdown = () => {
-    const raw = changelog().trim()
-    try {
-      return marked.parse(raw, { async: false, breaks: true, gfm: true }) as string
-    } catch {
-      return raw
-    }
-  }
+
+  // Sanitized: the release body is remote, untrusted text rendered via innerHTML.
+  const renderedMarkdown = () => renderMarkdown(changelog())
 
   const handleOpenReleasePage = async () => {
     try {
@@ -60,136 +40,22 @@ export function UpdateModal(props: UpdateModalProps) {
   }
 
   const handleStartUpdate = async () => {
-    const res = props.result
-    if (!res) return
-
-    setDownloadState({
-      status: 'downloading',
-      pct: 0,
-      downloaded: 0,
-      total: 0,
-    })
-
-    if (res.update) {
-      try {
-        let downloaded = 0
-        let total = 0
-
-        await res.update.downloadAndInstall((event) => {
-          switch (event.event) {
-            case 'Started':
-              total = event.data.contentLength ?? 0
-              setDownloadState({
-                status: 'downloading',
-                pct: 0,
-                downloaded: 0,
-                total,
-              })
-              break
-            case 'Progress':
-              downloaded += event.data.chunkLength
-              const pct = total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : 0
-              setDownloadState({
-                status: 'downloading',
-                pct,
-                downloaded,
-                total,
-              })
-              break
-            case 'Finished':
-              setDownloadState({
-                status: 'finished',
-                pct: 100,
-                downloaded: total || downloaded,
-                total: total || downloaded,
-              })
-              break
-          }
-        })
-
-        setDownloadState((prev) => ({ ...prev, status: 'finished', pct: 100 }))
-        setTimeout(async () => {
-          try {
-            await relaunch()
-          } catch {
-            // Relaunch fails or installer exits by itself
-          }
-        }, 1200)
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        setDownloadState({
-          status: 'error',
-          pct: 0,
-          downloaded: 0,
-          total: 0,
-          errorMsg: msg,
-        })
-      }
-    } else {
-      // Fallback in-app streaming download
-      const targetVersion = res.newVersion || 'latest'
-      const fallbackUrl = `https://github.com/ikomom/ai-finance-moyu/releases/download/v${targetVersion}/ai-finance-moyu_${targetVersion}_x64-setup.exe`
-      const url = res.installerUrl || fallbackUrl
-      const filename = res.installerFileName || `ai-finance-moyu_${targetVersion}_x64-setup.exe`
-
-      try {
-        const unlistenProgress = await listen<{ downloaded: number; total: number; pct: number }>(
-          'installer-download-progress',
-          (event) => {
-            const { downloaded, total, pct } = event.payload
-            setDownloadState({
-              status: pct >= 100 ? 'finished' : 'downloading',
-              pct,
-              downloaded,
-              total,
-            })
-          }
-        )
-
-        try {
-          await invoke('download_and_install_package', { url, filename })
-        } finally {
-          unlistenProgress()
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        if (msg.includes('下载已取消')) {
-          setDownloadState({
-            status: 'idle',
-            pct: 0,
-            downloaded: 0,
-            total: 0,
-          })
-          return
-        }
-        setDownloadState({
-          status: 'error',
-          pct: 0,
-          downloaded: 0,
-          total: 0,
-          errorMsg: msg,
-        })
-      }
-    }
+    const result = props.result
+    if (!result) return
+    await startUpdateDownload(result, { setProgress: setDownloadState })
   }
 
   const handleCancelDownload = async () => {
     try {
       await invoke('cancel_package_download')
-    } catch {}
-    setDownloadState({
-      status: 'idle',
-      pct: 0,
-      downloaded: 0,
-      total: 0,
-    })
+    } catch {
+      // Cancelling a download that already finished is a no-op.
+    }
+    setDownloadState({ status: 'idle', pct: 0, downloaded: 0, total: 0 })
   }
 
   const handleSkip = () => {
-    const v = newVersion()
-    if (v) {
-      props.onSkipVersion(v)
-    }
+    props.onSkipVersion(newVersion())
     props.onClose()
   }
 
@@ -274,7 +140,7 @@ export function UpdateModal(props: UpdateModalProps) {
 
                 <Show when={downloadState().status === 'error'}>
                   <div class="progress-error-detail">
-                    {downloadState().errorMsg || '网络连接超时或签名校验未通过'}
+                    {downloadState().error || '网络连接超时或签名校验未通过'}
                     <div class="progress-error-hint">
                       如因国内网络无法直连下载，可点击下方「网页手动下载」获取对应平台安装包覆盖升级。
                     </div>

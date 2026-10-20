@@ -2,37 +2,37 @@ use super::types::*;
 
 /// Calculate rolling MA5, MA10, MA20, and MACD(12, 26, 9), and synthesize diagnostics.
 pub fn compute_kline_indicators(code: &str, mut bars: Vec<KLineBar>) -> KLineData {
-    let n = bars.len();
-    for i in 0..n {
-        if i + 1 >= 5 {
-            let sum: f64 = bars[i + 1 - 5..=i].iter().map(|b| b.close).sum();
-            bars[i].ma5 = Some((sum / 5.0 * 100.0).round() / 100.0);
+    let closes: Vec<f64> = bars.iter().map(|b| b.close).collect();
+    for (i, bar) in bars.iter_mut().enumerate() {
+        if i >= 4 {
+            let sum: f64 = closes[i + 1 - 5..=i].iter().sum();
+            bar.ma5 = Some((sum / 5.0 * 100.0).round() / 100.0);
         }
-        if i + 1 >= 10 {
-            let sum: f64 = bars[i + 1 - 10..=i].iter().map(|b| b.close).sum();
-            bars[i].ma10 = Some((sum / 10.0 * 100.0).round() / 100.0);
+        if i >= 9 {
+            let sum: f64 = closes[i + 1 - 10..=i].iter().sum();
+            bar.ma10 = Some((sum / 10.0 * 100.0).round() / 100.0);
         }
-        if i + 1 >= 20 {
-            let sum: f64 = bars[i + 1 - 20..=i].iter().map(|b| b.close).sum();
-            bars[i].ma20 = Some((sum / 20.0 * 100.0).round() / 100.0);
+        if i >= 19 {
+            let sum: f64 = closes[i + 1 - 20..=i].iter().sum();
+            bar.ma20 = Some((sum / 20.0 * 100.0).round() / 100.0);
         }
     }
 
     // MACD(12, 26, 9) standard exponential moving average recursion
-    if n > 0 {
-        let mut ema12 = bars[0].close;
-        let mut ema26 = bars[0].close;
+    if let Some(first) = bars.first() {
+        let mut ema12 = first.close;
+        let mut ema26 = first.close;
         let mut dea = 0.0;
 
-        for i in 0..n {
-            let c = bars[i].close;
+        for (i, bar) in bars.iter_mut().enumerate() {
+            let c = bar.close;
             if i == 0 {
                 ema12 = c;
                 ema26 = c;
                 dea = 0.0;
-                bars[i].dif = Some(0.0);
-                bars[i].dea = Some(0.0);
-                bars[i].macd = Some(0.0);
+                bar.dif = Some(0.0);
+                bar.dea = Some(0.0);
+                bar.macd = Some(0.0);
             } else {
                 ema12 = ema12 * (11.0 / 13.0) + c * (2.0 / 13.0);
                 ema26 = ema26 * (25.0 / 27.0) + c * (2.0 / 27.0);
@@ -40,9 +40,9 @@ pub fn compute_kline_indicators(code: &str, mut bars: Vec<KLineBar>) -> KLineDat
                 dea = dea * (8.0 / 10.0) + dif * (2.0 / 10.0);
                 let macd_hist = (dif - dea) * 2.0;
 
-                bars[i].dif = Some((dif * 1000.0).round() / 1000.0);
-                bars[i].dea = Some((dea * 1000.0).round() / 1000.0);
-                bars[i].macd = Some((macd_hist * 1000.0).round() / 1000.0);
+                bar.dif = Some((dif * 1000.0).round() / 1000.0);
+                bar.dea = Some((dea * 1000.0).round() / 1000.0);
+                bar.macd = Some((macd_hist * 1000.0).round() / 1000.0);
             }
         }
     }

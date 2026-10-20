@@ -1,0 +1,218 @@
+
+.watch-head .num input {
+  width: 70px;
+  background: var(--surface-input-bg);
+  border: 1px solid var(--surface-input-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 5px 7px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.watch-head .num input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-bg);
+}
+
+.watch-head .alert-num input {
+  width: 58px;
+  text-align: center;
+}
+
+.watch-summary-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.summary-badge {
+  font-size: 10.5px;
+  padding: 1.5px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.summary-badge.holding {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.summary-badge.strategy {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: #c084fc;
+}
+
+.summary-badge.lines {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.collapse-toggle-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  user-select: none;
+}
+
+.collapse-toggle-btn:hover {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+  color: #93c5fd;
+}
+
+.collapse-toggle-btn.open {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+  color: #60a5fa;
+}
+
+.watch-drawer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: drawerFadeIn 0.2s ease-out;
+}
+
+@keyframes drawerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+}
+
+.drawer-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.drawer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.drawer-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.drawer-row .num {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.drawer-row .num input {
+  width: 85px;
+  background: var(--surface-input-bg);
+  border: 1px solid var(--surface-input-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 4px 7px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.indicator-select {
+  background: var(--surface-input-bg);
+  border: 1px solid var(--surface-input-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.indicator-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.watch-head .grow {
+  margin-left: auto;
+}
+
+.lines {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--surface-border-subtle);
+}
+
+.lines-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.line-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.line-row input {
+  background: var(--surface-input-bg);
+  border: 1px solid var(--surface-input-border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 4px 7px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.line-row input.price {
+  width: 80px;
+  font-family: var(--font-mono);
+}
+
+.line-row select {
+  width: 82px;
+  padding: 4px 22px 4px 6px !important;
+  font-size: 12px;
+}
+
+.line-row input.label {
+  flex: 1 1 auto;
+}

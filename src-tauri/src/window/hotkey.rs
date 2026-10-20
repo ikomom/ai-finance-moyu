@@ -16,7 +16,7 @@ pub fn register_hotkeys(app: &AppHandle, keys: &Hotkeys) -> Result<(), String> {
                     return;
                 }
                 let state = app.state::<AppState>();
-                let bindings = state.hotkey_bindings.lock().unwrap().clone();
+                let bindings = state.hotkey_bindings.lock().unwrap_or_else(|e| e.into_inner()).clone();
                 if bindings.toggle.as_ref() == Some(shortcut) {
                     toggle_window(app);
                 } else if bindings.bar.as_ref() == Some(shortcut) {
@@ -88,7 +88,7 @@ pub fn sync_hotkeys(app: &AppHandle, keys: &Hotkeys) {
     }
 
     let state = app.state::<AppState>();
-    *state.hotkey_bindings.lock().unwrap() = new_bindings;
+    *state.hotkey_bindings.lock().unwrap_or_else(|e| e.into_inner()) = new_bindings;
 }
 
 #[cfg(test)]

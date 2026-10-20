@@ -2,7 +2,8 @@ import { computeMinuteMacd } from '../../utils/indicators'
 import { drawCrosshair, drawHorizontalLevel, setupCanvasDpi } from '../canvasUtils'
 import { FONT, getChartTheme } from '../theme'
 import type { DrawOptions } from '../types'
-import { isValidAvg, SLOTS, slotOf } from '../scale'
+import { SLOTS } from '../scale'
+import { computeMaxDev, drawGrid, drawPriceAxis, drawTimeAxis, makeSlotResolver, type PlotGeometry } from './trendAxes'
 import { drawMacdSubchart } from './macdRenderer'
 import { drawMinuteVolumeSubchart } from './volumeRenderer'
 import { drawTrendPrice } from './trendRenderer'
@@ -43,74 +44,22 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   canvas.dataset.points = String(points.length)
 
   // --- y range: symmetric about 昨收 -------------------------------------
-  let maxDev = 0
-  for (const p of points) {
-    if (p.price > 0) {
-      maxDev = Math.max(maxDev, Math.abs(p.price - preClose))
-    }
-    if (isValidAvg(p.avgPrice, preClose)) {
-      maxDev = Math.max(maxDev, Math.abs(p.avgPrice - preClose))
-    }
-  }
-  if (preClose > 0) {
-    maxDev = Math.max(maxDev, preClose * 0.002)
-    for (const pl of opts.priceLines ?? []) {
-      if (pl.price > 0 && Math.abs(pl.price - preClose) <= maxDev * 1.5) {
-        maxDev = Math.max(maxDev, Math.abs(pl.price - preClose))
-      }
-    }
-    if (opts.costPrice && opts.costPrice > 0 && Math.abs(opts.costPrice - preClose) <= maxDev * 1.5) {
-      maxDev = Math.max(maxDev, Math.abs(opts.costPrice - preClose))
-    }
-    if (opts.orbHigh && opts.orbHigh > 0 && Math.abs(opts.orbHigh - preClose) <= maxDev * 1.5) {
-      maxDev = Math.max(maxDev, Math.abs(opts.orbHigh - preClose))
-    }
-    if (opts.orbLow && opts.orbLow > 0 && Math.abs(opts.orbLow - preClose) <= maxDev * 1.5) {
-      maxDev = Math.max(maxDev, Math.abs(opts.orbLow - preClose))
-    }
-  } else {
-    maxDev = Math.max(maxDev, 1)
-  }
+  const maxDev = computeMaxDev(points, preClose, opts)
 
   const yMin = preClose - maxDev
   const yTop = preClose + maxDev
   const span = yTop - yMin || 1
 
   const isGlobal = opts.isGlobal ?? false
-  const getSlot = (time: number, idx: number) => {
-    if (isGlobal) {
-      return (idx / Math.max(1, points.length - 1)) * SLOTS
-    }
-    return slotOf(time)
-  }
+  const getSlot = makeSlotResolver(isGlobal, points.length)
 
   const xOf = (slot: number) => plotL + (slot / SLOTS) * plotW
   const yOf = (price: number) => plotT + (1 - (price - yMin) / span) * priceH
 
+  const geo: PlotGeometry = { plotL, plotT, plotW, priceH, volT, volH }
+
   // --- grid ---------------------------------------------------------------
-  ctx.strokeStyle = theme.grid
-  ctx.lineWidth = 1
-  for (let i = 0; i <= 4; i++) {
-    const y = Math.round(plotT + (i / 4) * priceH) + 0.5
-    ctx.beginPath()
-    ctx.moveTo(plotL, y)
-    ctx.lineTo(plotL + plotW, y)
-    ctx.stroke()
-  }
-
-  // Volume subchart top separator line
-  ctx.beginPath()
-  ctx.moveTo(plotL, Math.round(volT) - 0.5)
-  ctx.lineTo(plotL + plotW, Math.round(volT) - 0.5)
-  ctx.stroke()
-
-  for (const slot of [0, 60, 120, 180, 240]) {
-    const x = Math.round(xOf(slot)) + 0.5
-    ctx.beginPath()
-    ctx.moveTo(x, plotT)
-    ctx.lineTo(x, volT + volH)
-    ctx.stroke()
-  }
+  drawGrid(ctx, theme, geo)
 
   // --- 昨收 baseline (the centre line) ------------------------------------
   const yPre = yOf(preClose)
@@ -124,60 +73,8 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   ctx.restore()
 
   // --- axis labels --------------------------------------------------------
-  ctx.fillStyle = theme.axisText
-  const fmtP = (v: number) => (preClose >= 1000 ? v.toFixed(1) : v.toFixed(2))
-  const step = maxDev / 2
-
-  ctx.textAlign = 'right'
-  for (let i = -2; i <= 2; i++) {
-    const price = preClose + i * step
-    const y = yOf(price)
-    if (y < plotT - 1 || y > plotT + plotH + 1) continue
-    ctx.fillText(fmtP(price), plotL - 3, y)
-  }
-
-  ctx.textAlign = 'left'
-  if (preClose > 0) {
-    for (let i = -2; i <= 2; i++) {
-      const pct = ((i * step) / preClose) * 100
-      const y = yOf(preClose + i * step)
-      if (y < plotT - 1 || y > plotT + plotH + 1) continue
-      ctx.fillText(`${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`, plotL + plotW + 3, y)
-    }
-  }
-
-  const fmtHhmm = (t: number): string => {
-    const h = Math.floor(t / 100).toString().padStart(2, '0')
-    const m = (t % 100).toString().padStart(2, '0')
-    return `${h}:${m}`
-  }
-
-  ctx.textAlign = 'center'
-  const timeLabels: Array<[number, string]> =
-    isGlobal && points.length > 0
-      ? [
-          [0, fmtHhmm(points[0].time)],
-          [120, fmtHhmm(points[Math.floor(points.length / 2)].time)],
-          [240, fmtHhmm(points[points.length - 1].time)],
-        ]
-      : [
-          [0, '9:30'],
-          [120, '11:30/13:00'],
-          [240, '15:00'],
-        ]
-  for (const [slot, label] of timeLabels) {
-    let x = xOf(slot)
-    if (slot === 0) {
-      ctx.textAlign = 'left'
-      x = plotL
-    } else if (slot === SLOTS) {
-      ctx.textAlign = 'right'
-      x = plotL + plotW
-    } else {
-      ctx.textAlign = 'center'
-    }
-    ctx.fillText(label, x, volT + volH + 7)
-  }
+  drawPriceAxis(ctx, theme, geo, preClose, maxDev, yOf)
+  drawTimeAxis(ctx, geo, isGlobal, points)
 
   if (points.length === 0) {
     ctx.textAlign = 'center'

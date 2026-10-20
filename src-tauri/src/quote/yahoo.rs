@@ -79,8 +79,7 @@ pub fn parse_yahoo_trend(code: &str, bytes: &[u8]) -> Result<Trend, FetchError> 
     let mut prev_price = if pre_close > 0.0 { pre_close } else { 0.0 };
     let mut date_str = String::new();
 
-    for i in 0..n {
-        let ts = timestamps[i];
+    for (i, ts) in timestamps.iter().copied().enumerate() {
         let price = match closes.get(i).copied().flatten() {
             Some(p) if p > 0.0 => {
                 prev_price = p;
@@ -174,8 +173,7 @@ pub fn parse_yahoo_chart(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, Fetc
     let n = timestamps.len();
     let mut bars = Vec::with_capacity(n);
 
-    for i in 0..n {
-        let ts = timestamps[i];
+    for (i, ts) in timestamps.iter().copied().enumerate() {
         let Some(open) = opens.get(i).copied().flatten() else { continue; };
         let Some(high) = highs.get(i).copied().flatten() else { continue; };
         let Some(low) = lows.get(i).copied().flatten() else { continue; };

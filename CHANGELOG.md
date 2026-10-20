@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+> 版本号由维护者决定发布日期，本段在正式发版前统一改名并补日期。
+
+### 🔒 安全加固
+- **渲染层 XSS 收口**：AI 复盘卡片与更新日志的 Markdown 渲染全部接入 DOMPurify 白名单净化，杜绝 `<img onerror>` 一类的注入执行。
+- **严格 CSP**：`tauri.conf.json` 由 `csp: null` 改为 `script-src 'self'` 等严格策略，并关闭 `withGlobalTauri`；内联启动脚本迁移到 `src/boot.ts` 以适配 CSP。
+- **命令加固**：`open_url` 改为协议白名单 + 参数向量调用（不再经 `cmd /c start`，避免 `&` 注入）；`download_and_install_package` 增加 HTTPS/域名白名单与安装包扩展名校验，文件名收敛为 `file_name()`，杜绝临时目录穿越。
+- **凭据不再回传前端**：行情快照与 Agent 配置只返回 `hasIwenCaiKey` / `has_api_key` 布尔位，密钥永不出后端；保存时留空表示保留原值。
+- **移除越权读取**：问财 Key 仅保留「设置面板 → 环境变量」两级来源，删除对第三方工具 `key.txt` 的隐式读取。
+- **Release 构建不再内置 devtools**。
+
+### 🐞 稳定性修复
+- **修复工具调用死锁**：`calc_portfolio_risk` 原先在持有 `quotes` 锁时反向获取 `config` 锁，与 3 秒轮询形成 ABBA 死锁并冻结整个应用；现统一锁序并在 `AppState` 文档化。
+- **修复 AI 配置契约错位**：前后端 `LlmConfig` 字段名与必填性对齐（`model_name` / `enable_search` / `temperature` / `max_tokens`），保存不再静默失败，采样温度与最大令牌真正下发。
+- **修复工具熔断器**：拆分为只读 `precheck` 与记账 `record_result`，连续失败计数不再被提前清零，`HardKill` 熔断可达并会终止本轮循环。
+- **修复设置中心打开即卡死**：`settings.html` 的静态启动遮罩不再残留并遮挡界面。
+- **修复 AI 页崩溃**：`Slider` 对 `undefined` 入参兜底，不再因 `toFixed` 抛异常导致整页失去响应。
+- 休市时段不再因错误重试持续请求接口；行情缓存落盘改为 60 秒节流且移出锁区；问财熔断仅在 Key 变更时重置。
+
+### 🧪 工程质量
+- **前端单元测试落地**：接入 vitest + jsdom，覆盖格式化、指标计算、坐标系与 Markdown 净化（42 项）。
+- **CI 增加门禁**：`cargo clippy --all-targets -D warnings`、`cargo test --all-targets`、`npm test`。
+- **控制单文件体量**：按 AGENTS.md §11 将 26 个超 300 行文件拆分（含大文件 CSS 的 `@import` 分片、设置上下文与 Canvas 绘制层抽离）。
 ## [0.2.1] - 2026-10-18
 
 ### 🚀 新增功能与体验革新

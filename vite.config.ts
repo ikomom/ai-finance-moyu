@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
+import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
@@ -10,7 +11,7 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [solid()],
+  plugins: [tailwindcss(), solid()],
 
   // Two windows, two entries: the floating display widget and the settings
   // window. Keeping them separate avoids shipping the settings form inside the

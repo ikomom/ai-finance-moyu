@@ -22,6 +22,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -34,8 +36,16 @@ jobs:
       - name: Type Check & Build Frontend
         run: npm run build
 
+      - name: Frontend Unit Tests
+        run: npm test
+
       - name: Cargo Check Backend
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+
+      # Lint gate. This used to be missing, which is how a deny-level
+      # `clippy::approx_constant` in a test literal survived unnoticed.
+      - name: Clippy (deny warnings)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
       - name: Run Backend Unit Tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+        run: cargo test --manifest-path src-tauri/Cargo.toml --all-targets

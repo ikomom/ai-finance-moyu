@@ -5,7 +5,6 @@ use super::indicators::compute_kline_indicators;
 use super::sina;
 use super::tencent;
 use super::types::*;
-use super::yahoo::{global_code_to_yahoo_symbol, parse_yahoo_chart, parse_yahoo_trend};
 
 pub const QUOTE_CHUNK_SIZE: usize = 50;
 
@@ -87,8 +86,10 @@ impl Fetcher {
             }
         }
 
-        if all_quotes.is_empty() && first_err.is_some() {
-            return Err(first_err.unwrap());
+        if all_quotes.is_empty() {
+            if let Some(err) = first_err {
+                return Err(err);
+            }
         }
 
         Ok(all_quotes)
@@ -175,7 +176,7 @@ impl Fetcher {
         Ok(trend)
     }
 
-    async fn get_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
+    pub(super) async fn get_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
         let mut last_err = None;
         for attempt in 0..2 {
             if attempt > 0 {
@@ -210,7 +211,7 @@ impl Fetcher {
         Err(last_err.unwrap_or_else(|| net_err("网络请求失败")))
     }
 
-    async fn get_global_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
+    pub(super) async fn get_global_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
         let mut last_err = None;
         for attempt in 0..2 {
             if attempt > 0 {
@@ -252,13 +253,10 @@ impl Fetcher {
     /// Tries Tencent's forward-adjusted endpoint first, then falls back to Sina if unavailable.
     pub async fn fetch_kline(&self, code: &str) -> Result<KLineData, FetchError> {
         let tencent_url = tencent::kline_url(code);
-        match self.get_bytes(&tencent_url, None).await {
-            Ok(bytes) => {
-                if let Ok(bars) = tencent::parse_kline(code, &bytes) {
-                    return Ok(compute_kline_indicators(code, bars));
-                }
+        if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
+            if let Ok(bars) = tencent::parse_kline(code, &bytes) {
+                return Ok(compute_kline_indicators(code, bars));
             }
-            Err(_) => {}
         }
 
         let sina_url = sina::kline_url(code);
@@ -267,91 +265,4 @@ impl Fetcher {
         Ok(compute_kline_indicators(code, bars))
     }
 
-    /// Fetch daily candlestick series for global indices.
-    /// Supports US/HK indices (via Tencent fqkline or Yahoo Finance fallback)
-    /// and Asia-Pacific / European indices (Nikkei 225, KOSPI, FTSE 100 via Yahoo Finance).
-    pub async fn fetch_global_kline(&self, code: &str) -> Result<KLineData, FetchError> {
-        let code_clean = code.trim();
-
-        // 1. For US/HK indices, Tencent fqkline is fast and reliable
-        let is_tencent_cand = code_clean.starts_with("us") || code_clean.starts_with("hk");
-        if is_tencent_cand {
-            let tencent_url = tencent::kline_url(code_clean);
-            if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
-                if let Ok(bars) = tencent::parse_kline(code_clean, &bytes) {
-                    return Ok(compute_kline_indicators(code_clean, bars));
-                }
-            }
-        }
-
-        // 2. Fetch from Yahoo Finance
-        if let Some(yahoo_symbol) = global_code_to_yahoo_symbol(code_clean) {
-            let encoded_symbol = if yahoo_symbol.starts_with('^') {
-                format!("%5E{}", &yahoo_symbol[1..])
-            } else {
-                yahoo_symbol.to_string()
-            };
-            let yahoo_url = format!(
-                "https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}?interval=1d&range=6mo"
-            );
-            let bytes = self.get_global_bytes(&yahoo_url, None).await?;
-            let bars = parse_yahoo_chart(code_clean, &bytes)?;
-            return Ok(compute_kline_indicators(code_clean, bars));
-        }
-
-        Err(parse_err(format!("不支持的全球指数代码: {code}")))
-    }
-
-    /// Fetch intraday minute trend (分时走势) for global indices.
-    /// Supports US/HK indices (via Tencent minute query or Yahoo fallback)
-    /// and Asia-Pacific / European indices (Nikkei 225, KOSPI, FTSE 100 via Yahoo 1m/5m chart).
-    pub async fn fetch_global_trend(&self, code: &str) -> Result<Trend, FetchError> {
-        let code_clean = code.trim();
-
-        // 1. For US/HK indices, Tencent minute query has great domestic speed and no proxy need
-        let is_tencent_cand = code_clean.starts_with("us") || code_clean.starts_with("hk");
-        if is_tencent_cand {
-            let tencent_url = tencent::trend_url(code_clean);
-            if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
-                if let Ok(trend) = tencent::parse_trend(code_clean, &bytes) {
-                    if trend.points.len() > 1 {
-                        return Ok(trend);
-                    }
-                }
-            }
-        }
-
-        // 2. Fetch from Yahoo Finance 1m chart (or 5m chart fallback)
-        if let Some(yahoo_symbol) = global_code_to_yahoo_symbol(code_clean) {
-            let encoded_symbol = if yahoo_symbol.starts_with('^') {
-                format!("%5E{}", &yahoo_symbol[1..])
-            } else {
-                yahoo_symbol.to_string()
-            };
-            let yahoo_url = format!(
-                "https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}?interval=1m&range=1d"
-            );
-            if let Ok(bytes) = self.get_global_bytes(&yahoo_url, None).await {
-                if let Ok(trend) = parse_yahoo_trend(code_clean, &bytes) {
-                    if !trend.points.is_empty() {
-                        return Ok(trend);
-                    }
-                }
-            }
-
-            // Fallback: try 5m interval
-            let yahoo_url_5m = format!(
-                "https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}?interval=5m&range=1d"
-            );
-            if let Ok(bytes) = self.get_global_bytes(&yahoo_url_5m, None).await {
-                if let Ok(trend) = parse_yahoo_trend(code_clean, &bytes) {
-                    if !trend.points.is_empty() {
-                        return Ok(trend);
-                    }
-                }
-            }
-        }
-
-        Err(parse_err(format!("不支持或未能获取全球指数分时: {code}")))
-    }
 }

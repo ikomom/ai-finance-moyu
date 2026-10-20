@@ -1,0 +1,119 @@
+            <>
+              {/* 指数名称、代码、交易时段状态微标、日内高低、大字价格、作息提示 (复用 StockHeader) */}
+              <StockHeader
+                name={idx().name}
+                code={idx().code}
+                price={idx().price}
+                changePct={idx().changePct}
+                activePrice={activePrice()}
+                activePct={activePct()}
+                high={stats().high}
+                low={stats().low}
+                badge={<GlobalStatusBadge status={st()} />}
+                hoverTime={hoverTime()}
+                hoverExtra={hoverExtra()}
+                extraInfo={
+                  <span class="hover-time-tag" style={{ opacity: 0.65, 'margin-left': 'auto' }}>
+                    {st().hoursText}
+                  </span>
+                }
+              />
+
+              {/* 图表展示区：分时 / 日K */}
+              <Show
+                when={activeMode() === 'kline'}
+                fallback={
+                  /* 分时走势图 */
+                  <Show
+                    when={!globalChart.loading() && trend()}
+                    fallback={
+                      <div class="chart-wrap kline-loading-box">
+                        <Show
+                          when={globalChart.loading()}
+                          fallback={
+                            <>
+                              <span>⚠️ 暂无分时数据或未在交易时段</span>
+                              <button
+                                type="button"
+                                class="global-retry-btn"
+                                onClick={() => loadTrend(idx().code, true)}
+                              >
+                                重试
+                              </button>
+                            </>
+                          }
+                        >
+                          <span class="loading-spinner">⌛</span>
+                          <span>加载分时数据中…</span>
+                        </Show>
+                      </div>
+                    }
+                  >
+                    <Chart
+                      trend={trend()}
+                      preClose={preClose()}
+                      lastPrice={idx().price}
+                      subchartMode={subchartMode()}
+                      compact={false}
+                      isGlobal={true}
+                      onHover={(point, extra) => {
+                        setHoveredPoint(point)
+                        setHoveredPointExtra(extra ?? null)
+                      }}
+                    />
+                  </Show>
+                }
+              >
+                {/* 日K走势图 */}
+                <Show
+                  when={!globalChart.loading() && kline()}
+                  fallback={
+                    <div class="chart-wrap kline-loading-box">
+                      <Show
+                        when={globalChart.loading()}
+                        fallback={
+                          <>
+                            <span>⚠️ 暂无日K数据</span>
+                            <button
+                              type="button"
+                              class="global-retry-btn"
+                              onClick={() => loadKLine(idx().code, true)}
+                            >
+                              重试
+                            </button>
+                          </>
+                        }
+                      >
+                        <span class="loading-spinner">⌛</span>
+                        <span>加载日K数据中…</span>
+                      </Show>
+                    </div>
+                  }
+                >
+                  <KlineCanvas
+                    kline={kline()}
+                    quote={quote()}
+                    subchartMode={subchartMode()}
+                    onHoverBar={(bar, extra) => {
+                      setHoveredKBar(bar)
+                      setHoveredKExtra(extra ?? null)
+                    }}
+                  />
+                </Show>
+              </Show>
+
+              {/* 底部状态条与副图/走势模式切换胶囊 (复用 FooterControls) */}
+              <div class="mini-footer">
+                <StatusLine status={s().status} />
+                <FooterControls
+                  subchartMode={subchartMode()}
+                  onToggleSubchart={toggleSubchartMode}
+                  viewMode={activeMode()}
+                  onToggleView={(m) => {
+                    if (m === 'trend' || m === 'kline') setActiveMode(m)
+                  }}
+                  showSubchart={true}
+                  showAuction={false}
+                />
+              </div>
+            </>

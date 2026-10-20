@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Framework-Tauri%20v2-24C8D8?style=flat-square&logo=tauri" alt="Tauri" />
   <img src="https://img.shields.io/badge/Backend-Rust%202021-DEA584?style=flat-square&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/Frontend-SolidJS%20%2B%20TypeScript-2C4F7C?style=flat-square&logo=solid" alt="SolidJS" />
-  <img src="https://img.shields.io/badge/Tests-107%20Passed-brightgreen?style=flat-square" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-170%20Passed-brightgreen?style=flat-square" alt="Tests" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
 </p>
 
@@ -19,8 +19,8 @@
 
 ## ✨ 核心特性一览
 
-### 1. 🎛️ 四大经典显示形态，随心切换
-支持通过全局热键 `Ctrl+Alt+1 ~ 4` 或右键菜单随时切换形态，窗口位置与各形态独立尺寸自动记忆：
+### 1. 🎛️ 五大显示形态，随心切换
+支持通过全局热键 `Ctrl+Alt+1 ~ 5` 或右键菜单随时切换形态，窗口位置与各形态独立尺寸自动记忆：
 
 | 形态 | 核心内容 | 适用场景 |
 | :--- | :--- | :--- |
@@ -28,6 +28,7 @@
 | **📈 迷你图 (Mini)** | 独立大卡片、实时分时走势、均价线、十字光标、标的药丸切歌 | 专注盯单只核心龙头或持仓标的日内分时 |
 | **📋 列表看板 (List)** | 高密度自选股票池、全标的实时走势 Sparkline、浮盈汇总统计 | 兼顾多只自选股走势，盈亏与波段一览无遗 |
 | **🧭 大盘全景 (Market)** | 三大指数快照、全市场涨跌分布多空温度计、两市总成交额及环比放缩量、领涨板块与龙头 | 宏观大盘温度监控与市场风格定位 |
+| **🌐 全球股指 (Global)** | 纳斯达克、标普500、道琼斯、恒生、日经225、韩国KOSPI、富时100 的实时快照与日K/分时走势 | 隔夜外盘与亚太联动观察 |
 
 ---
 
@@ -67,7 +68,7 @@
   - 原生注入 Windows `WS_EX_TOOLWINDOW`，**彻底移出 Alt+Tab 切换列表与任务栏**；
   - 全局老板键 `Ctrl+Alt+H`，任意时刻一键彻底隐藏/秒显；
   - 抑制 Windows Aero Snap 贴边分屏放大与标题栏双击放大，确保贴边吸附毫无阻滞；
-- **窗口透明度与记忆**：30% ~ 100% 自由滑块透明度调节，各形态独立窗口尺寸与屏幕位置关机持久记忆。
+- **窗口透明度与记忆**：20% ~ 100% 自由滑块透明度调节，各形态独立窗口尺寸与屏幕位置关机持久记忆。
 
 ---
 

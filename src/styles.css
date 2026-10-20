@@ -180,6 +180,25 @@ body {
 .dot.error {
   background: var(--color-warning);
 }
+.status-ai-btn {
+  margin-left: auto;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  font-size: 9.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.2;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+.status-ai-btn:hover {
+  background: rgba(56, 189, 248, 0.28);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.35);
+}
 
 /* Buttons */
 button {

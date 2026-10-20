@@ -79,6 +79,7 @@ export function FooterControls(props: FooterControlsProps) {
           </Show>
         </div>
       </Show>
+
     </div>
   )
 }

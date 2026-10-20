@@ -1,5 +1,6 @@
 //! Window visibility transitions, layout switching, settings window creation, and autostart toggling.
 
+use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -13,7 +14,7 @@ use super::geometry::{place_window, suppress_resize, DISPLAY, SETTINGS};
 pub fn apply_layout(app: &AppHandle, layout: Layout) {
     let (rows, snapshot) = {
         let state = app.state::<AppState>();
-        let mut cfg = state.config.lock().unwrap();
+        let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
         cfg.layout = layout;
         (cfg.watchlist.len(), cfg.clone())
     };
@@ -60,7 +61,7 @@ pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
 
     let current_layout = {
         let state = app.state::<AppState>();
-        let l = state.config.lock().unwrap().layout;
+        let l = state.config.lock().unwrap_or_else(|e| e.into_inner()).layout;
         l
     };
     if current_layout != Layout::Mini {
@@ -82,7 +83,7 @@ pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
 pub fn apply_visibility_mode(app: &AppHandle, mode: VisibilityMode) -> Result<(), String> {
     let cfg = {
         let state = app.state::<AppState>();
-        let mut cfg = state.config.lock().unwrap();
+        let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
         cfg.visibility_mode = mode;
         cfg.clone()
     };
@@ -100,7 +101,7 @@ pub fn toggle_window(app: &AppHandle) {
         let is_visible = win.is_visible().unwrap_or(false);
         let is_collapsed = {
             let state = app.state::<AppState>();
-            let c = state.dock_state.lock().unwrap().collapsed;
+            let c = state.dock_state.lock().unwrap_or_else(|e| e.into_inner()).collapsed;
             c
         };
 
@@ -115,18 +116,16 @@ pub fn toggle_window(app: &AppHandle) {
     }
 }
 
+static SETTINGS_LOCK: Mutex<()> = Mutex::new(());
+
 /// Open the settings window, creating it on first use.
-///
-/// Deliberately a real decorated window: it needs focus for its inputs, it wants
-/// a native close button, and it should appear in the taskbar so it can be found
-/// again. The display widget is the opposite of all three.
 pub fn open_settings(app: &AppHandle) -> Result<(), String> {
+    let _guard = SETTINGS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(win) = app.get_webview_window(SETTINGS) {
-        let _ = win.show();
-        let _ = win.unminimize();
-        let _ = win.set_focus();
+        reveal_secondary(&win, "#settings-root");
         return Ok(());
     }
+    log::info!(target: "USER", "打开设置窗口");
 
     let win = tauri::WebviewWindowBuilder::new(
         app,
@@ -146,23 +145,109 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     .build()
     .map_err(|e| format!("打开设置窗口失败: {e}"))?;
 
+    watch_new_window(win.clone(), "#settings-root");
     let _ = win.set_focus();
     Ok(())
 }
 
+/// Ask a window to reload itself if its document never rendered.
+///
+/// A secondary window is created once and then only ever `show()`n again. If the
+/// very first navigation failed — the dev server was not up yet, or WebView2's
+/// renderer died while the machine slept — the window stays a blank white
+/// rectangle forever, because nothing ever retries the load. Running this check
+/// on every reuse makes the window self-healing without disturbing a healthy one
+/// (a loaded page satisfies the selector and the script does nothing).
+fn reload_if_blank(win: &tauri::WebviewWindow, ready_selector: &str) {
+    // `ready_selector` is a compile-time constant defined in this module, so
+    // interpolating it into the script cannot inject anything.
+    //
+    // The log line fires only on the broken path, so a healthy window stays
+    // silent while a white one leaves a trace in `app.log` for later diagnosis.
+    // Before reloading, the entry module is re-fetched so the log records *why*
+    // the page came up empty (a 404/500 here means the module never executed).
+    let script = format!(
+        "if (!document.querySelector({sel:?})) {{ try {{ \
+           var s = document.querySelector('script[type=module]'); \
+           var u = s ? s.src : ''; \
+           var r = document.getElementById('root'); \
+           var b = document.getElementById('boot-err'); \
+           fetch(u).then(function(res) {{ window.__TAURI_INTERNALS__.invoke('frontend_log', {{ msg: '窗口空白 ready=' + document.readyState + ' rootKids=' + (r ? r.children.length : 'no-root') + ' entry=' + u + ' status=' + res.status + ' bootErr=' + (b ? b.textContent.slice(0, 200) : 'none') }}).catch(function(){{}}); }}).catch(function(e) {{ window.__TAURI_INTERNALS__.invoke('frontend_log', {{ msg: '窗口空白 入口请求失败 ' + e }}).catch(function(){{}}); }}); \
+         }} catch (e) {{}} location.reload(); }}",
+        sel = ready_selector
+    );
+
+    // The first `eval` can be dropped while the window is still being raised to
+    // the foreground, which is exactly the moment this runs. A second, delayed
+    // attempt makes the check reliable and stays a no-op once the page is up
+    // (the reloaded document satisfies the selector).
+    if let Err(e) = win.eval(&script) {
+        log::warn!(target: "SYSTEM", "窗口自检脚本执行失败: {e}");
+    }
+    let retry_win = win.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        let _ = retry_win.eval(&script);
+    });
+}
+
+/// Bring an existing secondary window back, healing a window that never loaded.
+fn reveal_secondary(win: &tauri::WebviewWindow, ready_selector: &str) {
+    let _ = win.show();
+    let _ = win.unminimize();
+    let _ = win.set_focus();
+    reload_if_blank(win, ready_selector);
+}
+
+/// How many automatic reloads the process may spend healing windows.
+///
+/// Each reload re-enters this path, so without a cap a page that genuinely
+/// cannot render (a broken build) would reload forever.
+static AUTO_HEAL_BUDGET: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(3);
+
+/// Give a freshly created window one chance to heal itself.
+///
+/// Creation normally paints immediately, but WebView2 occasionally finishes the
+/// navigation and then never composites — the window stays pure white while the
+/// DOM behind it is fine. The reuse path cannot help there (nobody reopens the
+/// window), so a delayed check runs once after creation.
+fn watch_new_window(win: tauri::WebviewWindow, ready_selector: &'static str) {
+    use std::sync::atomic::Ordering;
+    if AUTO_HEAL_BUDGET.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1)).is_err() {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        reload_if_blank(&win, ready_selector);
+    });
+}
+
+
 /// Flip the autostart registration and mirror it into the config file.
+///
+/// The OS registration is the source of truth: the config file is a cache of it,
+/// not a second opinion. Reading the flag back from disk (the old behaviour)
+/// let the tray and the settings form disagree, and the next save silently
+/// reverted whichever one lost.
 pub fn toggle_autostart(app: &AppHandle) -> Result<bool, String> {
     use tauri_plugin_autostart::ManagerExt;
 
-    let mut cfg = config::load(app);
-    let next = !cfg.autostart;
     let manager = app.autolaunch();
+    let currently = manager.is_enabled().unwrap_or(false);
+    let next = !currently;
     if next {
         manager.enable().map_err(|e| format!("开启自启失败: {e}"))?;
     } else {
         manager.disable().map_err(|e| format!("关闭自启失败: {e}"))?;
     }
-    cfg.autostart = next;
+
+    let cfg = {
+        let state = app.state::<AppState>();
+        let mut guard = state.config.lock().unwrap_or_else(|e| e.into_inner());
+        guard.autostart = next;
+        guard.clone()
+    };
     config::save(app, &cfg)?;
+    poller::emit_snapshot(app);
     Ok(next)
 }

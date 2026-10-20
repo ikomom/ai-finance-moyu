@@ -5,12 +5,11 @@ use crate::logger;
 
 /// Let a window write into the process log.
 ///
-/// A transparent widget can fail in ways that are invisible on screen, and the
-/// webview console is not reachable from the terminal. This bridge makes the
-/// frontend's own view of what it rendered observable from the dev log.
+/// The frontend is a thin presentation layer, so anything it reports belongs to
+/// the same `SYSTEM` bucket as the rest of the app's own diagnostics.
 #[tauri::command]
 pub fn frontend_log(msg: String) {
-    log::info!(target: "FRONTEND", "{msg}");
+    log::info!(target: "SYSTEM", "[前端] {msg}");
 }
 
 #[tauri::command]
