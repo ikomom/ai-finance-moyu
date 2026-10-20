@@ -213,8 +213,20 @@ static AUTO_HEAL_BUDGET: std::sync::atomic::AtomicUsize = std::sync::atomic::Ato
 /// window), so a delayed check runs once after creation.
 fn watch_new_window(win: tauri::WebviewWindow, ready_selector: &'static str) {
     use std::sync::atomic::Ordering;
-    if AUTO_HEAL_BUDGET.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1)).is_err() {
-        return;
+    let mut budget = AUTO_HEAL_BUDGET.load(Ordering::SeqCst);
+    loop {
+        if budget == 0 {
+            return;
+        }
+        match AUTO_HEAL_BUDGET.compare_exchange_weak(
+            budget,
+            budget - 1,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => break,
+            Err(actual) => budget = actual,
+        }
     }
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(1200)).await;

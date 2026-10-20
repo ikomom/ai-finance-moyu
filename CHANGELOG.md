@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🧪 工程质量
 - **前端单元测试落地**：接入 vitest + jsdom，覆盖格式化、指标计算、坐标系与 Markdown 净化（42 项）。
 - **CI 增加门禁**：`cargo clippy --all-targets -D warnings`、`cargo test --all-targets`、`npm test`。
+- **统一与锁定 Rust 工具链 (1.93.1)**：新增 `rust-toolchain.toml` 并锁定 CI/Release 工作流版本，杜绝编译器浮动漂移；改用底层无锁 CAS 消除原子弃用告警并优化 pattern guard 消除 Clippy 告警。
 - **控制单文件体量**：按 AGENTS.md §11 将 26 个超 300 行文件拆分（含大文件 CSS 的 `@import` 分片、设置上下文与 Canvas 绘制层抽离）。
 ## [0.2.1] - 2026-10-18
 

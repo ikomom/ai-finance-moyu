@@ -96,20 +96,18 @@ impl CrossingTracker {
             self.pct_band.insert(spec.code.clone(), new_band);
 
             match prev_band {
-                None => {}
-                Some(prev) => {
-                    if prev != new_band && new_band != Band::In {
-                        let key = format!("{}:pct:{:?}", spec.code, new_band);
-                        if Self::check_cooldown(&mut self.last_fired, self.cooldown, &key, now) {
-                            events.push(CrossingEvent::AlertPct {
-                                code: spec.code.clone(),
-                                pct,
-                                side: new_band,
-                                threshold,
-                            });
-                        }
+                Some(prev) if prev != new_band && new_band != Band::In => {
+                    let key = format!("{}:pct:{:?}", spec.code, new_band);
+                    if Self::check_cooldown(&mut self.last_fired, self.cooldown, &key, now) {
+                        events.push(CrossingEvent::AlertPct {
+                            code: spec.code.clone(),
+                            pct,
+                            side: new_band,
+                            threshold,
+                        });
                     }
                 }
+                _ => {}
             }
         }
 
