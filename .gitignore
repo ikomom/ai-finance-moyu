@@ -27,7 +27,6 @@ dist-ssr
 .omc/
 src-tauri/target/
 
-# Agent workspace: scratch output, audit reports, session notes.
-# Nothing generated during a task belongs in the source tree — it goes here,
-# where deleting the directory is always safe.
+# Local tool workspace (scratch output, session notes, audit artifacts).
+# Not part of the source tree; safe to delete at any time.
 .workbuddy/
