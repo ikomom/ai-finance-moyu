@@ -47,8 +47,10 @@ export type UnmatchedSide = 'none' | 'buy' | 'sell'
 export type AuctionTag = 'normal' | 'bull_trap' | 'bear_trap' | 'snatching' | 'dumping'
 
 export interface AuctionPoint {
-  /** 24h format HHMM, e.g. 915, 918, 920. */
+  /** 24h format HHMM or HHMMSS, e.g. 915, 91825, 145812. */
   time: number
+  /** Formatted time string, e.g. "09:18:25" or "14:58:12". */
+  rawTime?: string
   price: number
   /** Total volume (matched + unmatched) in 手. */
   volume: number
@@ -73,6 +75,7 @@ export interface AuctionData {
   code: string
   date: string
   points: AuctionPoint[]
+  closingPoints?: AuctionPoint[]
   diagnosis?: AuctionDiagnosis | null
 }
 

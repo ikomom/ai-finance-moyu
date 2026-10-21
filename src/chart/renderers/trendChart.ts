@@ -2,8 +2,9 @@ import { computeMinuteMacd } from '../../utils/indicators'
 import { drawCrosshair, drawHorizontalLevel, setupCanvasDpi } from '../canvasUtils'
 import { FONT, getChartTheme } from '../theme'
 import type { DrawOptions } from '../types'
-import { SLOTS } from '../scale'
-import { computeMaxDev, drawGrid, drawPriceAxis, drawTimeAxis, makeSlotResolver, type PlotGeometry } from './trendAxes'
+import { FULL_SLOTS, SLOTS, slotOf, slotOfFullTrend } from '../scale'
+import { drawGrid, drawPriceAxis, drawTimeAxis, type PlotGeometry } from './trendAxes'
+import { buildUnifiedChartData, computeUnifiedMaxDev, isFullSpectrumActive } from './trendData'
 import { drawMacdSubchart } from './macdRenderer'
 import { drawMinuteVolumeSubchart } from './volumeRenderer'
 import { drawTrendPrice } from './trendRenderer'
@@ -37,29 +38,23 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
 
   const points = opts.trend?.points ?? []
   const preClose = opts.preClose || opts.trend?.preClose || 0
+  const isGlobal = opts.isGlobal ?? false
+  const useFullSpectrum = isFullSpectrumActive(opts)
+  const totalSlots = isGlobal ? SLOTS : (useFullSpectrum ? FULL_SLOTS : SLOTS)
 
-  canvas.dataset.geom =
-    `css=${Math.round(cssW)}x${Math.round(cssH)} pad=${pad.left}/${pad.right}` +
-    ` plot=${plotL}+${Math.round(plotW)}x${Math.round(plotH)}`
-  canvas.dataset.points = String(points.length)
+  const xOf = (slot: number) => plotL + (slot / totalSlots) * plotW
 
   // --- y range: symmetric about 昨收 -------------------------------------
-  const maxDev = computeMaxDev(points, preClose, opts)
-
+  const maxDev = computeUnifiedMaxDev(points, preClose, opts)
   const yMin = preClose - maxDev
   const yTop = preClose + maxDev
   const span = yTop - yMin || 1
 
-  const isGlobal = opts.isGlobal ?? false
-  const getSlot = makeSlotResolver(isGlobal, points.length)
-
-  const xOf = (slot: number) => plotL + (slot / SLOTS) * plotW
   const yOf = (price: number) => plotT + (1 - (price - yMin) / span) * priceH
-
   const geo: PlotGeometry = { plotL, plotT, plotW, priceH, volT, volH }
 
   // --- grid ---------------------------------------------------------------
-  drawGrid(ctx, theme, geo)
+  drawGrid(ctx, theme, geo, isGlobal, useFullSpectrum)
 
   // --- 昨收 baseline (the centre line) ------------------------------------
   const yPre = yOf(preClose)
@@ -74,50 +69,51 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
 
   // --- axis labels --------------------------------------------------------
   drawPriceAxis(ctx, theme, geo, preClose, maxDev, yOf)
-  drawTimeAxis(ctx, geo, isGlobal, points)
+  drawTimeAxis(ctx, geo, isGlobal, points, useFullSpectrum)
 
-  if (points.length === 0) {
+  // Assemble unified auction + continuous points
+  const { pricePoints, volumeItems } = buildUnifiedChartData(opts, xOf, useFullSpectrum)
+
+  canvas.dataset.geom =
+    `css=${Math.round(cssW)}x${Math.round(cssH)} pad=${pad.left}/${pad.right}` +
+    ` plot=${plotL}+${Math.round(plotW)}x${Math.round(plotH)}`
+  canvas.dataset.points = String(pricePoints.length)
+
+  if (pricePoints.length === 0) {
     ctx.textAlign = 'center'
     ctx.fillStyle = theme.axisText
     ctx.fillText('暂无分时数据', plotL + plotW / 2, plotT + priceH / 2)
     return
   }
 
-  // Draw main price curve & average price
+  // Draw price curves (auction and continuous) & average price line
   drawTrendPrice({
     ctx,
-    points,
+    points: pricePoints,
     preClose,
     lastPrice: opts.lastPrice,
     xOf,
     yOf,
     yPre,
-    getSlot,
   })
 
   // --- subchart: switchable VOL vs MACD ------------------------------------
   const subMode = opts.subchartMode ?? 'vol'
 
-  let activeIdx: number | null = null
-  if (opts.hoverSlot != null) {
+  let activeVolIdx: number | null = null
+  if (opts.hoverSlot != null && volumeItems.length > 0) {
     let minDiff = 999
-    for (let i = 0; i < points.length; i++) {
-      const diff = Math.abs(getSlot(points[i].time, i) - opts.hoverSlot)
+    for (let i = 0; i < volumeItems.length; i++) {
+      const diff = Math.abs(volumeItems[i].slot - opts.hoverSlot)
       if (diff < minDiff) {
         minDiff = diff
-        activeIdx = i
+        activeVolIdx = i
       }
     }
   }
 
   if (subMode === 'vol') {
-    const minuteVols: number[] = new Array(points.length)
-    const isUpList: boolean[] = new Array(points.length)
-    for (let i = 0; i < points.length; i++) {
-      minuteVols[i] = i === 0 ? points[0].cumVolume : Math.max(0, points[i].cumVolume - points[i - 1].cumVolume)
-      isUpList[i] = i === 0 ? points[0].price >= preClose : points[i].price >= points[i - 1].price
-    }
-    const barW = Math.max(1, (plotW / SLOTS) * 0.82)
+    const barW = Math.max(1, (plotW / totalSlots) * 0.82)
     drawMinuteVolumeSubchart({
       ctx,
       plotL,
@@ -125,13 +121,26 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       volT,
       volH,
       subPlotH,
-      volumes: minuteVols,
-      isUpList,
-      getX: (i) => xOf(getSlot(points[i].time, i)),
+      items: volumeItems,
       barWidth: barW,
-      activeIdx,
+      activeIdx: activeVolIdx,
     })
   } else {
+    let activeContinuousIdx: number | null = null
+    const getContinuousSlot = (t: number, i: number) =>
+      isGlobal ? (i / Math.max(1, points.length - 1)) * 240 : (useFullSpectrum ? slotOfFullTrend(t) : slotOf(t))
+
+    if (opts.hoverSlot != null && points.length > 0) {
+      let minDiff = 999
+      for (let i = 0; i < points.length; i++) {
+        const slot = getContinuousSlot(points[i].time, i)
+        const diff = Math.abs(slot - opts.hoverSlot)
+        if (diff < minDiff) {
+          minDiff = diff
+          activeContinuousIdx = i
+        }
+      }
+    }
     const minuteMacd = computeMinuteMacd(points, opts.macdParams)
     drawMacdSubchart({
       ctx,
@@ -141,28 +150,24 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       volH,
       subPlotH,
       series: minuteMacd,
-      getX: (i) => xOf(getSlot(points[i].time, i)),
-      barWidth: Math.max(1, (plotW / SLOTS) * 0.72),
-      activeIdx,
+      getX: (i) => xOf(getContinuousSlot(points[i].time, i)),
+      barWidth: Math.max(1, (plotW / totalSlots) * 0.72),
+      activeIdx: activeContinuousIdx,
     })
   }
 
   // --- crosshair on hover -------------------------------------------------
-  if (opts.hoverSlot != null && points.length > 0) {
-    const targetSlot = opts.hoverSlot
-    let closest = points[0]
-    let closestIdx = 0
+  if (opts.hoverSlot != null && pricePoints.length > 0) {
+    let closest = pricePoints[0]
     let minDiff = 999
-    for (let i = 0; i < points.length; i++) {
-      const p = points[i]
-      const diff = Math.abs(getSlot(p.time, i) - targetSlot)
+    for (const p of pricePoints) {
+      const diff = Math.abs(p.slot - opts.hoverSlot)
       if (diff < minDiff) {
         minDiff = diff
         closest = p
-        closestIdx = i
       }
     }
-    const hx = xOf(getSlot(closest.time, closestIdx))
+    const hx = xOf(closest.slot)
     const hy = yOf(closest.price)
 
     drawCrosshair(ctx, {
@@ -178,7 +183,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     })
   }
 
-  // Draw levels
+  // Draw cost & price levels
   drawHorizontalLevel(ctx, {
     price: opts.costPrice && opts.costPrice > 0 ? opts.costPrice : null,
     yMin,

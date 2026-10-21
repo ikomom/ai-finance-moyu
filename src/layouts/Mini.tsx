@@ -61,15 +61,13 @@ export function Mini(props: { flash: boolean }) {
   }
 
   const isIndex = () => isIndexCode(quote()?.code ?? '')
-  const isAuctionSession = () =>
-    ['CallAuctionCancelable', 'CallAuctionLocked', 'PreTrade'].includes(s()?.status?.session ?? '')
 
   const activeMode = () => {
     const m = manualMode()
     if (m === 'kline') return 'kline'
     if (m === 'trend') return 'trend'
     if (isIndex()) return 'trend'
-    return m ?? (isAuctionSession() ? 'auction' : 'trend')
+    return 'trend'
   }
 
   // Lazy-load daily candlestick data on demand

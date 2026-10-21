@@ -123,7 +123,8 @@
         let data = tracker.data.get("sh600000").expect("auction data present");
         assert_eq!(data.points.len(), 1);
         let p = &data.points[0];
-        assert_eq!(p.time, 918);
+        assert_eq!(p.time, 91800);
+        assert_eq!(p.raw_time, "09:18:00");
         assert_eq!(p.matched_volume, 500.0);
         assert_eq!(p.unmatched_volume, 1000.0);
         assert_eq!(p.unmatched_side, UnmatchedSide::Buy);
@@ -149,7 +150,8 @@
         let data = tracker.data.get("sh600000").expect("auction data present");
         assert_eq!(data.points.len(), 2);
         let p2 = &data.points[1];
-        assert_eq!(p2.time, 925);
+        assert_eq!(p2.time, 92500);
+        assert_eq!(p2.raw_time, "09:25:00");
         assert_eq!(p2.matched_volume, 2000.0);
         assert_eq!(p2.unmatched_volume, 0.0);
         assert_eq!(p2.unmatched_side, UnmatchedSide::None);
@@ -195,4 +197,29 @@
         assert_eq!(diag.tag, AuctionTag::Normal);
         assert_eq!(diag.label, "竞价撮合中");
         assert!(diag.detail.contains("缺少试盘阶段对比"));
+    }
+
+    #[test]
+    fn tracks_closing_call_auction_points() {
+        let mut tracker = AuctionTracker::new();
+        let q = Quote {
+            code: "sh600000".into(),
+            name: "浦发银行".into(),
+            price: 9.70,
+            pre_close: 10.0,
+            bids: vec![(9.70, 800.0)],
+            asks: vec![(9.70, 65000.0)],
+            date: "20261021".into(),
+            time: "14:58:12".into(),
+            ..Default::default()
+        };
+        tracker.update_quote(Session::ClosingAuction, &q);
+        let data = tracker.data.get("sh600000").expect("closing auction data present");
+        assert_eq!(data.closing_points.len(), 1);
+        let p = &data.closing_points[0];
+        assert_eq!(p.time, 145812);
+        assert_eq!(p.raw_time, "14:58:12");
+        assert_eq!(p.matched_volume, 800.0);
+        assert_eq!(p.unmatched_volume, 64200.0);
+        assert_eq!(p.unmatched_side, UnmatchedSide::Sell);
     }

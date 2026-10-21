@@ -46,6 +46,16 @@ impl Session {
         )
     }
 
+    /// Whether this session is within any call auction (morning or closing: 09:15–09:24, 14:57–15:00).
+    pub fn is_call_auction(self) -> bool {
+        matches!(
+            self,
+            Session::CallAuctionCancelable
+                | Session::CallAuctionLocked
+                | Session::ClosingAuction
+        )
+    }
+
     /// Whether error-recovery polling is allowed to hit the network.
     ///
     /// The poller retries fast while a feed is broken, but a retry loop running

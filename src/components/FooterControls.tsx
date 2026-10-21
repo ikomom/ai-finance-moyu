@@ -14,7 +14,7 @@ export interface FooterControlsProps {
 }
 
 /**
- * 迷你/看板通用的底栏副图与走势模式切换胶囊控制组.
+ * 迷你/看板通用的底栏副图与走势模式切换胶囊控制组 (分时 / 日K).
  */
 export function FooterControls(props: FooterControlsProps) {
   const showSubchart = () => props.showSubchart ?? true
@@ -45,15 +45,15 @@ export function FooterControls(props: FooterControlsProps) {
         </div>
       </Show>
 
-      {/* 视图形态切换胶囊: 分时 / 日K / 竞价 */}
+      {/* 视图形态切换胶囊: 分时 / 日K */}
       <Show when={props.viewMode && props.onToggleView}>
         <div class="mode-pill-group">
           <button
             type="button"
             class="mode-pill"
-            classList={{ active: props.viewMode === 'trend' }}
+            classList={{ active: props.viewMode === 'trend' || props.viewMode === 'auction' }}
             onClick={() => props.onToggleView!('trend')}
-            title="全天分时图"
+            title="全天分时图 (含早盘与尾盘集合竞价)"
           >
             分时
           </button>
@@ -66,20 +66,8 @@ export function FooterControls(props: FooterControlsProps) {
           >
             日K
           </button>
-          <Show when={props.showAuction}>
-            <button
-              type="button"
-              class="mode-pill"
-              classList={{ active: props.viewMode === 'auction' }}
-              onClick={() => props.onToggleView!('auction')}
-              title="早盘集合竞价 (09:15-09:25) 走势与诱多/诱空诊断"
-            >
-              竞价
-            </button>
-          </Show>
         </div>
       </Show>
-
     </div>
   )
 }

@@ -40,7 +40,7 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
 
         let now = crate::market::beijing_now();
         let session = crate::market::session_at(now);
-        let in_auction_or_pretrade = session.is_morning_auction() || session == crate::market::Session::PreTrade;
+        let in_auction_or_pretrade = session.is_call_auction() || session == crate::market::Session::PreTrade;
 
         // Evaluate crossings against the *previous* tick before we replace the
         // stored quotes, otherwise every poll would look like a fresh seed.
@@ -114,6 +114,7 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let cache = crate::config::QuotesCache {
             quotes: store.values().cloned().collect(),
             trends: state.trends.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            auctions: state.auction_tracker.lock().unwrap_or_else(|e| e.into_inner()).data.clone(),
         };
 
         (notifications, cfg.trend_engine, cache)
@@ -151,6 +152,10 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
                         );
                     }
                 }
+            }
+        } else if session == crate::market::Session::ClosingAuction {
+            for q in &quotes {
+                auction_tracker.update_quote(session, q);
             }
         } else {
             for q in &quotes {

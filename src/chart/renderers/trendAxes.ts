@@ -7,7 +7,16 @@
 import type { TrendPoint } from '../../types'
 import type { DrawOptions } from '../types'
 import { getChartTheme } from '../theme'
-import { isValidAvg, SLOTS, slotOf } from '../scale'
+import {
+  AUCTION_MORNING_SLOT_END,
+  CLOSING_AUCTION_SLOT_END,
+  FULL_SLOTS,
+  PRETRADE_SLOT_END,
+  SLOTS,
+  slotOf,
+  slotOfFullTrend,
+} from '../scale'
+import { computeUnifiedMaxDev } from './trendData'
 
 export interface PlotGeometry {
   plotL: number
@@ -18,48 +27,54 @@ export interface PlotGeometry {
   volH: number
 }
 
-/** Symmetric price deviation around 昨收, widened to keep nearby overlays on screen. */
 export function computeMaxDev(
   points: ReadonlyArray<TrendPoint>,
   preClose: number,
   opts: DrawOptions
 ): number {
-  let maxDev = 0
-  for (const p of points) {
-    if (p.price > 0) {
-      maxDev = Math.max(maxDev, Math.abs(p.price - preClose))
-    }
-    if (isValidAvg(p.avgPrice, preClose)) {
-      maxDev = Math.max(maxDev, Math.abs(p.avgPrice - preClose))
-    }
-  }
-  if (preClose > 0) {
-    maxDev = Math.max(maxDev, preClose * 0.002)
-    for (const pl of opts.priceLines ?? []) {
-      if (pl.price > 0 && Math.abs(pl.price - preClose) <= maxDev * 1.5) {
-        maxDev = Math.max(maxDev, Math.abs(pl.price - preClose))
-      }
-    }
-    if (opts.costPrice && opts.costPrice > 0 && Math.abs(opts.costPrice - preClose) <= maxDev * 1.5) {
-      maxDev = Math.max(maxDev, Math.abs(opts.costPrice - preClose))
-    }
-    if (opts.orbHigh && opts.orbHigh > 0 && Math.abs(opts.orbHigh - preClose) <= maxDev * 1.5) {
-      maxDev = Math.max(maxDev, Math.abs(opts.orbHigh - preClose))
-    }
-    if (opts.orbLow && opts.orbLow > 0 && Math.abs(opts.orbLow - preClose) <= maxDev * 1.5) {
-      maxDev = Math.max(maxDev, Math.abs(opts.orbLow - preClose))
-    }
-  } else {
-    maxDev = Math.max(maxDev, 1)
-  }
-  return maxDev
+  return computeUnifiedMaxDev(points, preClose, opts)
 }
 
 export function drawGrid(
   ctx: CanvasRenderingContext2D,
   theme: ReturnType<typeof getChartTheme>,
-  geo: PlotGeometry
+  geo: PlotGeometry,
+  isGlobal = false,
+  useFullSpectrum = false
 ): void {
+  const totalSlots = isGlobal ? SLOTS : (useFullSpectrum ? FULL_SLOTS : SLOTS)
+  const xOf = (slot: number) => geo.plotL + (slot / totalSlots) * geo.plotW
+  const fullPlotH = geo.priceH + (geo.volT - (geo.plotT + geo.priceH)) + geo.volH
+
+  // Phase shading for A-shares
+  if (!isGlobal) {
+    if (useFullSpectrum) {
+      // 09:15-09:20: Morning auction with cancellation allowed (subtle amber)
+      const x0 = xOf(0)
+      const x5 = xOf(5)
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.025)'
+      ctx.fillRect(x0, geo.plotT, x5 - x0, fullPlotH)
+
+      // 09:20-09:25: Morning auction no cancellation (subtle blue)
+      const x10 = xOf(AUCTION_MORNING_SLOT_END)
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.025)'
+      ctx.fillRect(x5, geo.plotT, x10 - x5, fullPlotH)
+
+      // 14:57-15:00: Closing auction (subtle blue)
+      const x252 = xOf(252)
+      const x255 = xOf(CLOSING_AUCTION_SLOT_END)
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.025)'
+      ctx.fillRect(x252, geo.plotT, x255 - x252, fullPlotH)
+    } else {
+      // Standard 240-slot mode: 14:57-15:00 closing auction zone (slot 237..240)
+      const x237 = xOf(237)
+      const x240 = xOf(SLOTS)
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.025)'
+      ctx.fillRect(x237, geo.plotT, x240 - x237, fullPlotH)
+    }
+  }
+
+  // Horizontal price grid lines
   ctx.strokeStyle = theme.grid
   ctx.lineWidth = 1
 
@@ -77,12 +92,50 @@ export function drawGrid(
   ctx.lineTo(geo.plotL + geo.plotW, Math.round(geo.volT) - 0.5)
   ctx.stroke()
 
-  for (const slot of [0, 60, 120, 180, 240]) {
-    const x = Math.round(geo.plotL + (slot / SLOTS) * geo.plotW) + 0.5
-    ctx.beginPath()
-    ctx.moveTo(x, geo.plotT)
-    ctx.lineTo(x, geo.volT + geo.volH)
-    ctx.stroke()
+  // Vertical time grid lines
+  if (isGlobal || !useFullSpectrum) {
+    // Standard 5-column equidistant grid (0, 60, 120, 180, 240)
+    for (const slot of [0, 60, 120, 180, SLOTS]) {
+      const x = Math.round(geo.plotL + (slot / SLOTS) * geo.plotW) + 0.5
+      ctx.beginPath()
+      ctx.moveTo(x, geo.plotT)
+      ctx.lineTo(x, geo.volT + geo.volH)
+      ctx.stroke()
+    }
+    // 14:57 demarcation line in standard mode
+    if (!isGlobal) {
+      ctx.save()
+      ctx.setLineDash([2, 2])
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+      const x237 = Math.round(xOf(237)) + 0.5
+      ctx.beginPath()
+      ctx.moveTo(x237, geo.plotT)
+      ctx.lineTo(x237, geo.volT + geo.volH)
+      ctx.stroke()
+      ctx.restore()
+    }
+  } else {
+    // Full spectrum mode (09:15, 09:30, 11:30/13:00, 15:00)
+    for (const slot of [0, PRETRADE_SLOT_END, 135, FULL_SLOTS]) {
+      const x = Math.round(xOf(slot)) + 0.5
+      ctx.beginPath()
+      ctx.moveTo(x, geo.plotT)
+      ctx.lineTo(x, geo.volT + geo.volH)
+      ctx.stroke()
+    }
+
+    // Demarcation dashed lines (09:20 and 14:57)
+    ctx.save()
+    ctx.setLineDash([2, 2])
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+    for (const slot of [5, 252]) {
+      const x = Math.round(xOf(slot)) + 0.5
+      ctx.beginPath()
+      ctx.moveTo(x, geo.plotT)
+      ctx.lineTo(x, geo.volT + geo.volH)
+      ctx.stroke()
+    }
+    ctx.restore()
   }
 }
 
@@ -124,14 +177,16 @@ function fmtHhmm(t: number): string {
   return `${h}:${m}`
 }
 
-/** Bottom time axis; global indices label the real clock, A-shares the session. */
+/** Bottom time axis; never crowd labels to avoid overlapping text. */
 export function drawTimeAxis(
   ctx: CanvasRenderingContext2D,
   geo: PlotGeometry,
   isGlobal: boolean,
-  points: ReadonlyArray<{ time: number }>
+  points: ReadonlyArray<{ time: number }>,
+  useFullSpectrum = false
 ): void {
-  const xOf = (slot: number) => geo.plotL + (slot / SLOTS) * geo.plotW
+  const totalSlots = isGlobal ? SLOTS : (useFullSpectrum ? FULL_SLOTS : SLOTS)
+  const xOf = (slot: number) => geo.plotL + (slot / totalSlots) * geo.plotW
 
   const timeLabels: Array<[number, string]> =
     isGlobal && points.length > 0
@@ -140,19 +195,24 @@ export function drawTimeAxis(
           [120, fmtHhmm(points[Math.floor(points.length / 2)].time)],
           [240, fmtHhmm(points[points.length - 1].time)],
         ]
-      : [
-          [0, '9:30'],
-          [120, '11:30/13:00'],
-          [240, '15:00'],
-        ]
+      : useFullSpectrum
+        ? [
+            [0, '9:15'],
+            [135, '11:30/13:00'],
+            [FULL_SLOTS, '15:00'],
+          ]
+        : [
+            [0, '9:30'],
+            [120, '11:30/13:00'],
+            [SLOTS, '15:00'],
+          ]
 
-  ctx.textAlign = 'center'
   for (const [slot, label] of timeLabels) {
     let x = xOf(slot)
     if (slot === 0) {
       ctx.textAlign = 'left'
       x = geo.plotL
-    } else if (slot === SLOTS) {
+    } else if (slot === totalSlots) {
       ctx.textAlign = 'right'
       x = geo.plotL + geo.plotW
     } else {
@@ -162,13 +222,17 @@ export function drawTimeAxis(
   }
 }
 
-/** Slot mapping: global indices are evenly spread, A-shares map by clock time. */
+/** Slot mapping: resolves clock time to the appropriate slot index. */
 export function makeSlotResolver(
   isGlobal: boolean,
-  pointCount: number
+  pointCount: number,
+  useFullSpectrum = false
 ): (time: number, idx: number) => number {
   if (isGlobal) {
     return (_time: number, idx: number) => (idx / Math.max(1, pointCount - 1)) * SLOTS
+  }
+  if (useFullSpectrum) {
+    return (time: number) => slotOfFullTrend(time)
   }
   return (time: number) => slotOf(time)
 }

@@ -7,8 +7,7 @@
 import { Show, type Accessor, type Setter } from 'solid-js'
 
 import { AuctionBadge } from '../components/AuctionBadge'
-import { AuctionCanvas } from '../components/AuctionCanvas'
-import { Chart } from '../components/Chart'
+import { Chart, type HoverExtra } from '../components/Chart'
 import { FooterControls } from '../components/FooterControls'
 import { KLineBadge } from '../components/KLineBadge'
 import { KlineCanvas } from '../components/KlineCanvas'
@@ -40,8 +39,8 @@ export interface MiniIndicatorParams {
 export interface MiniHoverState {
   point: Accessor<TrendPoint | null>
   setPoint: Setter<TrendPoint | null>
-  pointExtra: Accessor<{ minVol: number; dif?: number; dea?: number; macd?: number } | null>
-  setPointExtra: Setter<{ minVol: number; dif?: number; dea?: number; macd?: number } | null>
+  pointExtra: Accessor<HoverExtra | null>
+  setPointExtra: Setter<HoverExtra | null>
   auctionPoint: Accessor<AuctionPoint | null>
   setAuctionPoint: Setter<AuctionPoint | null>
   kbar: Accessor<KLineBar | null>
@@ -96,7 +95,6 @@ export function MiniBody(props: MiniBodyProps) {
   const hoveredPointExtra = props.hover.pointExtra
   const setHoveredPointExtra = props.hover.setPointExtra
   const hoveredAuctionPoint = props.hover.auctionPoint
-  const setHoveredAuctionPoint = props.hover.setAuctionPoint
   const hoveredKBar = props.hover.kbar
   const setHoveredKBar = props.hover.setKbar
   const hoveredKExtra = props.hover.kbarExtra
@@ -116,120 +114,111 @@ export function MiniBody(props: MiniBodyProps) {
       hoveredKExtra,
     })
 
+  const isAuctionSession = () =>
+    ['CallAuctionCancelable', 'CallAuctionLocked', 'PreTrade'].includes(s().status?.session ?? '')
 
-          return (
-            <>
-              {/* Unified Stock Header */}
-              <StockHeader
-                name={q().name}
-                code={q().code}
-                price={q().price}
-                changePct={q().changePct}
-                activePrice={activePrice()}
-                activePct={activePct()}
-                high={stats().high}
-                low={stats().low}
-                badge={
-                  <Show
-                    when={activeMode() === 'kline'}
-                    fallback={
-                      <Show
-                        when={activeMode() === 'auction' && !isIndex()}
-                        fallback={
-                          <Show when={s().config.trendEngine}>
-                            <TrendBadge signal={s().trendSignals?.[q().code]} quote={q()} />
-                          </Show>
-                        }
-                      >
-                        <AuctionBadge auction={auction()} quote={q()} />
-                      </Show>
-                    }
-                  >
-                    <KLineBadge kline={kline()} quote={q()} />
-                  </Show>
-                }
-                hoverTime={hoverTime()}
-                hoverExtra={hoverExtra()}
-                extraInfo={
-                  <div class="mini-pnl-group">
-                    <Show when={cost()}>
-                      {(c) => {
-                        const pct = profitPct(q().price, c())
-                        return pct !== null ? (
-                          <span class={`profit-badge ${trendClass(pct)}`}>
-                            浮盈 {fmtPct(pct)}
-                          </span>
-                        ) : null
-                      }}
-                    </Show>
-                    <Show when={pnl() !== null}>
-                      <span class={`profit-badge ${trendClass(pnl()!)}`}>
-                        {fmtMoney(pnl()!)}
-                      </span>
-                    </Show>
-                  </div>
-                }
-              />
-
-              {/* Chart Canvas */}
+  return (
+    <>
+      {/* Unified Stock Header */}
+      <StockHeader
+        name={q().name}
+        code={q().code}
+        price={q().price}
+        changePct={q().changePct}
+        activePrice={activePrice()}
+        activePct={activePct()}
+        high={stats().high}
+        low={stats().low}
+        badge={
+          <Show
+            when={activeMode() === 'kline'}
+            fallback={
               <Show
-                when={activeMode() === 'kline'}
+                when={(hoveredPointExtra()?.auctionPoint != null || isAuctionSession()) && !isIndex()}
                 fallback={
-                  <Show
-                    when={activeMode() === 'auction'}
-                    fallback={
-                      <Chart
-                        trend={trend()}
-                        preClose={q().preClose}
-                        costPrice={cost()}
-                        priceLines={item()?.priceLines ?? []}
-                        lastPrice={q().price}
-                        orbHigh={s().trendSignals?.[q().code]?.orbHigh}
-                        orbLow={s().trendSignals?.[q().code]?.orbLow}
-                        subchartMode={subchartMode()}
-                        macdParams={indicatorParams().macd}
-                        onHover={(point, extra) => {
-                          setHoveredPoint(point)
-                          setHoveredPointExtra(extra ?? null)
-                        }}
-                      />
-                    }
-                  >
-                    <AuctionCanvas
-                      auction={auction()}
-                      preClose={q().preClose}
-                      onHover={setHoveredAuctionPoint}
-                    />
+                  <Show when={s().config.trendEngine}>
+                    <TrendBadge signal={s().trendSignals?.[q().code]} quote={q()} />
                   </Show>
                 }
               >
-                <KlineCanvas
-                  kline={kline()}
-                  quote={q()}
-                  costPrice={cost()}
-                  priceLines={item()?.priceLines ?? []}
-                  subchartMode={subchartMode()}
-                  maPeriods={indicatorParams().ma}
-                  macdParams={indicatorParams().macd}
-                  onHoverBar={(bar, extra) => {
-                    setHoveredKBar(bar)
-                    setHoveredKExtra(extra ?? null)
-                  }}
-                />
+                <AuctionBadge auction={auction()} quote={q()} />
               </Show>
+            }
+          >
+            <KLineBadge kline={kline()} quote={q()} />
+          </Show>
+        }
+        hoverTime={hoverTime()}
+        hoverExtra={hoverExtra()}
+        extraInfo={
+          <div class="mini-pnl-group">
+            <Show when={cost()}>
+              {(c) => {
+                const pct = profitPct(q().price, c())
+                return pct !== null ? (
+                  <span class={`profit-badge ${trendClass(pct)}`}>
+                    浮盈 {fmtPct(pct)}
+                  </span>
+                ) : null
+              }}
+            </Show>
+            <Show when={pnl() !== null}>
+              <span class={`profit-badge ${trendClass(pnl()!)}`}>
+                {fmtMoney(pnl()!)}
+              </span>
+            </Show>
+          </div>
+        }
+      />
 
-              {/* Unified Footer */}
-              <div class="mini-footer">
-                <StatusLine status={s().status} />
-                <FooterControls
-                  subchartMode={subchartMode()}
-                  onToggleSubchart={toggleSubchartMode}
-                  viewMode={activeMode()}
-                  onToggleView={(m) => setManualMode(m)}
-                  showSubchart={activeMode() !== 'auction'}
-                  showAuction={!isIndex()}
-                />
-              </div>
-            </>
-          )
+      {/* Unified Chart Canvas: Trend (with seamless Auction) vs KLine */}
+      <Show
+        when={activeMode() === 'kline'}
+        fallback={
+          <Chart
+            trend={trend()}
+            auction={auction()}
+            preClose={q().preClose}
+            costPrice={cost()}
+            priceLines={item()?.priceLines ?? []}
+            lastPrice={q().price}
+            orbHigh={s().trendSignals?.[q().code]?.orbHigh}
+            orbLow={s().trendSignals?.[q().code]?.orbLow}
+            subchartMode={subchartMode()}
+            macdParams={indicatorParams().macd}
+            onHover={(point, extra) => {
+              setHoveredPoint(point)
+              setHoveredPointExtra(extra ?? null)
+            }}
+          />
+        }
+      >
+        <KlineCanvas
+          kline={kline()}
+          quote={q()}
+          costPrice={cost()}
+          priceLines={item()?.priceLines ?? []}
+          subchartMode={subchartMode()}
+          maPeriods={indicatorParams().ma}
+          macdParams={indicatorParams().macd}
+          onHoverBar={(bar, extra) => {
+            setHoveredKBar(bar)
+            setHoveredKExtra(extra ?? null)
+          }}
+        />
+      </Show>
+
+      {/* Unified Footer */}
+      <div class="mini-footer">
+        <StatusLine status={s().status} />
+        <FooterControls
+          subchartMode={subchartMode()}
+          onToggleSubchart={toggleSubchartMode}
+          viewMode={activeMode()}
+          onToggleView={(m) => setManualMode(m)}
+          showSubchart={true}
+        />
+      </div>
+    </>
+  )
 }

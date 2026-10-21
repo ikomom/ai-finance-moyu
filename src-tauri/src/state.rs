@@ -140,6 +140,13 @@ impl AppState {
         for (code, t) in cache.trends {
             trends_map.insert(code, t);
         }
+        let mut auction_tracker = crate::auction_engine::AuctionTracker::new();
+        if !cache.auctions.is_empty() {
+            if let Some(first) = cache.auctions.values().next() {
+                auction_tracker.set_last_date(first.date.clone());
+            }
+            auction_tracker.data = cache.auctions;
+        }
 
         // A search client that fails to build (TLS init) must not take the app
         // down with it: the widget is still useful without the search box.
@@ -165,7 +172,7 @@ impl AppState {
             active_trend_targets: Mutex::new(None),
             market_fetcher: MarketFetcher::default(),
             market_overview: Mutex::new(None),
-            auction_tracker: Mutex::new(crate::auction_engine::AuctionTracker::new()),
+            auction_tracker: Mutex::new(auction_tracker),
             hotkey_bindings: Mutex::new(HotkeyBindings::default()),
         }
     }

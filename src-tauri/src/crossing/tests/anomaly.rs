@@ -266,3 +266,29 @@
             "Flat tick (< 0.3% price motion) should NOT fire VolumeBurst"
         );
     }
+
+    #[test]
+    fn empty_depth_at_closing_does_not_fire_seal_loosening() {
+        let mut t = CrossingTracker::without_cooldown();
+        let s = spec(None, vec![]);
+        let cfg = crate::config::AnomalyAlertConfig::default();
+        let t0 = Instant::now();
+
+        let q0 = mock_quote("sh600000", 10.0, 0.0, 1000.0);
+        t.update_quote_at(&s, &q0, &cfg, t0);
+
+        let mut q_seal = mock_quote("sh600000", 11.00, 10.0, 8000.0);
+        q_seal.bids = vec![(11.00, 100000.0)];
+        q_seal.asks = vec![];
+        t.update_quote_at(&s, &q_seal, &cfg, t0 + Duration::from_secs(10));
+
+        // 14:57 Closing auction clears depth order book (bids: [], asks: [])
+        let mut q_closing = mock_quote("sh600000", 11.00, 10.0, 8500.0);
+        q_closing.bids = vec![];
+        q_closing.asks = vec![];
+        let evs = t.update_quote_at(&s, &q_closing, &cfg, t0 + Duration::from_secs(20));
+        assert!(
+            !evs.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { board_kind: LimitBoardKind::SealLoosening { .. }, .. })),
+            "Empty depth book at closing auction should NOT trigger seal loosening!"
+        );
+    }

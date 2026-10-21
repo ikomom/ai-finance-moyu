@@ -90,7 +90,8 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
         let trends = state.trends.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let enabled = state.config.lock().unwrap_or_else(|e| e.into_inner()).trend_engine;
         update_trend_signals(&state, enabled);
-        crate::config::QuotesCache { quotes, trends }
+        let auctions = state.auction_tracker.lock().unwrap_or_else(|e| e.into_inner()).data.clone();
+        crate::config::QuotesCache { quotes, trends, auctions }
     };
     crate::config::save_cache(app, &cache);
 

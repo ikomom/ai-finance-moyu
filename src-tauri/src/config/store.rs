@@ -68,6 +68,8 @@ pub fn save(app: &AppHandle, cfg: &Config) -> Result<(), String> {
 pub struct QuotesCache {
     pub quotes: Vec<Quote>,
     pub trends: HashMap<String, Trend>,
+    #[serde(default)]
+    pub auctions: HashMap<String, crate::auction_engine::AuctionData>,
 }
 
 pub fn cache_path(app: &AppHandle) -> Result<PathBuf, String> {

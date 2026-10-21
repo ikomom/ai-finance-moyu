@@ -9,8 +9,10 @@ import {
   createLinearScale,
   createSymmetricScale,
   isValidAvg,
+  FULL_SLOTS,
   slotOf,
   slotOfAuctionTime,
+  slotOfFullTrend,
 } from './scale'
 
 describe('clamp', () => {
@@ -99,5 +101,30 @@ describe('symmetric scale', () => {
   it('maps the ±maxDev bounds to the plot edges', () => {
     expect(scale(10.5)).toBeCloseTo(0, 5)
     expect(scale(9.5)).toBeCloseTo(200, 5)
+  })
+})
+
+describe('full-spectrum trend slot mapping (09:15 - 15:00)', () => {
+  it('maps 09:15 to slot 0', () => {
+    expect(slotOfFullTrend(915)).toBe(0)
+    expect(slotOfFullTrend(91500)).toBe(0)
+  })
+
+  it('maps 09:25 to slot 10 and 09:30 to slot 15', () => {
+    expect(slotOfFullTrend(925)).toBe(10)
+    expect(slotOfFullTrend(930)).toBe(15)
+  })
+
+  it('maps continuous morning 11:30 to slot 135 and collapses lunch', () => {
+    expect(slotOfFullTrend(1130)).toBe(135)
+    expect(slotOfFullTrend(1200)).toBe(135)
+    expect(slotOfFullTrend(1300)).toBe(135)
+  })
+
+  it('maps closing auction 14:57 to slot 252 and 15:00 to slot 255', () => {
+    expect(slotOfFullTrend(1457)).toBe(252)
+    expect(slotOfFullTrend(1500)).toBe(FULL_SLOTS)
+    // 3-second tick at 14:58:12 -> 252 + 1 + 12/60 = 253.2
+    expect(slotOfFullTrend(145812)).toBeCloseTo(253.2, 2)
   })
 })

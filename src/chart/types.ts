@@ -1,9 +1,10 @@
-import type { PriceLine, Trend } from '../types'
+import type { AuctionData, PriceLine, Trend } from '../types'
 
 export interface DrawOptions {
   trend: Trend | undefined
   /** Fallback 昨收 when the trend payload hasn't arrived yet. */
   preClose: number
+  auction?: AuctionData | null
   costPrice?: number | null
   priceLines?: PriceLine[]
   /** Latest price, marked with a dot at the end of the series. */

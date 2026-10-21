@@ -130,7 +130,8 @@ impl SecurityIntradayState {
             } else if b1_vol > self.peak_seal_vol {
                 self.peak_seal_vol = b1_vol;
                 self.seal_loosening_warned = false;
-            } else if self.peak_seal_vol >= 1000.0
+            } else if snapshot.has_depth
+                && self.peak_seal_vol >= 1000.0
                 && b1_vol <= self.peak_seal_vol * 0.4
                 && !self.seal_loosening_warned
             {
@@ -149,7 +150,7 @@ impl SecurityIntradayState {
                         change_pct: quote.change_pct,
                     });
                 }
-            } else if b1_vol >= self.peak_seal_vol * 0.9 {
+            } else if snapshot.has_depth && b1_vol >= self.peak_seal_vol * 0.9 {
                 self.seal_loosening_warned = false;
             }
         } else if self.had_been_sealed_up && (!is_at_up_price || (has_depth && !asks_empty)) {

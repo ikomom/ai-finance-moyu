@@ -26,8 +26,11 @@ pub enum AuctionTag {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuctionPoint {
-    /// 24h format HHMM, e.g. 915, 918, 920, 924.
+    /// 24h format HHMM or HHMMSS, e.g. 915, 91825, 145812.
     pub time: u32,
+    /// Formatted time string e.g. "09:18:25", "14:58:12".
+    #[serde(default)]
+    pub raw_time: String,
     /// Auction match price.
     pub price: f64,
     /// Total volume (matched + unmatched) in 手.
@@ -47,6 +50,7 @@ impl AuctionPoint {
     pub fn new(time: u32, price: f64, volume: f64) -> Self {
         Self {
             time,
+            raw_time: String::new(),
             price,
             volume,
             matched_volume: volume,
@@ -64,6 +68,7 @@ impl AuctionPoint {
     ) -> Self {
         Self {
             time,
+            raw_time: String::new(),
             price,
             volume: matched_volume + unmatched_volume,
             matched_volume,
@@ -90,5 +95,7 @@ pub struct AuctionData {
     pub code: String,
     pub date: String,
     pub points: Vec<AuctionPoint>,
+    #[serde(default)]
+    pub closing_points: Vec<AuctionPoint>,
     pub diagnosis: Option<AuctionDiagnosis>,
 }

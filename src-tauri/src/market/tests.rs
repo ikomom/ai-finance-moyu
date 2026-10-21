@@ -87,6 +87,19 @@
     }
 
     #[test]
+    fn is_call_auction_matches_morning_and_closing() {
+        assert!(Session::CallAuctionCancelable.is_call_auction());
+        assert!(Session::CallAuctionLocked.is_call_auction());
+        assert!(Session::ClosingAuction.is_call_auction());
+        assert!(!Session::Morning.is_call_auction());
+        assert!(!Session::Afternoon.is_call_auction());
+        assert!(!Session::PreTrade.is_call_auction());
+        assert!(!Session::PreOpen.is_call_auction());
+        assert!(!Session::LunchBreak.is_call_auction());
+        assert!(!Session::Closed.is_call_auction());
+    }
+
+    #[test]
     fn parses_time_and_calculates_elapsed_minutes() {
         assert_eq!(parse_time_to_minutes("09:30:00"), Some(570));
         assert_eq!(parse_time_to_minutes("10:00:00"), Some(600));

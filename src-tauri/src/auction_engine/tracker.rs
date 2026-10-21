@@ -21,17 +21,21 @@ impl AuctionTracker {
         Self::default()
     }
 
-    /// Reset tracker when trading day rolls over or market is before 09:15.
-    pub fn check_date_or_reset(&mut self, today: &str) {
-        if self.last_date != today {
-            self.data.clear();
-            self.last_date = today.to_string();
-        }
+    pub fn set_last_date(&mut self, date: String) {
+        self.last_date = date;
     }
 
-    /// Ingest a quote tick during morning auction (09:15–09:29).
+    /// Reset tracker when trading day rolls over.
+    pub fn check_date_or_reset(&mut self, today: &str) {
+        if !self.last_date.is_empty() && self.last_date != today {
+            self.data.clear();
+        }
+        self.last_date = today.to_string();
+    }
+
+    /// Ingest a quote tick during call auctions (morning 09:15–09:29 or closing 14:57–15:00).
     pub fn update_quote(&mut self, session: Session, quote: &Quote) {
-        if !session.is_morning_auction() && session != Session::PreTrade {
+        if !session.is_call_auction() && session != Session::PreTrade {
             return;
         }
 
@@ -42,16 +46,20 @@ impl AuctionTracker {
 
         self.check_date_or_reset(&quote.date);
 
-        let time_num = parse_time_hhmm(&quote.time);
-        if !(915..=925).contains(&time_num) {
+        let (time_sec, raw_time, time_hhmm) = parse_time_details(&quote.time);
+        let is_morning = (915..=925).contains(&time_hhmm);
+        let is_closing = (1457..=1500).contains(&time_hhmm);
+
+        if !is_morning && !is_closing {
             return;
         }
 
         let b1_vol = quote.bids.first().map(|b| b.1).unwrap_or(0.0);
         let a1_vol = quote.asks.first().map(|a| a.1).unwrap_or(0.0);
 
-        let (matched_vol, unmatched_vol, unmatched_side) = if time_num == 925 {
-            // 09:25 is formal opening trade completion: full matched volume, unmatched goes to 0
+        let is_match_finish = (is_morning && time_hhmm == 925) || (is_closing && time_hhmm == 1500);
+
+        let (matched_vol, unmatched_vol, unmatched_side) = if is_match_finish {
             (quote.volume.max(0.0), 0.0, UnmatchedSide::None)
         } else if b1_vol > 0.0 && a1_vol > 0.0 {
             let m = b1_vol.min(a1_vol);
@@ -77,19 +85,28 @@ impl AuctionTracker {
             code: quote.code.clone(),
             date: quote.date.clone(),
             points: Vec::new(),
+            closing_points: Vec::new(),
             diagnosis: None,
         });
 
-        if let Some(last) = entry.points.last_mut() {
-            if last.time == time_num {
+        let target_vec = if is_morning {
+            &mut entry.points
+        } else {
+            &mut entry.closing_points
+        };
+
+        if let Some(last) = target_vec.last_mut() {
+            if last.time == time_sec {
                 last.price = quote.price;
                 last.volume = total_vol;
                 last.matched_volume = matched_vol;
                 last.unmatched_volume = unmatched_vol;
                 last.unmatched_side = unmatched_side;
-            } else if time_num > last.time {
-                entry.points.push(AuctionPoint {
-                    time: time_num,
+                last.raw_time = raw_time;
+            } else if time_sec > last.time {
+                target_vec.push(AuctionPoint {
+                    time: time_sec,
+                    raw_time,
                     price: quote.price,
                     volume: total_vol,
                     matched_volume: matched_vol,
@@ -98,8 +115,9 @@ impl AuctionTracker {
                 });
             }
         } else {
-            entry.points.push(AuctionPoint {
-                time: time_num,
+            target_vec.push(AuctionPoint {
+                time: time_sec,
+                raw_time,
                 price: quote.price,
                 volume: total_vol,
                 matched_volume: matched_vol,
@@ -108,7 +126,9 @@ impl AuctionTracker {
             });
         }
 
-        entry.diagnosis = evaluate_auction(quote.pre_close, &entry.points);
+        if is_morning {
+            entry.diagnosis = evaluate_auction(quote.pre_close, &entry.points);
+        }
     }
 
     /// If app starts after morning call auction (or runs in continuous trading), backfill a baseline 09:25 match anchor
@@ -141,13 +161,15 @@ impl AuctionTracker {
                 code: quote.code.clone(),
                 date: quote.date.clone(),
                 points: vec![AuctionPoint {
-                    time: 925,
+                    time: 92500,
+                    raw_time: "09:25:00".to_string(),
                     price: quote.open,
                     volume: quote.volume,
                     matched_volume: quote.volume,
                     unmatched_volume: 0.0,
                     unmatched_side: UnmatchedSide::None,
                 }],
+                closing_points: Vec::new(),
                 diagnosis: Some(AuctionDiagnosis {
                     tag: AuctionTag::Normal,
                     label,
@@ -161,7 +183,8 @@ impl AuctionTracker {
 
         if entry.points.is_empty() {
             entry.points.push(AuctionPoint {
-                time: 925,
+                time: 92500,
+                raw_time: "09:25:00".to_string(),
                 price: quote.open,
                 volume: quote.volume,
                 matched_volume: quote.volume,
@@ -179,6 +202,37 @@ pub fn is_index_symbol(code: &str) -> bool {
         || code.starts_with("bj899")
 }
 
+/// Parse time string into `(time_sec, raw_time, time_hhmm)`.
+/// `time_sec` is `HHMMSS` as `u32` (e.g. `91825` or `145812`).
+/// `raw_time` is formatted as `"09:18:25"`.
+/// `time_hhmm` is `HHMM` (e.g. `918` or `1458`).
+pub fn parse_time_details(s: &str) -> (u32, String, u32) {
+    let clean = s.trim();
+    let (h, m, sec) = if clean.contains(':') {
+        let parts: Vec<&str> = clean.split(':').collect();
+        let h: u32 = parts.first().and_then(|p| p.parse().ok()).unwrap_or(0);
+        let m: u32 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
+        let s: u32 = parts.get(2).and_then(|p| p.parse().ok()).unwrap_or(0);
+        (h, m, s)
+    } else if clean.len() >= 12 {
+        let h: u32 = clean[8..10].parse().unwrap_or(0);
+        let m: u32 = clean[10..12].parse().unwrap_or(0);
+        let s: u32 = if clean.len() >= 14 { clean[12..14].parse().unwrap_or(0) } else { 0 };
+        (h, m, s)
+    } else if clean.len() >= 4 {
+        let h: u32 = clean[0..2].parse().unwrap_or(0);
+        let m: u32 = clean[2..4].parse().unwrap_or(0);
+        let s: u32 = if clean.len() >= 6 { clean[4..6].parse().unwrap_or(0) } else { 0 };
+        (h, m, s)
+    } else {
+        (0, 0, 0)
+    };
+    let time_sec = h * 10000 + m * 100 + sec;
+    let time_hhmm = h * 100 + m;
+    let raw_time = format!("{h:02}:{m:02}:{sec:02}");
+    (time_sec, raw_time, time_hhmm)
+}
+
 /// Parse time string into `HHMM` u32:
 /// Handles both `"09:18:25"` -> `918`, `"20261013091825"` -> `918`, or `"0918"` -> `918`.
 pub fn parse_time_hhmm(s: &str) -> u32 {
@@ -191,7 +245,6 @@ pub fn parse_time_hhmm(s: &str) -> u32 {
             return h * 100 + m;
         }
     } else if clean.len() >= 12 {
-        // e.g. "20261013091825" -> hours at [8..10], minutes at [10..12]
         let h: u32 = clean[8..10].parse().unwrap_or(0);
         let m: u32 = clean[10..12].parse().unwrap_or(0);
         return h * 100 + m;
