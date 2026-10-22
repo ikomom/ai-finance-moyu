@@ -164,6 +164,67 @@ impl CrossingEvent {
         }
     }
 
+    /// Extract the associated price if available.
+    pub fn price(&self) -> Option<f64> {
+        match self {
+            CrossingEvent::RapidChange { price, .. } => Some(*price),
+            CrossingEvent::IntradayExtreme { price, .. } => Some(*price),
+            CrossingEvent::VolumeBurst { price, .. } => Some(*price),
+            CrossingEvent::LimitBoard { price, .. } => Some(*price),
+            CrossingEvent::PriceLine { price, .. } => Some(*price),
+            CrossingEvent::AlertPct { .. } => None,
+        }
+    }
+
+    /// Compact badge text for multi-anomaly composite alerts.
+    pub fn badge(&self) -> String {
+        match self {
+            CrossingEvent::AlertPct { pct, threshold, .. } => {
+                format!("突破±{threshold:.1}%({pct:+.2}%)")
+            }
+            CrossingEvent::PriceLine { line, price, .. } => {
+                let dir = match line.direction {
+                    LineDirection::Above => "上穿",
+                    LineDirection::Below => "下穿",
+                };
+                let label = line.label.as_deref().unwrap_or("价位线");
+                format!("{dir}{label}({price:.2})")
+            }
+            CrossingEvent::RapidChange { pct_delta, is_surge, .. } => {
+                if *is_surge {
+                    format!("🚀急速拉升(+{pct_delta:.2}%)")
+                } else {
+                    format!("⚡急速跳水(-{pct_delta:.2}%)")
+                }
+            }
+            CrossingEvent::IntradayExtreme { is_new_high, .. } => {
+                if *is_new_high {
+                    "📈创日内新高".to_string()
+                } else {
+                    "📉创日内新低".to_string()
+                }
+            }
+            CrossingEvent::VolumeBurst { is_surge, multiple, .. } => {
+                if *is_surge {
+                    format!("💥盘口扫盘({multiple:.1}x)")
+                } else {
+                    format!("💥盘口砸盘({multiple:.1}x)")
+                }
+            }
+            CrossingEvent::LimitBoard { board_kind, .. } => {
+                match board_kind {
+                    LimitBoardKind::NearLimitUp => "🔴逼近涨停".to_string(),
+                    LimitBoardKind::SealedLimitUp { .. } => "🔒封死涨停".to_string(),
+                    LimitBoardKind::SealLoosening { drop_pct, .. } => format!("⚡封单骤降(-{drop_pct:.0}%)"),
+                    LimitBoardKind::BrokenLimitUp => "⚠️涨停炸板".to_string(),
+                    LimitBoardKind::NearLimitDown => "🟢逼近跌停".to_string(),
+                    LimitBoardKind::SealedLimitDown { .. } => "🔒封死跌停".to_string(),
+                    LimitBoardKind::BrokenLimitDown => "🚀跌停翘板".to_string(),
+                }
+            }
+        }
+    }
+
     /// Human-readable line for a system notification.
     pub fn message(&self, name: &str) -> String {
         match self {

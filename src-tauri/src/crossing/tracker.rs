@@ -14,6 +14,8 @@ pub struct CrossingTracker {
     line_above: HashMap<String, Vec<bool>>,
     /// Timestamp of the last time an alert event was triggered for a key.
     last_fired: HashMap<String, Instant>,
+    /// Timestamp of the last time a desktop notification was fired for a code.
+    desktop_notif_fired: HashMap<String, Instant>,
     /// Anti-spam cooldown duration. Repeated alerts for the same event key within this window are throttled.
     cooldown: Duration,
     intraday_states: HashMap<String, SecurityIntradayState>,
@@ -41,6 +43,7 @@ impl CrossingTracker {
             pct_band: HashMap::new(),
             line_above: HashMap::new(),
             last_fired: HashMap::new(),
+            desktop_notif_fired: HashMap::new(),
             cooldown,
             intraday_states: HashMap::new(),
         }
@@ -205,11 +208,28 @@ impl CrossingTracker {
         events
     }
 
+    /// Check whether a desktop system notification is allowed for this security.
+    /// Rate-limited to at most 1 desktop notification per security per 60 seconds.
+    pub fn allow_desktop_notification(&mut self, code: &str, now: Instant) -> bool {
+        if self.cooldown.is_zero() {
+            return true;
+        }
+        const DESKTOP_COOLDOWN: Duration = Duration::from_secs(60);
+        if let Some(&last) = self.desktop_notif_fired.get(code) {
+            if now.saturating_duration_since(last) < DESKTOP_COOLDOWN {
+                return false;
+            }
+        }
+        self.desktop_notif_fired.insert(code.to_string(), now);
+        true
+    }
+
     /// Drop remembered state for codes no longer watched, so removed-then-
     /// re-added securities re-arm from scratch.
     pub fn retain(&mut self, keep: &[String]) {
         self.pct_band.retain(|k, _| keep.contains(k));
         self.line_above.retain(|k, _| keep.contains(k));
+        self.desktop_notif_fired.retain(|k, _| keep.contains(k));
         self.intraday_states.retain(|k, _| keep.contains(k));
         self.last_fired.retain(|k, _| {
             k.split_once(':')

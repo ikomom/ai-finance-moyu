@@ -89,13 +89,14 @@ impl SecurityIntradayState {
             let max_p = self.samples.iter().map(|s| s.price).fold(0.0, f64::max);
             let prev_tick_price = self.samples[self.samples.len() - 2].price;
 
+            // Reset reference anchor only on substantial structural reversal (>= 2.5%)
             if let Some(prev_p) = self.last_surge_price {
-                if quote.price <= prev_p * 0.990 {
+                if quote.price <= prev_p * 0.975 {
                     self.last_surge_price = None;
                 }
             }
             if let Some(prev_p) = self.last_drop_price {
-                if quote.price >= prev_p * 1.010 {
+                if quote.price >= prev_p * 1.025 {
                     self.last_drop_price = None;
                 }
             }
@@ -105,16 +106,19 @@ impl SecurityIntradayState {
                 if surge_pct >= 1.5 && quote.price >= prev_tick_price {
                     let wave_allowed = match self.last_surge_price {
                         None => true,
-                        Some(prev_p) => quote.price >= prev_p * 1.008,
+                        Some(prev_p) => quote.price >= prev_p * 1.010,
                     };
                     if wave_allowed {
-                        self.last_surge_price = Some(quote.price);
-                        events.push(CrossingEvent::RapidChange {
-                            code: code.to_string(),
-                            pct_delta: (surge_pct * 100.0).round() / 100.0,
-                            is_surge: true,
-                            price: quote.price,
-                        });
+                        let key = format!("{code}:rapid_surge");
+                        if check_cooldown(&key, Duration::from_secs(90)) {
+                            self.last_surge_price = Some(quote.price);
+                            events.push(CrossingEvent::RapidChange {
+                                code: code.to_string(),
+                                pct_delta: (surge_pct * 100.0).round() / 100.0,
+                                is_surge: true,
+                                price: quote.price,
+                            });
+                        }
                     }
                 }
             }
@@ -124,16 +128,19 @@ impl SecurityIntradayState {
                 if drop_pct >= 1.5 && quote.price <= prev_tick_price {
                     let wave_allowed = match self.last_drop_price {
                         None => true,
-                        Some(prev_p) => quote.price <= prev_p * 0.992,
+                        Some(prev_p) => quote.price <= prev_p * 0.990,
                     };
                     if wave_allowed {
-                        self.last_drop_price = Some(quote.price);
-                        events.push(CrossingEvent::RapidChange {
-                            code: code.to_string(),
-                            pct_delta: (drop_pct * 100.0).round() / 100.0,
-                            is_surge: false,
-                            price: quote.price,
-                        });
+                        let key = format!("{code}:rapid_drop");
+                        if check_cooldown(&key, Duration::from_secs(90)) {
+                            self.last_drop_price = Some(quote.price);
+                            events.push(CrossingEvent::RapidChange {
+                                code: code.to_string(),
+                                pct_delta: (drop_pct * 100.0).round() / 100.0,
+                                is_surge: false,
+                                price: quote.price,
+                            });
+                        }
                     }
                 }
             }

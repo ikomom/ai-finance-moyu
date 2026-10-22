@@ -255,3 +255,5 @@
 
 #[path = "anomaly.rs"]
 mod anomaly;
+#[path = "dedup.rs"]
+mod dedup;

@@ -82,23 +82,43 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let notifications: Vec<AlertNotification> = if in_auction_or_pretrade {
             Vec::new()
         } else {
-            events
-                .iter()
-                .map(|ev| {
-                    let name = names.get(ev.code()).copied().unwrap_or(ev.code());
+            let mut grouped_events: Vec<(&str, Vec<&crate::crossing::CrossingEvent>)> = Vec::new();
+            for ev in &events {
+                if let Some((_, list)) = grouped_events.iter_mut().find(|(c, _)| *c == ev.code()) {
+                    list.push(ev);
+                } else {
+                    grouped_events.push((ev.code(), vec![ev]));
+                }
+            }
+
+            grouped_events
+                .into_iter()
+                .map(|(code, code_events)| {
+                    let name = names.get(code).copied().unwrap_or(code);
+                    let message = if code_events.len() == 1 {
+                        code_events[0].message(name)
+                    } else {
+                        let latest_price = code_events.iter().find_map(|e| e.price());
+                        let badges: Vec<String> = code_events.iter().map(|e| e.badge()).collect();
+                        match latest_price {
+                            Some(p) => format!("{name} 现价 {p:.2} | {}", badges.join(" · ")),
+                            None => format!("{name} | {}", badges.join(" · ")),
+                        }
+                    };
                     AlertNotification {
-                        code: ev.code().to_string(),
+                        code: code.to_string(),
                         name: name.to_string(),
-                        message: ev.message(name),
+                        message,
                     }
                 })
                 .collect()
         };
 
         if !notifications.is_empty() {
+            let now_instant = std::time::Instant::now();
             for notif in &notifications {
                 log::info!(target: "ALERT", "[盘中异动] {} ({}): {}", notif.name, notif.code, notif.message);
-                if cfg.notifications {
+                if cfg.notifications && tracker.allow_desktop_notification(&notif.code, now_instant) {
                     spawn_system_notification(app, notif);
                 }
             }
