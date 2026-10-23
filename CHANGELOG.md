@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
 ### 📊 全景量化决策引擎与日线 AI 研判深度升级 (Quant Wave Decision & Daily K-Line AI Engine)
 - **彻底废除死板拼接模板，引入全景盘面博弈**：
   - 彻底抛弃硬编码 `format!("建议{}。{}，{}。")` 简单拼接，重塑战术评语生成内核；
