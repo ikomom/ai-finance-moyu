@@ -264,7 +264,7 @@ fn synthesize_tactical_summary(
 ) -> String {
     let wave = p.wave_trend.as_deref().unwrap_or("波段整理");
     let sup_note = match p.support_dist_pct {
-        Some(d) if d >= 0.0 && d <= 2.2 => format!("逼近5日强支撑(现价差{d:.1}%)，"),
+        Some(d) if (0.0..=2.2).contains(&d) => format!("逼近5日强支撑(现价差{d:.1}%)，"),
         Some(d) if d < -1.0 => format!("已破位5日支撑(跌破{d:.1}%)，"),
         _ => String::new(),
     };
