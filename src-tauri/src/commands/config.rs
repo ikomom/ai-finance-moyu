@@ -12,6 +12,7 @@ use crate::state::{AppState, Snapshot};
 struct PreviousConfig {
     iwencai_api_key: Option<String>,
     layout_sizes: crate::config::LayoutSizes,
+    ai_decision_online_api_key: Option<String>,
 }
 
 /// Hand the renderer a consistent view of everything it displays.
@@ -51,8 +52,17 @@ pub fn save_config(app: AppHandle, mut cfg: Config) -> Result<(), String> {
         PreviousConfig {
             iwencai_api_key: guard.iwencai_api_key.clone(),
             layout_sizes: guard.layout_sizes.clone(),
+            ai_decision_online_api_key: guard.ai_decision.online_api_key.clone(),
         }
     };
+
+    if let Some(ref key) = cfg.ai_decision.online_api_key {
+        if key.trim().is_empty() {
+            cfg.ai_decision.online_api_key = previous.ai_decision_online_api_key;
+        }
+    } else {
+        cfg.ai_decision.online_api_key = previous.ai_decision_online_api_key;
+    }
 
     match cfg.iwencai_api_key.as_deref() {
         None => cfg.iwencai_api_key = previous.iwencai_api_key.clone(),

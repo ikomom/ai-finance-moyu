@@ -205,6 +205,9 @@ pub fn parse_yahoo_chart(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, Fetc
             dif: None,
             dea: None,
             macd: None,
+            k: None,
+            d: None,
+            j: None,
         });
     }
 

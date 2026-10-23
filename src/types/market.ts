@@ -92,6 +92,9 @@ export interface KLineBar {
   dif?: number | null
   dea?: number | null
   macd?: number | null
+  k?: number | null
+  d?: number | null
+  j?: number | null
 }
 
 export type KLineSignal = 'bull_aligned' | 'above_ma20' | 'below_ma20' | 'bear_aligned' | 'neutral'
@@ -101,6 +104,11 @@ export interface KLineData {
   bars: KLineBar[]
   maSignal: KLineSignal
   maComment: string
+  kdjStatus?: string | null
+  support?: number | null
+  resistance?: number | null
+  klineAction?: string | null
+  klineTone?: string | null
 }
 
 export interface PollStatus {

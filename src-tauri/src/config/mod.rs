@@ -5,6 +5,7 @@
 //! - [`types`] holds the rest of the schema
 //! - [`store`] holds load/save plus the offline quote cache
 
+mod ai;
 mod layout;
 mod prefs;
 mod store;

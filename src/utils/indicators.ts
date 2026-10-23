@@ -128,3 +128,70 @@ export function computeMinuteMacd(
   }
   return res
 }
+
+/**
+ * 为日K线序列重算 KDJ(9, 3, 3) 指标 (后台静默运算，供决策引擎使用).
+ */
+export function computeKLineKdj(
+  bars: KLineBar[],
+  params: [number, number, number] = [9, 3, 3]
+): void {
+  const n = bars.length
+  if (n === 0) return
+  const [period, m1, m2] = params
+
+  let prevK = 50.0
+  let prevD = 50.0
+
+  for (let i = 0; i < n; i++) {
+    const start = Math.max(0, i - period + 1)
+    let lowest = Infinity
+    let highest = -Infinity
+    for (let k = start; k <= i; k++) {
+      if (bars[k].low < lowest) lowest = bars[k].low
+      if (bars[k].high > highest) highest = bars[k].high
+    }
+
+    const c = bars[i].close
+    const rsv =
+      Math.abs(highest - lowest) < 1e-6
+        ? 50.0
+        : Math.min(100.0, Math.max(0.0, ((c - lowest) / (highest - lowest)) * 100.0))
+
+    const k = (1 / m1) * rsv + ((m1 - 1) / m1) * prevK
+    const d = (1 / m2) * k + ((m2 - 1) / m2) * prevD
+    const j = 3 * k - 2 * d
+
+    bars[i].k = Math.round(k * 10) / 10
+    bars[i].d = Math.round(d * 10) / 10
+    bars[i].j = Math.round(j * 10) / 10
+
+    prevK = k
+    prevD = d
+  }
+}
+
+/**
+ * 计算日K序列的前 5 日滚动支撑位与阻力位 (排除当前Bar).
+ */
+export function computeKLineLevels(
+  bars: KLineBar[]
+): { support: number | null; resistance: number | null } {
+  const n = bars.length
+  if (n < 2) return { support: null, resistance: null }
+
+  const start = Math.max(0, n - 6)
+  const end = n - 1
+  let sup = Infinity
+  let res = -Infinity
+
+  for (let i = start; i < end; i++) {
+    if (bars[i].high > res) res = bars[i].high
+    if (bars[i].low < sup) sup = bars[i].low
+  }
+
+  return {
+    support: sup !== Infinity ? Math.round(sup * 100) / 100 : null,
+    resistance: res !== -Infinity ? Math.round(res * 100) / 100 : null,
+  }
+}

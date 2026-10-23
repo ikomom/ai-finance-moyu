@@ -96,7 +96,7 @@ pub fn match_stock_sector(
     sectors: &[SectorItem],
     market_change_pct: f64,
 ) -> Option<SectorLinkage> {
-    if crate::market::is_index(code) || sectors.is_empty() {
+    if crate::market::is_index(code) {
         return None;
     }
 
@@ -150,32 +150,84 @@ pub fn match_stock_sector(
         })
     };
 
-    let sec = matched_sector?;
+    let (sec_code, sec_name, sec_pct, leader_c, leader_n, leader_zdf, is_exact) =
+        if let Some(sec) = matched_sector {
+            (
+                sec.code.clone(),
+                sec.name.clone(),
+                sec.change_pct,
+                sec.lead_stock_code.clone(),
+                sec.lead_stock_name.clone(),
+                sec.lead_stock_zdf,
+                true,
+            )
+        } else if let Some(ind) = target_ind {
+            (
+                format!("ind_{ind}"),
+                ind.to_string(),
+                0.0,
+                "".to_string(),
+                "".to_string(),
+                0.0,
+                false,
+            )
+        } else {
+            return None;
+        };
 
-    let delta_r_sector = ((change_pct - sec.change_pct) * 100.0).round() / 100.0;
+    let delta_r_sector = ((change_pct - sec_pct) * 100.0).round() / 100.0;
     let delta_r_market = ((change_pct - market_change_pct) * 100.0).round() / 100.0;
 
-    let (role, diagnosis) = if (sec.change_pct <= -0.5 || market_change_pct <= -0.5) && change_pct >= 0.2 {
-        ("逆势抗跌核心", format!("逆大盘/{}板块走强（超额 +{delta_r_sector:.2}%），资金逆势承接", sec.name))
-    } else if change_pct >= sec.lead_stock_zdf - 0.3 && change_pct > 0.0 {
-        ("板块领涨核心", format!("涨幅逼近龙头{}，具备极强板块核心辨识度", sec.lead_stock_name))
-    } else if change_pct >= 0.0 && sec.change_pct >= 0.5 && delta_r_sector >= -1.5 {
-        ("梯队协同助攻", format!("跟随{}板块主力节奏上行，与龙头{}共振", sec.name, sec.lead_stock_name))
-    } else if sec.change_pct >= 0.5 && change_pct <= -1.0 {
-        ("脱离板块补跌", format!("大幅落后{}板块（负超额 {delta_r_sector:.2}%），需警惕补跌风险", sec.name))
+    let (role, diagnosis) = if !is_exact {
+        if crate::trend_engine::classify_sector_style(code, &sec_name)
+            == crate::trend_engine::SectorStyle::DefensiveBank
+        {
+            (
+                "权重防御配置",
+                format!("归属{sec_name}行业（大盘避险防御），未入领涨榜，受成长风格分流"),
+            )
+        } else {
+            (
+                "行业常规轮动",
+                format!("归属{sec_name}行业，今日资金关注度有限，暂处跟随蓄势态"),
+            )
+        }
+    } else if (sec_pct <= -0.5 || market_change_pct <= -0.5) && change_pct >= 0.2 {
+        (
+            "逆势抗跌核心",
+            format!("逆大盘/{sec_name}板块走强（超额 +{delta_r_sector:.2}%），资金逆势承接"),
+        )
+    } else if change_pct >= leader_zdf - 0.3 && change_pct > 0.0 {
+        (
+            "板块领涨核心",
+            format!("涨幅逼近龙头{leader_n}，具备极强板块核心辨识度"),
+        )
+    } else if change_pct >= 0.0 && sec_pct >= 0.5 && delta_r_sector >= -1.5 {
+        (
+            "梯队协同助攻",
+            format!("跟随{sec_name}板块主力节奏上行，与龙头{leader_n}共振"),
+        )
+    } else if sec_pct >= 0.5 && change_pct <= -1.0 {
+        (
+            "脱离板块补跌",
+            format!("大幅落后{sec_name}板块（负超额 {delta_r_sector:.2}%），需警惕补跌风险"),
+        )
     } else {
-        ("跟随板块整理", format!("走势与{}板块大体同步，处于跟随蓄势阶段", sec.name))
+        (
+            "跟随板块整理",
+            format!("走势与{sec_name}板块大体同步，处于跟随蓄势阶段"),
+        )
     };
 
     Some(SectorLinkage {
-        sector_code: sec.code.clone(),
-        sector_name: sec.name.clone(),
-        sector_change_pct: sec.change_pct,
+        sector_code: sec_code,
+        sector_name: sec_name,
+        sector_change_pct: sec_pct,
         delta_r_sector,
         delta_r_market,
-        leader_code: sec.lead_stock_code.clone(),
-        leader_name: sec.lead_stock_name.clone(),
-        leader_change_pct: sec.lead_stock_zdf,
+        leader_code: leader_c,
+        leader_name: leader_n,
+        leader_change_pct: leader_zdf,
         role: role.to_string(),
         diagnosis,
     })

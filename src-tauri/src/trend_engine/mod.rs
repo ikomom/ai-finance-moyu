@@ -11,9 +11,11 @@
 
 mod analyze;
 mod patterns;
+pub mod sector_style;
 mod types;
 
 pub use analyze::*;
+pub use sector_style::*;
 pub use types::*;
 
 #[cfg(test)]

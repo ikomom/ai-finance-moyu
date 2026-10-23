@@ -4,21 +4,7 @@ import './Market.css'
 import { Grip } from '../components/Grip'
 import { StatusLine } from '../components/StatusLine'
 import { snapshot } from '../store'
-import { fmtPct, fmtPrice, trendClass } from '../types'
-
-/**
- * Format total turnover into human-readable Chinese units (万亿 / 亿).
- */
-function fmtTurnover(turnover: number): string {
-  if (!turnover || turnover <= 0) return '--'
-  if (turnover >= 1e12) {
-    return `${(turnover / 1e12).toFixed(2)}万亿`
-  }
-  if (turnover >= 1e8) {
-    return `${(turnover / 1e8).toFixed(0)}亿`
-  }
-  return `${(turnover / 1e4).toFixed(0)}万`
-}
+import { fmtPct, fmtPrice, fmtTurnover, trendClass } from '../types'
 
 /**
  * Layout 4 — 大盘全景看板 (A股市场温度与板块情绪).

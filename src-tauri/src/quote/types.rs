@@ -115,6 +115,12 @@ pub struct KLineBar {
     pub dif: Option<f64>,
     pub dea: Option<f64>,
     pub macd: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub k: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub d: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub j: Option<f64>,
 }
 
 /// Normalized daily K-line series with moving averages and diagnostic state.
@@ -127,6 +133,16 @@ pub struct KLineData {
     pub ma_signal: String,
     /// Detailed diagnostic comment
     pub ma_comment: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kdj_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub support: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resistance: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kline_action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kline_tone: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

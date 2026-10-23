@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeKLineMacd, computeKLineMovingAverages, computeMinuteMacd } from './indicators'
+import {
+  computeKLineKdj,
+  computeKLineLevels,
+  computeKLineMacd,
+  computeKLineMovingAverages,
+  computeMinuteMacd,
+} from './indicators'
 import type { KLineBar, TrendPoint } from '../types'
 
 function bars(closes: number[]): KLineBar[] {
@@ -85,5 +91,24 @@ describe('minute MACD', () => {
 
   it('returns an empty array for no data', () => {
     expect(computeMinuteMacd([])).toEqual([])
+  })
+})
+
+describe('kline KDJ and levels', () => {
+  it('computes rolling KDJ values', () => {
+    const b = bars([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+    computeKLineKdj(b)
+    expect(b[0].k).toBe(50)
+    expect(b[9].k).toBeDefined()
+    expect(b[9].j).toBeGreaterThan(50)
+  })
+
+  it('computes rolling 5-day support and resistance', () => {
+    const b = bars([10, 12, 14, 16, 18, 15, 17])
+    const levels = computeKLineLevels(b)
+    expect(levels.support).toBeDefined()
+    expect(levels.resistance).toBeDefined()
+    expect(levels.resistance).toBe(18)
+    expect(levels.support).toBe(12)
   })
 })

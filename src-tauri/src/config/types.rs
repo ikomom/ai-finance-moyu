@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::crossing::{PriceLine, WatchSpec};
 
+pub use super::ai::*;
 pub use super::layout::*;
 use super::layout::sizes_are_empty;
-
 
 /// Indicator strategy configuration (MA periods & MACD parameters).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,15 +87,8 @@ impl WatchItem {
     }
 }
 
-/// Global shortcut chords, as strings the global-shortcut plugin accepts.
-///
-/// Deliberately `Ctrl+Alt` rather than `Ctrl+Shift`: on Chinese Windows
-/// `Ctrl+Shift` is the IME switch chord, and `Ctrl+Shift+1/2/3` are commonly
-/// bound to switching between input methods. Using them would switch the IME as
-/// a side effect of changing layout.
 pub use super::prefs::*;
 use super::prefs::{default_theme, default_true};
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -135,6 +128,9 @@ pub struct Config {
     /// Global indicator strategy configuration (MA & MACD parameters).
     #[serde(default)]
     pub indicator_config: IndicatorConfig,
+    /// Jev / Laya (System-1) decision model configuration.
+    #[serde(default)]
+    pub ai_decision: AiDecisionConfig,
 }
 
 impl Default for Config {
@@ -164,6 +160,7 @@ impl Default for Config {
             anomaly_alerts: AnomalyAlertConfig::default(),
             iwencai_api_key: None,
             indicator_config: IndicatorConfig::default(),
+            ai_decision: AiDecisionConfig::default(),
         }
     }
 }

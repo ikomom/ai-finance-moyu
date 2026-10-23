@@ -1,5 +1,5 @@
-import { createSignal, Show } from 'solid-js'
-
+import { Show } from 'solid-js'
+import { BaseBadge } from './badge'
 import { fmtPct, fmtPrice, fmtSigned, type AuctionData, type Quote } from '../types'
 
 export function AuctionBadge(props: {
@@ -8,8 +8,6 @@ export function AuctionBadge(props: {
   compact?: boolean
   showDetails?: boolean
 }) {
-  const [hovered, setHovered] = createSignal(false)
-
   const auc = () => props.auction
   const q = () => props.quote
   const diag = () => auc()?.diagnosis
@@ -75,20 +73,14 @@ export function AuctionBadge(props: {
   }
 
   return (
-    <div
-      class={`trend-badge-wrap ${props.compact ? 'compact' : ''}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span
-        class={`trend-badge ${badgeInfo().tone}`}
-        title={props.compact ? `${badgeInfo().label}\n${badgeInfo().detail}` : undefined}
-      >
-        {props.compact ? badgeInfo().compactLabel : badgeInfo().label}
-      </span>
-
-      <Show when={hovered() && (props.showDetails ?? true) && !props.compact}>
-        <div class="trend-popover" onWheel={(e) => e.stopPropagation()}>
+    <BaseBadge
+      label={props.compact ? badgeInfo().compactLabel : badgeInfo().label}
+      tone={badgeInfo().tone}
+      compact={props.compact}
+      showDetails={props.showDetails}
+      title={props.compact ? `${badgeInfo().label}\n${badgeInfo().detail}` : undefined}
+      popover={(popoverRef) => (
+        <div ref={popoverRef} class="trend-popover" onWheel={(e) => e.stopPropagation()}>
           {/* 头部：竞价状态 + 阶段标识 */}
           <div class="popover-head-simple">
             <span class={`popover-badge-label ${badgeInfo().tone}`}>{badgeInfo().label}</span>
@@ -141,7 +133,7 @@ export function AuctionBadge(props: {
             </Show>
           </div>
         </div>
-      </Show>
-    </div>
+      )}
+    />
   )
 }

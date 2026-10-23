@@ -163,7 +163,22 @@ pub fn run() {
             commands::fetch_latest_release,
             commands::clear_memory_logs,
             commands::set_log_level,
+            commands::get_ai_decision_config,
+            commands::save_ai_decision_config,
+            commands::start_local_decision_service,
+            commands::stop_local_decision_service,
+            commands::get_local_service_status,
+            commands::download_decision_model,
+            commands::cancel_download_decision_model,
+            commands::get_model_download_status,
+            commands::open_models_dir,
+            commands::decide_stock_with_ai,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                let _ = commands::stop_local_decision_service();
+            }
+        });
 }

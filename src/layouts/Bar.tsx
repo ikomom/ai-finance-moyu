@@ -1,6 +1,8 @@
 import { For, onMount, Show } from 'solid-js'
 
 import { setTrendTargets } from '../tauri'
+import { diagnoseIndex } from '../utils/indexDiagnosis'
+import { diagnoseStock } from '../utils/stockDiagnosis'
 import './Bar.css'
 import {
   fmtMoney,
@@ -57,19 +59,24 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
             const tooltip = () => {
               const it = item()
               const parts = [`${q.name} (${q.code})`, `现价: ${fmtPrice(q.price)} (${fmtPct(q.changePct)})`]
-              if (props.snapshot.config.trendEngine) {
+              if (isIndexCode(q.code)) {
+                const diag = diagnoseIndex(q, props.snapshot.marketOverview, props.snapshot.trendSignals?.[q.code])
+                parts.push(`大盘诊断: ${diag.badgeLabel} · ${diag.guidance}`)
+                parts.push(`盘面实况: ${diag.summary}`)
+                parts.push(`两市成交: ${diag.totalTurnoverText} (${diag.turnoverDeltaDetail}) | 涨 ${diag.upCount} 跌 ${diag.downCount}`)
+              } else if (props.snapshot.config.trendEngine) {
                 const sig = props.snapshot.trendSignals?.[q.code]
                 if (sig) {
-                  parts.push(`形态诊断: ${sig.label} (评分 ${sig.score > 0 ? '+' : ''}${sig.score})`)
-                  parts.push(`均线偏离: ${sig.biasPct >= 0 ? '+' : ''}${sig.biasPct.toFixed(2)}% | ${sig.summary}`)
-                  if (!isIndexCode(q.code) && sig.sectorLinkage) {
+                  const sdiag = diagnoseStock(q, sig)
+                  parts.push(`个股诊断: ${sdiag.badgeLabel} · ${sdiag.guidance}`)
+                  parts.push(`实战指引: ${sdiag.actionSummary}`)
+                  parts.push(`资金量价: ${sdiag.vwapStatusText} | 盘口 ${sdiag.imbalanceText} | 主买 ${sdiag.activeBuyText}`)
+                  if (sig.sectorLinkage) {
                     const lk = sig.sectorLinkage
                     const leaderText = lk.leaderName ? ` (龙头: ${lk.leaderName} ${lk.leaderChangePct >= 0 ? '+' : ''}${lk.leaderChangePct.toFixed(2)}%)` : ''
                     parts.push(`板块联动: ${lk.sectorName} ${lk.sectorChangePct >= 0 ? '+' : ''}${lk.sectorChangePct.toFixed(2)}%${leaderText} | [${lk.role}] 超额: ${lk.deltaRSector >= 0 ? '+' : ''}${lk.deltaRSector.toFixed(2)}%`)
                   }
-                  if (q.bidAskImbalance != null && q.bidAskImbalance !== 0) {
-                    parts.push(`微观盘口: 买卖失衡 ${(q.bidAskImbalance * 100).toFixed(1)}% | 主买占比 ${((q.activeBuyRatio ?? 0.5) * 100).toFixed(1)}%`)
-                  }
+                  parts.push(`多空能量: ${sdiag.scoreLabel}`)
                 }
               }
               if (it?.costPrice != null) {

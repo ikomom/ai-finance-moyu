@@ -122,6 +122,12 @@ v_gzFTSE="FTSE~英国富时100指数~2026-10-16 16:16:59~10826.96~-13.39~-0.12~E
         // 5. Index symbols always return None
         let l5 = match_stock_sector("sh000001", "上证指数", 0.5, &sectors, 0.5);
         assert!(l5.is_none());
+
+        // 6. Defensive bank matching even when not in top sectors
+        let empty_sectors: Vec<SectorItem> = vec![];
+        let l6 = match_stock_sector("sh601398", "工商银行", -3.14, &empty_sectors, -0.5).unwrap();
+        assert_eq!(l6.sector_name, "银行");
+        assert_eq!(l6.role, "权重防御配置");
     }
 
     #[tokio::test]

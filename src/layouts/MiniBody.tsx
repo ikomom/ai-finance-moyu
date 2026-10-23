@@ -9,11 +9,12 @@ import { Show, type Accessor, type Setter } from 'solid-js'
 import { AuctionBadge } from '../components/AuctionBadge'
 import { Chart, type HoverExtra } from '../components/Chart'
 import { FooterControls } from '../components/FooterControls'
+import { IndexBadge } from '../components/IndexBadge'
 import { KLineBadge } from '../components/KLineBadge'
 import { KlineCanvas } from '../components/KlineCanvas'
 import { StatusLine } from '../components/StatusLine'
 import { StockHeader } from '../components/StockHeader'
-import { TrendBadge } from '../components/TrendBadge'
+import { StockBadge } from '../components/StockBadge'
 import {
   fmtMoney,
   fmtPct,
@@ -130,23 +131,36 @@ export function MiniBody(props: MiniBodyProps) {
         high={stats().high}
         low={stats().low}
         badge={
-          <Show
-            when={activeMode() === 'kline'}
-            fallback={
-              <Show
-                when={(hoveredPointExtra()?.auctionPoint != null || isAuctionSession()) && !isIndex()}
-                fallback={
-                  <Show when={s().config.trendEngine}>
-                    <TrendBadge signal={s().trendSignals?.[q().code]} quote={q()} />
-                  </Show>
-                }
-              >
-                <AuctionBadge auction={auction()} quote={q()} />
-              </Show>
-            }
-          >
-            <KLineBadge kline={kline()} quote={q()} />
-          </Show>
+          <>
+            <Show
+              when={activeMode() === 'kline'}
+              fallback={
+                <Show
+                  when={isIndex()}
+                  fallback={
+                    <Show
+                      when={hoveredPointExtra()?.auctionPoint != null || isAuctionSession()}
+                      fallback={
+                        <Show when={s().config.trendEngine}>
+                          <StockBadge signal={s().trendSignals?.[q().code]} quote={q()} snapshot={s()} />
+                        </Show>
+                      }
+                    >
+                      <AuctionBadge auction={auction()} quote={q()} />
+                    </Show>
+                  }
+                >
+                  <IndexBadge
+                    quote={q()}
+                    overview={s().marketOverview}
+                    signal={s().trendSignals?.[q().code]}
+                  />
+                </Show>
+              }
+            >
+              <KLineBadge kline={kline()} quote={q()} snapshot={s()} />
+            </Show>
+          </>
         }
         hoverTime={hoverTime()}
         hoverExtra={hoverExtra()}

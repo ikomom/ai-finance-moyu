@@ -3,15 +3,17 @@ import { invoke } from '@tauri-apps/api/core'
 import './List.css'
 
 import { Grip } from '../components/Grip'
+import { IndexBadge } from '../components/IndexBadge'
 import { Sparkline } from '../components/Sparkline'
 import { StatusLine } from '../components/StatusLine'
-import { TrendBadge } from '../components/TrendBadge'
+import { StockBadge } from '../components/StockBadge'
 import { selectedIndex, setSelected, snapshot } from '../store'
 import { setTrendTargets } from '../tauri'
 import {
   fmtMoney,
   fmtPct,
   fmtPrice,
+  isIndexCode,
   profitAmount,
   profitPct,
   todayProfitAmount,
@@ -211,24 +213,28 @@ export function List(props: { flash: boolean }) {
                       <span class="name-text">{q.name}</span>
                       <div class="code-and-signal">
                         <span class="code-text">{q.code.replace(/^(sh|sz|bj)/, '')}</span>
-                        <Show when={s().config.trendEngine && s().trendSignals?.[q.code]}>
-                          <TrendBadge signal={s().trendSignals[q.code]} quote={q} compact />
+                        <Show
+                          when={isIndexCode(q.code)}
+                          fallback={
+                            <Show when={s().config.trendEngine && s().trendSignals?.[q.code]}>
+                              <StockBadge signal={s().trendSignals[q.code]} quote={q} compact />
+                            </Show>
+                          }
+                        >
+                          <IndexBadge compact quote={q} overview={s().marketOverview} signal={s().trendSignals?.[q.code]} />
                         </Show>
                       </div>
                     </div>
-
                     <div class="col-price cell-price">
                       <span class={q.price > 0 ? trendClass(q.changePct) : 'flat'}>
                         {q.price > 0 ? fmtPrice(q.price) : '--'}
                       </span>
                     </div>
-
                     <div class="col-pct cell-pct">
                       <span class={`badge-pct ${q.price > 0 ? trendClass(q.changePct) : 'flat'}`}>
                         {q.price > 0 ? fmtPct(q.changePct) : '--'}
                       </span>
                     </div>
-
                     <div class="col-trend cell-trend">
                       <Sparkline
                         trend={s().trends[q.code]}
@@ -236,7 +242,6 @@ export function List(props: { flash: boolean }) {
                         lastPrice={q.price}
                       />
                     </div>
-
                     <div class="col-pnl cell-pnl">
                       <Show
                         when={pnl() !== null}

@@ -90,6 +90,9 @@
                 dif: None,
                 dea: None,
                 macd: None,
+            k: None,
+            d: None,
+            j: None,
             });
         }
         let kline = compute_kline_indicators("sh600000", bars);

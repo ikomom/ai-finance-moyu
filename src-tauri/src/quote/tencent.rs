@@ -242,6 +242,9 @@ pub fn parse_kline(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, FetchError
                         dif: None,
                         dea: None,
                         macd: None,
+                        k: None,
+                        d: None,
+                        j: None,
                     });
                 }
             }

@@ -216,6 +216,12 @@
   border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
+.log-badge-target.target-ai {
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
 .log-badge-target.target-net {
   background: rgba(14, 165, 233, 0.15);
   color: #38bdf8;

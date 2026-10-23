@@ -82,6 +82,18 @@ export function trendClass(changePct: number): string {
   return 'flat'
 }
 
+/** Format total turnover into human-readable Chinese units (万亿 / 亿 / 万). */
+export function fmtTurnover(turnover?: number | null): string {
+  if (!turnover || turnover <= 0) return '--'
+  if (turnover >= 1e12) {
+    return `${(turnover / 1e12).toFixed(2)}万亿`
+  }
+  if (turnover >= 1e8) {
+    return `${(turnover / 1e8).toFixed(0)}亿`
+  }
+  return `${(turnover / 1e4).toFixed(0)}万`
+}
+
 /** Check if symbol represents an index (no individual call auction or VWAP) */
 export function isIndexCode(code: string): boolean {
   return code.startsWith('sh000') || code.startsWith('sz399') || code.startsWith('bj899')

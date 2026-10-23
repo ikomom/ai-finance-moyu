@@ -7,6 +7,8 @@
 
 export type LineDirection = 'above' | 'below'
 
+import type { AiDecisionConfig } from './aiDecision'
+
 export interface PriceLine {
   price: number
   label?: string | null
@@ -284,6 +286,7 @@ export interface Config {
   anomalyAlerts?: AnomalyAlertConfig
   iwencaiApiKey?: string
   indicatorConfig?: IndicatorConfig
+  aiDecision?: AiDecisionConfig
 }
 
 export interface AnomalyAlertConfig {
