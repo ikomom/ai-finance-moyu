@@ -32,6 +32,15 @@ export function StockBadge(props: StockBadgeProps) {
   const tone = (): StockDiagnosisTone => {
     if (!isAiActive()) return diag().tone
     const act = aiResult()!.action.toLowerCase()
+    if (act.includes('sealed_limit_down') || act.includes('跌停') || act.includes('观望封单')) {
+      return 'bear'
+    }
+    if (act.includes('sealed_limit_up') || act.includes('涨停')) {
+      return 'bull'
+    }
+    if (act.includes('broken_limit') || act.includes('翘板') || act.includes('炸板') || act.includes('资金博弈')) {
+      return 'warn'
+    }
     if (
       act.includes('buy') ||
       act.includes('hold') ||
@@ -62,6 +71,9 @@ export function StockBadge(props: StockBadgeProps) {
     if (isAiActive()) {
       const clean = aiResult()!.actionLabel.replace(/[【】]/g, '')
       const prefix = diag().badgeLabel.split(' · ')[0]
+      if (prefix.includes('跌停') || prefix.includes('涨停') || prefix.includes('炸板') || prefix.includes('翘板')) {
+        return diag().badgeLabel
+      }
       return combineBadgeText(prefix, clean, diag().badgeLabel.split(' · ')[1])
     }
 

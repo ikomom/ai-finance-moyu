@@ -127,4 +127,46 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     expect(res.sectorRoleText).toContain('领涨核心 · 超额 +1.5%')
     expect(res.leaderText).toContain('中芯国际 (+5.2%)')
   })
+
+  it('diagnoses sealedLimitDown (封死跌停·观望封单)', () => {
+    const q = mockQuote(4.42, 4.91, { bidAskImbalance: -1.0, activeBuyRatio: 0.05 })
+    const sig = mockSignal('sealedLimitDown', -100, -9.98, { summary: '' })
+    const res = diagnoseStock(q, sig)
+
+    expect(res.badgeLabel).toBe('🔒 封死跌停 · 观望封单')
+    expect(res.compactLabel).toBe('跌停(锁)')
+    expect(res.tone).toBe('bear')
+    expect(res.guidance).toBe('【观望封单】')
+    expect(res.actionSummary).toContain('买档真空流动性枯竭')
+  })
+
+  it('diagnoses brokenLimitDown (跌停翘板·资金博弈)', () => {
+    const q = mockQuote(4.55, 4.91, { bidAskImbalance: 0.15, activeBuyRatio: 0.58 })
+    const sig = mockSignal('brokenLimitDown', -35, -7.33)
+    const res = diagnoseStock(q, sig)
+
+    expect(res.badgeLabel).toBe('⚡ 跌停翘板 · 资金博弈')
+    expect(res.compactLabel).toBe('翘板(察)')
+    expect(res.tone).toBe('warn')
+  })
+
+  it('diagnoses sealedLimitUp (封死涨停·顺势持股)', () => {
+    const q = mockQuote(11.0, 10.0, { bidAskImbalance: 1.0, activeBuyRatio: 0.95 })
+    const sig = mockSignal('sealedLimitUp', 100, 10.0)
+    const res = diagnoseStock(q, sig)
+
+    expect(res.badgeLabel).toBe('🔒 封死涨停 · 顺势持股')
+    expect(res.compactLabel).toBe('涨停(持)')
+    expect(res.tone).toBe('bull')
+  })
+
+  it('diagnoses brokenLimitUp (涨停炸板·逢高减仓)', () => {
+    const q = mockQuote(10.8, 10.0, { bidAskImbalance: -0.2, activeBuyRatio: 0.42 })
+    const sig = mockSignal('brokenLimitUp', 30, 8.0)
+    const res = diagnoseStock(q, sig)
+
+    expect(res.badgeLabel).toBe('⚡ 涨停炸板 · 逢高减仓')
+    expect(res.compactLabel).toBe('炸板(减)')
+    expect(res.tone).toBe('warn')
+  })
 })

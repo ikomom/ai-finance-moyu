@@ -38,6 +38,11 @@ def evaluate_decision(state: dict) -> dict:
         bias_val = 0.0
 
     try:
+        chg_pct_val = float(change_pct_str.replace("%", "").replace("+", "").split()[0])
+    except Exception:
+        chg_pct_val = 0.0
+
+    try:
         buy_ratio = float(active_buy_str.replace("%", "").split()[0]) / 100.0
     except Exception:
         buy_ratio = 0.5
@@ -73,7 +78,22 @@ def evaluate_decision(state: dict) -> dict:
     trap_prob = max(0.05, min(0.95, round(trap_score, 2)))
 
     # 2. trade_action (Choice)
-    if trap_prob >= 0.70 or (is_near_resist and bias_val > 1.2):
+    is_gem_or_star = stock.startswith("30") or stock.startswith("68") or stock.startswith("sz30") or stock.startswith("sh68")
+    limit_pct = 19.5 if is_gem_or_star else 9.8
+
+    if chg_pct_val <= -limit_pct and imb_val <= -0.85:
+        action = "sealed_limit_down"
+        action_zh = "观望封单"
+    elif chg_pct_val >= limit_pct and imb_val >= 0.85:
+        action = "sealed_limit_up"
+        action_zh = "顺势持股"
+    elif chg_pct_val < -limit_pct * 0.85 and imb_val > -0.60:
+        action = "broken_limit_down"
+        action_zh = "资金博弈"
+    elif chg_pct_val > limit_pct * 0.85 and imb_val < 0.60:
+        action = "broken_limit_up"
+        action_zh = "逢高减仓"
+    elif trap_prob >= 0.70 or (is_near_resist and bias_val > 1.2):
         action = "take_profit"
         action_zh = "逢高止盈"
     elif (is_oversold or is_near_support) and has_buy_absorption:
@@ -122,7 +142,27 @@ def evaluate_decision(state: dict) -> dict:
     elif imb_val <= -0.15:
         summary_parts.append(f"盘口卖单压制沉重 ({int(imb_val*100)}%)，")
 
-    if action in ["support_test", "oversold_bounce"]:
+    if action == "sealed_limit_down":
+        summary_parts = [
+            "已被巨额空头封单死死封在跌停板上，买盘真空流动性枯竭，当前挂单出逃极难成交；"
+            "严禁伸手接飞刀，重点密切跟踪跌停封单消耗与主力翘板自救信号。"
+        ]
+    elif action == "sealed_limit_up":
+        summary_parts = [
+            "多头主力资金牢牢封死涨停板，卖盘真空锁仓坚固，享受强势溢价；"
+            "持股待涨，次日高开溢价预期强烈，密切观察尾盘封单厚度。"
+        ]
+    elif action == "broken_limit_down":
+        summary_parts = [
+            "跌停板被巨量撬板资金撬开，多空资金剧烈换手博弈；"
+            "持仓者可密切跟踪盘口承接择机自救控仓，未持仓切忌盲目追进。"
+        ]
+    elif action == "broken_limit_up":
+        summary_parts = [
+            "涨停板巨额封单被大单砸开炸板，高位筹码分歧松动；"
+            "警惕主力高位兑现撤退回落风险，宜逢高分批减仓锁定利润。"
+        ]
+    elif action in ["support_test", "oversold_bounce"]:
         summary_parts.append("重点观察支撑位企稳与超跌反抽动能，不宜盲目杀跌。")
     elif action == "take_profit":
         summary_parts.append("逼近阻力位且出现滞涨，建议逢高分批落袋兑现。")

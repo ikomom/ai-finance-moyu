@@ -4,6 +4,7 @@
 
 use crate::quote::{Quote, Trend, TrendPoint};
 
+use super::limit_board::detect_limit_board_pattern;
 use super::patterns::{early_patterns, PatternCtx};
 use super::types::{now_epoch_secs, TrendSignal, TrendState};
 
@@ -166,6 +167,11 @@ pub fn analyze_trend(
         orb_high,
         orb_low,
     };
+    // 0. Highest priority: Limit Board States (封死跌停 / 封死涨停 / 跌停翘板 / 涨停炸板)
+    if let Some(signal) = detect_limit_board_pattern(quote, price, &make_signal) {
+        return Some(signal);
+    }
+
     if let Some(signal) = early_patterns(&ctx, &make_signal) {
         return Some(signal);
     }

@@ -232,8 +232,9 @@ export type TrendState =
   | 'illiquidDrift'
   | 'independentAlpha'
   | 'soloPlunge'
-  | 'orbBreakoutUp'
-  | 'orbBreakdownDown'
+  | 'orbBreakoutUp' | 'orbBreakdownDown'
+  | 'sealedLimitDown' | 'brokenLimitDown'
+  | 'sealedLimitUp' | 'brokenLimitUp'
 
 export interface TrendSignal {
   state: TrendState

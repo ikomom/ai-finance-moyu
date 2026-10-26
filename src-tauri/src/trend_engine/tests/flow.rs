@@ -85,3 +85,52 @@
         assert_eq!(sig.compact_label, "抗跌");
         assert!(sig.sector_linkage.is_some());
     }
+
+    #[test]
+    fn detects_limit_board_four_states() {
+        let pv = vec![(4.42, 50.0); 10];
+        let t = mock_trend("sh600293", &pv, 4.91, false);
+
+        // 1. 封死跌停 (三峡新材真实跌停场景)
+        let mut q_limit_down = mock_quote("sh600293", 4.42, 4.91, -9.98);
+        q_limit_down.name = "三峡新材".into();
+        q_limit_down.low = 4.42;
+        q_limit_down.bids = vec![];
+        q_limit_down.asks = vec![(4.42, 50000.0)];
+        q_limit_down.bid_ask_imbalance = -1.0;
+        let sig_down = analyze_trend(&q_limit_down, Some(&t), None).unwrap();
+        assert_eq!(sig_down.state, TrendState::SealedLimitDown);
+        assert_eq!(sig_down.compact_label, "跌停");
+        assert!(sig_down.summary.contains("死封跌停"));
+        assert!(sig_down.summary.contains("严禁伸手接飞刀"));
+
+        // 2. 跌停翘板
+        let mut q_broken_down = mock_quote("sh600293", 4.55, 4.91, -7.33);
+        q_broken_down.name = "三峡新材".into();
+        q_broken_down.low = 4.42;
+        let sig_broken_down = analyze_trend(&q_broken_down, Some(&t), None).unwrap();
+        assert_eq!(sig_broken_down.state, TrendState::BrokenLimitDown);
+        assert_eq!(sig_broken_down.compact_label, "翘板");
+        assert!(sig_broken_down.summary.contains("跌停板被巨量撬板资金撬开"));
+
+        // 3. 封死涨停
+        let mut q_limit_up = mock_quote("sh600000", 11.00, 10.00, 10.0);
+        q_limit_up.name = "浦发银行".into();
+        q_limit_up.high = 11.00;
+        q_limit_up.asks = vec![];
+        q_limit_up.bids = vec![(11.00, 80000.0)];
+        q_limit_up.bid_ask_imbalance = 1.0;
+        let sig_up = analyze_trend(&q_limit_up, Some(&t), None).unwrap();
+        assert_eq!(sig_up.state, TrendState::SealedLimitUp);
+        assert_eq!(sig_up.compact_label, "涨停");
+        assert!(sig_up.summary.contains("牢牢封死涨停"));
+
+        // 4. 涨停炸板
+        let mut q_broken_up = mock_quote("sh600000", 10.80, 10.00, 8.0);
+        q_broken_up.name = "浦发银行".into();
+        q_broken_up.high = 11.00;
+        let sig_broken_up = analyze_trend(&q_broken_up, Some(&t), None).unwrap();
+        assert_eq!(sig_broken_up.state, TrendState::BrokenLimitUp);
+        assert_eq!(sig_broken_up.compact_label, "炸板");
+        assert!(sig_broken_up.summary.contains("涨停板被大单砸开炸板"));
+    }

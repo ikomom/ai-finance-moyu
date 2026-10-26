@@ -203,6 +203,10 @@ pub async fn execute_decision(
         "buy" => "顺势做多",
         "oversold_bounce" => "超跌反弹",
         "support_test" => "考验支撑",
+        "sealed_limit_down" => "观望封单",
+        "broken_limit_down" => "资金博弈",
+        "sealed_limit_up" => "顺势持股",
+        "broken_limit_up" => "逢高减仓",
         _ => "观望防守",
     };
 
@@ -275,6 +279,12 @@ fn synthesize_tactical_summary(
     };
     let trap_warn = if fake_prob >= 0.70 { "诱多嫌疑显著；" } else { "" };
 
+    if act == "观望封单" {
+        return "死封跌停流动性枯竭；严禁盲目接飞刀，重点跟踪封单消耗与撬板动向。".into();
+    }
+    if act == "资金博弈" {
+        return "跌停板被撬开多空换手博弈；持仓者借反弹择机自救控仓，未持仓切忌追进。".into();
+    }
     if act == "考验支撑" || act == "超跌反弹" {
         format!("{wave}。{attr}；{sup_note}{imb_note}重点观察企稳反抽动能，不宜盲目杀跌。")
     } else if act == "逢高止盈" {

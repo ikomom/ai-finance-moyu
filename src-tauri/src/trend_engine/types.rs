@@ -48,6 +48,14 @@ pub enum TrendState {
     OrbBreakoutUp,
     /// ORB 向下跌破：放量跌破开盘15分钟区间低点
     OrbBreakdownDown,
+    /// 封死跌停：现价触及跌停价且买盘真空，极端流动性枯竭
+    SealedLimitDown,
+    /// 跌停翘板：曾封死跌停，盘中被巨量资金撬开反弹
+    BrokenLimitDown,
+    /// 封死涨停：现价触及涨停价且卖盘真空，多头强势锁仓
+    SealedLimitUp,
+    /// 涨停炸板：曾封死涨停，盘中大单砸开回落
+    BrokenLimitUp,
 }
 
 impl TrendState {
@@ -72,6 +80,10 @@ impl TrendState {
             TrendState::SoloPlunge => "▼ 独立下杀",
             TrendState::OrbBreakoutUp => "▲ ORB突破",
             TrendState::OrbBreakdownDown => "▼ ORB跌破",
+            TrendState::SealedLimitDown => "🔒 封死跌停",
+            TrendState::BrokenLimitDown => "⚡ 跌停翘板",
+            TrendState::SealedLimitUp => "🔒 封死涨停",
+            TrendState::BrokenLimitUp => "⚡ 涨停炸板",
         }
     }
 
@@ -96,6 +108,10 @@ impl TrendState {
             TrendState::SoloPlunge => "下杀",
             TrendState::OrbBreakoutUp => "突破",
             TrendState::OrbBreakdownDown => "跌破",
+            TrendState::SealedLimitDown => "跌停",
+            TrendState::BrokenLimitDown => "翘板",
+            TrendState::SealedLimitUp => "涨停",
+            TrendState::BrokenLimitUp => "炸板",
         }
     }
 }
