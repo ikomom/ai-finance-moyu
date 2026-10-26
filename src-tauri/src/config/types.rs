@@ -219,6 +219,10 @@ impl Config {
             }
         }
 
+        if self.ai_decision.local_port < 1024 {
+            self.ai_decision.local_port = 8000;
+        }
+
         // Indicator config sanitization
         if !matches!(
             self.indicator_config.preset.as_str(),

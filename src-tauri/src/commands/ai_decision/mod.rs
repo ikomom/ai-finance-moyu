@@ -43,6 +43,11 @@ pub fn save_ai_decision_config(
         new_cfg.online_api_key = guard.ai_decision.online_api_key.clone();
     }
 
+    // Validate and clamp local port to prevent unprivileged system port crashes
+    if new_cfg.local_port < 1024 {
+        new_cfg.local_port = 8000;
+    }
+
     let port_changed = new_cfg.local_port != old_port;
     let mode_changed = new_cfg.mode != old_mode;
 

@@ -44,11 +44,23 @@ export function AiLocalCard(props: AiLocalCardProps) {
 
       <div class="ai-grid-fields">
         <div class="field">
-          <label>服务监听端口</label>
+          <label>服务监听端口 (1024 - 65535)</label>
           <input
             type="number"
+            min="1024"
+            max="65535"
             value={props.localPort()}
-            onInput={(e) => props.setLocalPort(Number(e.currentTarget.value))}
+            onInput={(e) => {
+              const val = parseInt(e.currentTarget.value, 10)
+              if (!isNaN(val)) {
+                props.setLocalPort(val)
+              }
+            }}
+            onBlur={(e) => {
+              const val = parseInt(e.currentTarget.value, 10)
+              const clamped = isNaN(val) ? 8000 : Math.min(65535, Math.max(1024, val))
+              props.setLocalPort(clamped)
+            }}
             placeholder="默认 8000"
           />
         </div>

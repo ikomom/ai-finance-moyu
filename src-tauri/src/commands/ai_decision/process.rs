@@ -10,6 +10,7 @@ use reqwest::Client;
 use super::types::LocalServiceStatus;
 
 static LOCAL_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
+static STARTUP_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -38,6 +39,8 @@ pub async fn start_service(
     script_path: Option<String>,
     models_dir: PathBuf,
 ) -> Result<LocalServiceStatus, String> {
+    let _startup_guard = STARTUP_LOCK.lock().await;
+
     // 1. If already listening on this port, report active
     if check_service_alive(port).await {
         log::info!(target: "AI", "本地服务已在端口 {} 运行就绪", port);

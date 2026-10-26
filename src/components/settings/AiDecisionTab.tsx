@@ -43,6 +43,7 @@ export function AiDecisionTab() {
   const [modelReady, setModelReady] = createSignal(false)
   const [downloadProgress, setDownloadProgress] = createSignal<ModelDownloadProgress | null>(null)
   const [isDownloading, setIsDownloading] = createSignal(false)
+  const [isSaving, setIsSaving] = createSignal(false)
 
   const refreshStatus = async () => {
     try {
@@ -91,10 +92,17 @@ export function AiDecisionTab() {
   })
 
   const handleSave = async (targetMode?: AiDecisionMode) => {
+    if (isSaving()) return
+    setIsSaving(true)
+
     const effectiveMode = targetMode ?? mode()
+    const parsedPort = Number(localPort())
+    const clampedPort = isNaN(parsedPort) ? 8000 : Math.min(65535, Math.max(1024, parsedPort))
+    setLocalPort(clampedPort)
+
     const payload: AiDecisionConfig = {
       mode: effectiveMode,
-      localPort: Number(localPort()) || 8000,
+      localPort: clampedPort,
       modelsDir: modelsDir().trim() || null,
       localScriptPath: localScriptPath().trim() || null,
       localModelId: localModelId().trim() || 'convaiinnovations/laya-multilingual',
@@ -104,19 +112,23 @@ export function AiDecisionTab() {
       timeoutSecs: Number(timeoutSecs()) || 5,
     }
 
-    const ok = await saveAiDecisionConfig(payload)
-    if (ok) {
-      say(
-        `AI决策配置已保存 (${effectiveMode === 'local' ? '本地服务' : effectiveMode === 'online' ? '线上API' : '已停用'})`,
-        'ok'
-      )
-      await refreshStatus()
-      if (effectiveMode === 'local') {
-        setTimeout(refreshStatus, 800)
-        setTimeout(refreshStatus, 2000)
+    try {
+      const ok = await saveAiDecisionConfig(payload)
+      if (ok) {
+        say(
+          `AI决策配置已保存 (${effectiveMode === 'local' ? '本地服务' : effectiveMode === 'online' ? '线上API' : '已停用'})`,
+          'ok'
+        )
+        await refreshStatus()
+        if (effectiveMode === 'local') {
+          setTimeout(refreshStatus, 800)
+          setTimeout(refreshStatus, 2000)
+        }
+      } else {
+        say('保存 AI 决策配置失败', 'bad')
       }
-    } else {
-      say('保存 AI 决策配置失败', 'bad')
+    } finally {
+      setIsSaving(false)
     }
   }
 
