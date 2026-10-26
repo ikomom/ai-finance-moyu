@@ -12,7 +12,7 @@ pub enum AiDecisionMode {
 }
 
 pub fn default_local_port() -> u16 {
-    8000
+    9999
 }
 
 pub fn default_local_model_id() -> String {

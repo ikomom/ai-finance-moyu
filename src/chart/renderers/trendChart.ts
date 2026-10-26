@@ -184,6 +184,16 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   }
 
   // Draw cost & price levels
+  const costLabel = (() => {
+    if (!opts.costPrice || opts.costPrice <= 0) return undefined
+    if (opts.lastPrice && opts.lastPrice > 0) {
+      const pct = ((opts.lastPrice - opts.costPrice) / opts.costPrice) * 100
+      const sign = pct >= 0 ? '+' : ''
+      return `成本 ${opts.costPrice.toFixed(2)} (${sign}${pct.toFixed(2)}%)`
+    }
+    return `成本 ${opts.costPrice.toFixed(2)}`
+  })()
+
   drawHorizontalLevel(ctx, {
     price: opts.costPrice && opts.costPrice > 0 ? opts.costPrice : null,
     yMin,
@@ -195,7 +205,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     plotH: priceH,
     color: theme.costLine,
     dash: [5, 2, 1, 2],
-    label: opts.costPrice && opts.costPrice > 0 ? '成本' : undefined,
+    label: costLabel,
   })
 
   for (const pl of opts.priceLines ?? []) {

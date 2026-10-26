@@ -109,8 +109,8 @@
   justify-content: center;
 }
 .col-pnl {
-  flex: 1.15;
-  min-width: 56px;
+  flex: 1.25;
+  min-width: 64px;
   text-align: right;
 }
 
@@ -156,9 +156,24 @@
   font-weight: 500;
   font-size: 11px;
 }
+.pnl-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  font-size: 9.5px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.pnl-pct {
+  font-weight: 500;
+}
 .pnl-sub {
   font-size: 9.5px;
   opacity: 0.85;
+}
+.summary-pnl .pnl-sub-pct {
+  font-weight: 600;
 }
 .pnl-dash {
   opacity: 0.35;

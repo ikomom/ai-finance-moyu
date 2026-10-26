@@ -13,7 +13,7 @@ import json
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-PORT = int(os.environ.get("GATEWAY_PORT", os.environ.get("PORT", "8000")))
+PORT = int(os.environ.get("GATEWAY_PORT", os.environ.get("PORT", "9999")))
 MODELS_DIR = os.environ.get("MODELS_DIR", os.environ.get("HF_HOME", ""))
 
 def evaluate_decision(state: dict) -> dict:

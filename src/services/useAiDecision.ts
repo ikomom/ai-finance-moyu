@@ -169,7 +169,7 @@ export function useAiDecision(
   const startLocalService = async () => {
     setStartingService(true)
     try {
-      const port = snapshot()?.config?.aiDecision?.localPort ?? 8000
+      const port = snapshot()?.config?.aiDecision?.localPort ?? 9999
       const s = await startLocalDecisionService(port)
       if (s.running) {
         setErrorMsg(null)

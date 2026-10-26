@@ -45,7 +45,7 @@ pub fn save_ai_decision_config(
 
     // Validate and clamp local port to prevent unprivileged system port crashes
     if new_cfg.local_port < 1024 {
-        new_cfg.local_port = 8000;
+        new_cfg.local_port = 9999;
     }
 
     let port_changed = new_cfg.local_port != old_port;

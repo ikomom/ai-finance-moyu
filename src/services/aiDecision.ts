@@ -17,7 +17,7 @@ export async function getAiDecisionConfig(): Promise<AiDecisionConfig | null> {
   if (!inTauri()) {
     return {
       mode: 'disabled',
-      localPort: 8000,
+      localPort: 9999,
       localModelId: 'convaiinnovations/laya-multilingual',
       onlineModel: 'typesafe/jev-1.13',
       timeoutSecs: 5,
@@ -46,14 +46,14 @@ export async function startLocalDecisionService(
   port?: number
 ): Promise<LocalServiceStatus> {
   if (!inTauri()) {
-    return { running: true, port: port ?? 8000, message: '预览模式: 模拟已启动' }
+    return { running: true, port: port ?? 9999, message: '预览模式: 模拟已启动' }
   }
   return await invoke<LocalServiceStatus>('start_local_decision_service', { port })
 }
 
 export async function stopLocalDecisionService(): Promise<LocalServiceStatus> {
   if (!inTauri()) {
-    return { running: false, port: 8000, message: '预览模式: 模拟已停止' }
+    return { running: false, port: 9999, message: '预览模式: 模拟已停止' }
   }
   return await invoke<LocalServiceStatus>('stop_local_decision_service')
 }
@@ -62,7 +62,7 @@ export async function getLocalServiceStatus(
   port?: number
 ): Promise<LocalServiceStatus> {
   if (!inTauri()) {
-    return { running: false, port: port ?? 8000, message: '预览模式' }
+    return { running: false, port: port ?? 9999, message: '预览模式' }
   }
   return await invoke<LocalServiceStatus>('get_local_service_status', { port })
 }

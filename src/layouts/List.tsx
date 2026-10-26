@@ -1,4 +1,4 @@
-import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import './List.css'
 
@@ -8,7 +8,6 @@ import { Sparkline } from '../components/Sparkline'
 import { StatusLine } from '../components/StatusLine'
 import { StockBadge } from '../components/StockBadge'
 import { selectedIndex, setSelected, snapshot } from '../store'
-import { setTrendTargets } from '../tauri'
 import {
   fmtMoney,
   fmtPct,
@@ -20,6 +19,7 @@ import {
   trendClass,
   type WatchItem,
 } from '../types'
+import { computeTotalStats, useListScroll } from './useListScroll'
 
 /**
  * Layout 3 — 自选股列表 (紧凑金融看板).
@@ -28,127 +28,16 @@ import {
 export function List(props: { flash: boolean }) {
   const s = () => snapshot()!
   let tableBodyRef: HTMLDivElement | undefined
-  let lastReportedTargets = ''
-  let scrollTimer: number | null = null
 
-  const BUFFER_ROWS = 4
-  const ESTIMATED_ROW_HEIGHT = 28
-
-  const updateVisibleTargets = () => {
-    const quotesList = s()?.quotes ?? []
-    if (quotesList.length === 0) {
-      if (lastReportedTargets !== '') {
-        lastReportedTargets = ''
-        setTrendTargets([])
-      }
-      return
-    }
-
-    if (quotesList.length <= 15) {
-      const codes = quotesList.map((q) => q.code)
-      const key = codes.join(',')
-      if (key !== lastReportedTargets) {
-        lastReportedTargets = key
-        setTrendTargets(codes)
-      }
-      return
-    }
-
-    if (!tableBodyRef) {
-      const initialCodes = quotesList.slice(0, 15).map((q) => q.code)
-      const key = initialCodes.join(',')
-      if (key !== lastReportedTargets) {
-        lastReportedTargets = key
-        setTrendTargets(initialCodes)
-      }
-      return
-    }
-
-    const scrollTop = tableBodyRef.scrollTop
-    const clientHeight = tableBodyRef.clientHeight || 200
-    const rowHeight = tableBodyRef.firstElementChild?.clientHeight || ESTIMATED_ROW_HEIGHT
-
-    const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - BUFFER_ROWS)
-    const endIdx = Math.min(
-      quotesList.length,
-      Math.ceil((scrollTop + clientHeight) / rowHeight) + BUFFER_ROWS
-    )
-
-    const targetCodes = quotesList.slice(startIdx, endIdx).map((q) => q.code)
-    const key = targetCodes.join(',')
-    if (key !== lastReportedTargets) {
-      lastReportedTargets = key
-      setTrendTargets(targetCodes)
-    }
-  }
-
-  const handleScroll = () => {
-    if (scrollTimer !== null) return
-    scrollTimer = window.setTimeout(() => {
-      scrollTimer = null
-      updateVisibleTargets()
-    }, 100)
-  }
-
-  onMount(() => {
-    updateVisibleTargets()
-    if (tableBodyRef) {
-      const observer = new ResizeObserver(() => {
-        updateVisibleTargets()
-      })
-      observer.observe(tableBodyRef)
-      onCleanup(() => observer.disconnect())
-
-      // Auto-scroll the active row into view when returning from Mini layout
-      requestAnimationFrame(() => {
-        if (!tableBodyRef) return
-        const activeEl = tableBodyRef.querySelector('.table-row.active') as HTMLElement | null
-        if (activeEl) {
-          activeEl.scrollIntoView({ block: 'nearest', behavior: 'auto' })
-        }
-      })
-    }
-    onCleanup(() => {
-      if (scrollTimer !== null) {
-        window.clearTimeout(scrollTimer)
-        scrollTimer = null
-      }
-    })
-  })
-
-  createEffect(() => {
-    s()?.quotes.length
-    requestAnimationFrame(updateVisibleTargets)
-  })
+  const { handleScroll } = useListScroll(
+    () => s()?.quotes,
+    () => tableBodyRef
+  )
 
   const itemFor = (code: string): WatchItem | undefined =>
     s()?.config.watchlist.find((w) => w.code === code)
 
-  // Aggregate today PnL and total profit if shares are held
-  const totalStats = () => {
-    const snap = s()
-    if (!snap) return null
-    let totalToday = 0
-    let totalFloating = 0
-    let hasShares = false
-
-    for (const q of snap.quotes) {
-      const it = itemFor(q.code)
-      if (it?.shares && it.shares > 0) {
-        hasShares = true
-        if (q.price > 0) {
-          if (q.preClose > 0) {
-            totalToday += (q.price - q.preClose) * it.shares
-          }
-          if (it.costPrice != null) {
-            totalFloating += (q.price - it.costPrice) * it.shares
-          }
-        }
-      }
-    }
-
-    return hasShares ? { totalToday, totalFloating } : null
-  }
+  const totalStats = () => computeTotalStats(s()?.quotes, s()?.config.watchlist)
 
   const handleRowDblClick = (e: MouseEvent, index: number) => {
     e.preventDefault()
@@ -173,6 +62,11 @@ export function List(props: { flash: boolean }) {
               <span class="pnl-sep">|</span>
               <span class="pnl-item">
                 总浮盈: <span class={trendClass(stats().totalFloating)}>{fmtMoney(stats().totalFloating)}</span>
+                <Show when={stats().floatingPct !== null}>
+                  <span class={`pnl-sub-pct ${trendClass(stats().floatingPct!)}`}>
+                    {' '}({fmtPct(stats().floatingPct!)})
+                  </span>
+                </Show>
               </span>
             </div>
           )}
@@ -267,11 +161,21 @@ export function List(props: { flash: boolean }) {
                           <span class={`pnl-val ${trendClass(pnl()!)}`}>
                             {fmtMoney(pnl()!)}
                           </span>
-                          <Show when={todayPnl() !== null}>
-                            <span class={`pnl-sub ${trendClass(todayPnl()!)}`}>
-                              日 {fmtMoney(todayPnl()!)}
-                            </span>
-                          </Show>
+                          <div class="pnl-sub-row">
+                            <Show when={cost() && profitPct(q.price, cost()!) !== null}>
+                              <span class={`pnl-pct ${trendClass(profitPct(q.price, cost()!)!)}`}>
+                                {fmtPct(profitPct(q.price, cost()!)!)}
+                              </span>
+                            </Show>
+                            <Show when={todayPnl() !== null}>
+                              <span class={`pnl-sub ${trendClass(todayPnl()!)}`}>
+                                <Show when={cost() && profitPct(q.price, cost()!) !== null}>
+                                  {' · '}
+                                </Show>
+                                日 {fmtMoney(todayPnl()!)}
+                              </span>
+                            </Show>
+                          </div>
                         </div>
                       </Show>
                     </div>

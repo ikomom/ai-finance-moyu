@@ -220,7 +220,7 @@ impl Config {
         }
 
         if self.ai_decision.local_port < 1024 {
-            self.ai_decision.local_port = 8000;
+            self.ai_decision.local_port = 9999;
         }
 
         // Indicator config sanitization

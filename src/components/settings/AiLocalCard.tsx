@@ -58,10 +58,10 @@ export function AiLocalCard(props: AiLocalCardProps) {
             }}
             onBlur={(e) => {
               const val = parseInt(e.currentTarget.value, 10)
-              const clamped = isNaN(val) ? 8000 : Math.min(65535, Math.max(1024, val))
+              const clamped = isNaN(val) ? 9999 : Math.min(65535, Math.max(1024, val))
               props.setLocalPort(clamped)
             }}
-            placeholder="默认 8000"
+            placeholder="默认 9999"
           />
         </div>
         <div class="field">

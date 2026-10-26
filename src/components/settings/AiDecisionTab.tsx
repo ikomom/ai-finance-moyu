@@ -30,7 +30,7 @@ export function AiDecisionTab() {
   const { say } = useSettings()
 
   const [mode, setMode] = createSignal<AiDecisionMode>('disabled')
-  const [localPort, setLocalPort] = createSignal(8000)
+  const [localPort, setLocalPort] = createSignal(9999)
   const [modelsDir, setModelsDir] = createSignal('')
   const [localScriptPath, setLocalScriptPath] = createSignal('')
   const [localModelId, setLocalModelId] = createSignal('convaiinnovations/laya-multilingual')
@@ -97,7 +97,7 @@ export function AiDecisionTab() {
 
     const effectiveMode = targetMode ?? mode()
     const parsedPort = Number(localPort())
-    const clampedPort = isNaN(parsedPort) ? 8000 : Math.min(65535, Math.max(1024, parsedPort))
+    const clampedPort = isNaN(parsedPort) ? 9999 : Math.min(65535, Math.max(1024, parsedPort))
     setLocalPort(clampedPort)
 
     const payload: AiDecisionConfig = {
@@ -141,7 +141,7 @@ export function AiDecisionTab() {
     say('正在保存配置并拉起本地模型决策进程…')
     await handleSave('local')
     try {
-      const s = await startLocalDecisionService(Number(localPort()) || 8000)
+      const s = await startLocalDecisionService(Number(localPort()) || 9999)
       setServiceStatus(s)
       if (s.running) {
         say(`本地决策服务已成功启动并在端口 ${s.port} 监听`, 'ok')

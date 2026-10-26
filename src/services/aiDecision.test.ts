@@ -12,7 +12,7 @@ describe('AI Decision Service (Jev / Laya)', () => {
     const cfg = await getAiDecisionConfig()
     expect(cfg).not.toBeNull()
     expect(cfg?.mode).toBe('disabled')
-    expect(cfg?.localPort).toBe(8000)
+    expect(cfg?.localPort).toBe(9999)
     expect(cfg?.localModelId).toContain('laya-multilingual')
   })
 
@@ -28,8 +28,8 @@ describe('AI Decision Service (Jev / Laya)', () => {
   })
 
   it('reports offline/preview status when checking local service in mock environment', async () => {
-    const status = await getLocalServiceStatus(8000)
-    expect(status.port).toBe(8000)
+    const status = await getLocalServiceStatus(9999)
+    expect(status.port).toBe(9999)
     expect(status.message).toContain('预览模式')
   })
 

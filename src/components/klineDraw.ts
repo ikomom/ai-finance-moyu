@@ -201,7 +201,10 @@ export function drawKline(ctxIn: KlineDrawContext): void {
         ctx.stroke()
 
         ctx.fillStyle = COST_LINE
-        ctx.fillText(`成本 ${fmtPrice(cp)}`, plotL + plotW + 4, cy)
+        const latestPrice = allBars.length > 0 ? allBars[allBars.length - 1].close : null
+        const pct = latestPrice && cp > 0 ? ((latestPrice - cp) / cp) * 100 : null
+        const label = pct !== null ? `成本 ${fmtPrice(cp)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)` : `成本 ${fmtPrice(cp)}`
+        ctx.fillText(label, plotL + plotW + 4, cy)
         ctx.restore()
       }
     }
