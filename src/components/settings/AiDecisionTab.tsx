@@ -77,7 +77,9 @@ export function AiDecisionTab() {
       } else if (p.status === 'completed') {
         setIsDownloading(false)
         setModelReady(true)
-        say('模型权重已从国内镜像成功就绪！', 'ok')
+        say('模型权重已从国内镜像成功就绪！后台正在自动拉起本地服务...', 'ok')
+        setTimeout(refreshStatus, 800)
+        setTimeout(refreshStatus, 2000)
       } else if (p.status === 'error' || p.status === 'cancelled') {
         setIsDownloading(false)
       }
@@ -109,6 +111,10 @@ export function AiDecisionTab() {
         'ok'
       )
       await refreshStatus()
+      if (effectiveMode === 'local') {
+        setTimeout(refreshStatus, 800)
+        setTimeout(refreshStatus, 2000)
+      }
     } else {
       say('保存 AI 决策配置失败', 'bad')
     }

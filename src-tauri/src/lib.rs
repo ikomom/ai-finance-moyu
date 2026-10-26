@@ -109,6 +109,11 @@ pub fn run() {
                 poller::run(handle).await;
             });
 
+            let ai_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                commands::ai_decision::auto_start_if_ready(&ai_handle).await;
+            });
+
             Ok(())
         })
         .on_window_event(|window, event| {

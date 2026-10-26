@@ -1,4 +1,5 @@
 import { Show } from 'solid-js'
+import './AuctionBadge.css'
 import { BaseBadge } from './badge'
 import { fmtPct, fmtPrice, fmtSigned, type AuctionData, type Quote } from '../types'
 
@@ -80,22 +81,26 @@ export function AuctionBadge(props: {
       showDetails={props.showDetails}
       title={props.compact ? `${badgeInfo().label}\n${badgeInfo().detail}` : undefined}
       popover={(popoverRef) => (
-        <div ref={popoverRef} class="trend-popover" onWheel={(e) => e.stopPropagation()}>
+        <div ref={popoverRef} class="stock-popover auction-popover" onWheel={(e) => e.stopPropagation()}>
           {/* 头部：竞价状态 + 阶段标识 */}
-          <div class="popover-head-simple">
-            <span class={`popover-badge-label ${badgeInfo().tone}`}>{badgeInfo().label}</span>
-            <span class="popover-score-pill">
-              阶段 <b>{badgeInfo().phase}</b>
-            </span>
+          <div class="stock-popover-head">
+            <div class="stock-head-left">
+              <span class={`stock-badge-title ${badgeInfo().tone}`}>{badgeInfo().label}</span>
+            </div>
+            <div class="stock-quant-meta">
+              <span class="auction-popover-stage font-mono">
+                阶段 <b>{badgeInfo().phase}</b>
+              </span>
+            </div>
           </div>
 
           {/* 主体核心：完整展开的诊断解读（绝不截断省略，字号高亮加白） */}
-          <div class="popover-comment-body">
+          <div class="stock-popover-summary">
             {badgeInfo().detail}
           </div>
 
           {/* 底部辅助行：核心竞价参数 Pills */}
-          <div class="popover-param-strip">
+          <div class="auction-param-strip">
             <Show when={q()?.open && q()!.open > 0}>
               <span class="param-pill">
                 <span class="pill-lbl">撮合价</span>

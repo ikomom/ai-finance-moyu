@@ -1,0 +1,52 @@
+/* Auction Badge Popover - Unified Dark Glassmorphic Styling */
+.auction-popover {
+  width: 304px;
+}
+
+.auction-popover-stage {
+  font-size: 9px;
+  padding: 1px 4.5px;
+  border-radius: var(--radius-xs);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+}
+
+.auction-param-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.10);
+  padding-top: 5px;
+  margin-top: 4px;
+}
+
+.param-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: var(--radius-sm);
+  padding: 1.5px 5.5px;
+  font-size: 9.5px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.param-pill .pill-lbl {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.param-pill .pill-val {
+  font-weight: 500;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.param-pill .pill-val.bull { color: var(--color-up-subtle); }
+.param-pill .pill-val.bear { color: var(--color-down-subtle); }
+.param-pill .pill-val.warn { color: var(--color-warning-light); }
+.param-pill .pill-val.neutral { color: #e5e7eb; }
