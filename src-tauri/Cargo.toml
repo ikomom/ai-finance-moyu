@@ -1,6 +1,6 @@
 [package]
 name = "ai-finance-moyu"
-version = "0.3.1"
+version = "0.3.2"
 description = "A股摸鱼悬浮窗"
 authors = ["you"]
 edition = "2021"

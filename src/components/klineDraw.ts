@@ -69,7 +69,7 @@ export function drawKline(ctxIn: KlineDrawContext): void {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.28)'
       ctx.font = FONT
       ctx.textAlign = 'center'
-      ctx.fillText('日K线加载中...', w / 2, h / 2)
+      ctx.fillText('K线加载中...', w / 2, h / 2)
       return
     }
 

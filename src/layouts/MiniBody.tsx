@@ -23,6 +23,7 @@ import {
   type AuctionPoint,
   type KLineBar,
   type KLineData,
+  type KlinePeriod,
   type Quote,
   type Snapshot,
   type TrendPoint,
@@ -77,6 +78,8 @@ export interface MiniBodyProps {
   subchartMode: Accessor<'vol' | 'macd'>
   onToggleSubchart: () => void
   onSelectMode: (mode: MiniMode) => void
+  klinePeriod?: Accessor<KlinePeriod>
+  onSelectPeriod?: (period: KlinePeriod) => void
   hover: MiniHoverState
 }
 
@@ -231,6 +234,8 @@ export function MiniBody(props: MiniBodyProps) {
           viewMode={activeMode()}
           onToggleView={(m) => setManualMode(m)}
           showSubchart={true}
+          klinePeriod={props.klinePeriod?.()}
+          onSelectPeriod={props.onSelectPeriod}
         />
       </div>
     </>

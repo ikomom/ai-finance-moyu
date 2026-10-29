@@ -101,13 +101,36 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     expect(res.guidance).toBe('【多看少动】')
   })
 
-  it('detects BLEEDING_DRIFT (缩量阴跌无承接)', () => {
+  it('detects DIVERGE_INDEX_PUMP with slight green index (e.g. +0.19% while 78% stocks down)', () => {
+    const q = mockQuote('sh000001', 0.19)
+    const ov = mockOverview(1100, 3900, 50, -1.0, -10000000000)
+    const res = diagnoseIndex(q, ov)
+
+    expect(res.code).toBe('DIVERGE_INDEX_PUMP')
+    expect(res.badgeLabel).toContain('🚨拉权护盘')
+    expect(res.compactLabel).toBe('拉大票')
+    expect(res.tone).toBe('warn')
+  })
+
+  it('detects HEAVY_DROP when index drops significantly without surge (e.g. -1.71%)', () => {
+    const q = mockQuote('sz399006', -1.71)
+    const ov = mockOverview(1100, 3900, 50, -2.0, -20000000000)
+    const res = diagnoseIndex(q, ov)
+
+    expect(res.code).toBe('HEAVY_DROP')
+    expect(res.badgeLabel).toContain('⚡破位重挫')
+    expect(res.compactLabel).toBe('重挫破位')
+    expect(res.tone).toBe('bear')
+  })
+
+  it('detects BLEEDING_DRIFT (弱势阴跌无承接)', () => {
     const q = mockQuote('sh000001', -0.45)
     const ov = mockOverview(1400, 3500, 100, -6.0, -90000000000)
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('BLEEDING_DRIFT')
-    expect(res.badgeLabel).toContain('📉缩量阴跌')
+    expect(res.badgeLabel).toContain('📉弱势阴跌')
+    expect(res.compactLabel).toBe('弱势阴跌')
     expect(res.tone).toBe('bear')
     expect(res.guidance).toBe('【防守控仓】')
   })

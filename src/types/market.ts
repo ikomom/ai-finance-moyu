@@ -97,6 +97,8 @@ export interface KLineBar {
   j?: number | null
 }
 
+export type KlinePeriod = '15m' | '30m' | '60m' | '120m' | 'day' | 'week'
+
 export type KLineSignal = 'bull_aligned' | 'above_ma20' | 'below_ma20' | 'bear_aligned' | 'neutral'
 
 export interface KLineData {

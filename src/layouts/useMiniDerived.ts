@@ -110,7 +110,15 @@ export function createMiniDerived(args: MiniDerivedArgs) {
   const hoverTime = () => {
     if (activeMode() === 'kline') {
       const hk = hoveredKBar()
-      return hk ? hk.date : null
+      if (!hk?.date) return null
+      // For minute K-lines (e.g. "2026-10-26 14:30:00"), condense to "10-26 14:30"
+      if (hk.date.length >= 16 && hk.date.includes(' ')) {
+        const parts = hk.date.split(' ')
+        const d = parts[0].length >= 10 ? parts[0].slice(5) : parts[0]
+        const t = parts[1].slice(0, 5)
+        return `${d} ${t}`
+      }
+      return hk.date
     }
     const ap = hoveredPointExtra()?.auctionPoint ?? hoveredAuctionPoint?.()
     if (ap) {

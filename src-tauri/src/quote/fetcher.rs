@@ -251,15 +251,20 @@ impl Fetcher {
     /// Fetch daily candlestick series with forward adjustment (QFQ) and moving averages.
     ///
     /// Tries Tencent's forward-adjusted endpoint first, then falls back to Sina if unavailable.
-    pub async fn fetch_kline(&self, code: &str) -> Result<KLineData, FetchError> {
-        let tencent_url = tencent::kline_url(code);
-        if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
-            if let Ok(bars) = tencent::parse_kline(code, &bytes) {
-                return Ok(compute_kline_indicators(code, bars));
+    pub async fn fetch_kline(&self, code: &str, period: Option<&str>) -> Result<KLineData, FetchError> {
+        let period_str = period.unwrap_or("day");
+        let is_minute = matches!(period_str, "15m" | "30m" | "60m" | "120m");
+
+        if !is_minute {
+            let tencent_url = tencent::kline_url(code, period);
+            if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
+                if let Ok(bars) = tencent::parse_kline(code, &bytes) {
+                    return Ok(compute_kline_indicators(code, bars));
+                }
             }
         }
 
-        let sina_url = sina::kline_url(code);
+        let sina_url = sina::kline_url(code, period);
         let bytes = self.get_bytes(&sina_url, Some(sina::REFERER)).await?;
         let bars = sina::parse_kline(code, &bytes)?;
         Ok(compute_kline_indicators(code, bars))

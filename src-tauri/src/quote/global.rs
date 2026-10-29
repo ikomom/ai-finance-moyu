@@ -21,7 +21,7 @@ impl Fetcher {
         // 1. For US/HK indices, Tencent fqkline is fast and reliable
         let is_tencent_cand = code_clean.starts_with("us") || code_clean.starts_with("hk");
         if is_tencent_cand {
-            let tencent_url = tencent::kline_url(code_clean);
+            let tencent_url = tencent::kline_url(code_clean, None);
             if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
                 if let Ok(bars) = tencent::parse_kline(code_clean, &bytes) {
                     return Ok(compute_kline_indicators(code_clean, bars));

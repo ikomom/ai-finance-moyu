@@ -20,8 +20,16 @@ pub fn trend_url(code: &str) -> String {
     format!("{TREND_ENDPOINT}?symbol={code}&scale=1&ma=no&datalen={TREND_DATALEN}")
 }
 
-pub fn kline_url(code: &str) -> String {
-    format!("{KLINE_ENDPOINT}?symbol={code}&scale=240&ma=no&datalen=320")
+pub fn kline_url(code: &str, period: Option<&str>) -> String {
+    let scale = match period.unwrap_or("day") {
+        "15m" => 15,
+        "30m" => 30,
+        "60m" => 60,
+        "120m" => 120,
+        "week" => 1200,
+        _ => 240,
+    };
+    format!("{KLINE_ENDPOINT}?symbol={code}&scale={scale}&ma=no&datalen=320")
 }
 
 /// Parse `var hq_str_sh600000="浦发银行,9.450,9.480,...";` lines.

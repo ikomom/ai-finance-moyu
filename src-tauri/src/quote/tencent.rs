@@ -15,8 +15,12 @@ pub fn trend_url(code: &str) -> String {
     format!("{TREND_ENDPOINT}{code}")
 }
 
-pub fn kline_url(code: &str) -> String {
-    format!("{KLINE_ENDPOINT}{code},day,,,320,qfq")
+pub fn kline_url(code: &str, period: Option<&str>) -> String {
+    let p = match period.unwrap_or("day") {
+        "week" => "week",
+        _ => "day",
+    };
+    format!("{KLINE_ENDPOINT}{code},{p},,,320,qfq")
 }
 
 /// Parse the `v_<code>="f0~f1~f2~...";` lines.
@@ -210,12 +214,14 @@ pub fn parse_kline(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, FetchError
         .and_then(|d| d.get(code))
         .ok_or_else(|| parse_err(format!("响应中缺少 {code} 的K线数据")))?;
 
-    // Try qfqday first (forward-adjusted for stocks), fall back to day (indices or unadjusted)
+    // Try qfqday/qfqweek first (forward-adjusted for stocks), fall back to day/week (indices or unadjusted)
     let rows = entry
         .get("qfqday")
         .or_else(|| entry.get("day"))
+        .or_else(|| entry.get("qfqweek"))
+        .or_else(|| entry.get("week"))
         .and_then(|v| v.as_array())
-        .ok_or_else(|| parse_err(format!("{code} 未返回日K线数组")))?;
+        .ok_or_else(|| parse_err(format!("{code} 未返回K线数组")))?;
 
     let mut bars = Vec::with_capacity(rows.len());
     for row in rows {

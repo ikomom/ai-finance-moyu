@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { KLineData, Trend } from './types'
+import type { KlinePeriod, KLineData, Trend } from './types'
 
 /**
  * Whether a Tauri runtime is present to talk to. False when the page is opened
@@ -27,14 +27,14 @@ export function setTrendTargets(targets: string[]): void {
 }
 
 /**
- * Request daily candlestick series (QFQ forward-adjusted) from backend.
+ * Request candlestick series from backend with optional period.
  */
-export async function fetchKLine(code: string): Promise<KLineData | null> {
+export async function fetchKLine(code: string, period?: KlinePeriod): Promise<KLineData | null> {
   if (!inTauri()) return null
   try {
-    return await invoke<KLineData>('get_kline', { code })
+    return await invoke<KLineData>('get_kline', { code, period })
   } catch (e) {
-    logToBackend(`fetchKLine failed for ${code}: ${e}`)
+    logToBackend(`fetchKLine failed for ${code} (${period ?? 'day'}): ${e}`)
     return null
   }
 }

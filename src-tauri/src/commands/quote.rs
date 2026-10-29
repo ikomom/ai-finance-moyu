@@ -53,10 +53,14 @@ pub async fn set_trend_targets(app: AppHandle, targets: Vec<String>) -> Result<(
 }
 
 #[tauri::command]
-pub async fn get_kline(app: AppHandle, code: String) -> Result<quote::KLineData, String> {
+pub async fn get_kline(
+    app: AppHandle,
+    code: String,
+    period: Option<String>,
+) -> Result<quote::KLineData, String> {
     let state = app.state::<AppState>();
     let norm_code = market::normalize_code(&code)?;
-    state.fetcher.fetch_kline(&norm_code).await.map_err(|e| e.to_string())
+    state.fetcher.fetch_kline(&norm_code, period.as_deref()).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

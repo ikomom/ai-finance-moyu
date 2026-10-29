@@ -14,6 +14,7 @@ import {
   type AuctionPoint,
   type KLineBar,
   type KLineData,
+  type KlinePeriod,
   type TrendPoint,
 } from '../types'
 
@@ -38,9 +39,28 @@ export function Mini(props: { flash: boolean }) {
     }
   })
 
+  const STORAGE_KEY_KLINE_PERIOD = 'kline_period'
+  const getSavedKlinePeriod = (): KlinePeriod => {
+    try {
+      const p = localStorage.getItem(STORAGE_KEY_KLINE_PERIOD) as KlinePeriod
+      if (p && ['15m', '30m', '60m', '120m', 'day', 'week'].includes(p)) {
+        return p
+      }
+    } catch {}
+    return 'day'
+  }
+
   const [klineCache, setKlineCache] = createSignal<Record<string, KLineData>>({})
   const [klineLoading, setKlineLoading] = createSignal(false)
+  const [klinePeriod, setKlinePeriod] = createSignal<KlinePeriod>(getSavedKlinePeriod())
   const { subchartMode, setSubchartMode: toggleSubchartMode } = useSubchartMode()
+
+  const handleSelectPeriod = (p: KlinePeriod) => {
+    setKlinePeriod(p)
+    try {
+      localStorage.setItem(STORAGE_KEY_KLINE_PERIOD, p)
+    } catch {}
+  }
 
   const quotes = () => s()?.quotes ?? []
   const item = () => {
@@ -57,7 +77,8 @@ export function Mini(props: { flash: boolean }) {
 
   const kline = () => {
     const c = quote()?.code
-    return c ? klineCache()[c] : undefined
+    const k = c ? `${c}:${klinePeriod()}` : undefined
+    return k ? klineCache()[k] : undefined
   }
 
   const isIndex = () => isIndexCode(quote()?.code ?? '')
@@ -70,16 +91,18 @@ export function Mini(props: { flash: boolean }) {
     return 'trend'
   }
 
-  // Lazy-load daily candlestick data on demand
+  // Lazy-load candlestick data on demand
   createEffect(() => {
     const code = quote()?.code
     const mode = activeMode()
-    if (mode === 'kline' && code && !klineCache()[code] && !klineLoading()) {
+    const period = klinePeriod()
+    const key = code ? `${code}:${period}` : ''
+    if (mode === 'kline' && code && key && !klineCache()[key] && !klineLoading()) {
       setKlineLoading(true)
-      fetchKLine(code)
+      fetchKLine(code, period)
         .then((data) => {
           if (data) {
-            setKlineCache((prev) => ({ ...prev, [code]: data }))
+            setKlineCache((prev) => ({ ...prev, [key]: data }))
           }
         })
         .finally(() => {
@@ -161,6 +184,8 @@ export function Mini(props: { flash: boolean }) {
             subchartMode={subchartMode}
             onToggleSubchart={() => toggleSubchartMode(subchartMode() === 'macd' ? 'vol' : 'macd')}
             onSelectMode={(m) => setManualMode(m)}
+            klinePeriod={klinePeriod}
+            onSelectPeriod={handleSelectPeriod}
             hover={{
               point: hoveredPoint,
               setPoint: setHoveredPoint,

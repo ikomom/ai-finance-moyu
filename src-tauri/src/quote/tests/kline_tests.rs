@@ -192,3 +192,44 @@
         assert_eq!(trend.points[1].price, 5661.80);
         assert_eq!(trend.points[1].cum_volume, 3600.0);
     }
+
+    #[test]
+    fn multiscale_kline_urls_and_parsing() {
+        assert!(sina::kline_url("sh600000", Some("15m")).contains("scale=15"));
+        assert!(sina::kline_url("sh600000", Some("30m")).contains("scale=30"));
+        assert!(sina::kline_url("sh600000", Some("60m")).contains("scale=60"));
+        assert!(sina::kline_url("sh600000", Some("120m")).contains("scale=120"));
+        assert!(sina::kline_url("sh600000", Some("day")).contains("scale=240"));
+        assert!(sina::kline_url("sh600000", Some("week")).contains("scale=1200"));
+        assert!(sina::kline_url("sh600000", None).contains("scale=240"));
+
+        assert!(tencent::kline_url("sh600000", Some("day")).contains("sh600000,day,,,320,qfq"));
+        assert!(tencent::kline_url("sh600000", Some("week")).contains("sh600000,week,,,320,qfq"));
+        assert!(tencent::kline_url("sh600000", None).contains("sh600000,day,,,320,qfq"));
+
+        // Test minute-level bar parsing with timestamp
+        let minute_json = r#"[
+            {"day":"2026-10-26 11:30:00","open":"9.510","high":"9.530","low":"9.470","close":"9.490","volume":"11319500"},
+            {"day":"2026-10-26 15:00:00","open":"9.540","high":"9.680","low":"9.530","close":"9.620","volume":"31501700"}
+        ]"#;
+        let minute_bars = sina::parse_kline("sh600000", minute_json.as_bytes()).unwrap();
+        assert_eq!(minute_bars.len(), 2);
+        assert_eq!(minute_bars[0].date, "2026-10-26 11:30:00");
+        assert_eq!(minute_bars[0].volume, 113195.0);
+
+        // Test week parsing for Tencent
+        let week_json = r#"{
+            "code": 0,
+            "data": {
+                "sh600519": {
+                    "qfqweek": [
+                        ["2026-10-16", "1259.000", "1252.570", "1259.950", "1250.800", "25017.000"],
+                        ["2026-10-23", "1252.150", "1253.800", "1265.880", "1248.100", "24573.000"]
+                    ]
+                }
+            }
+        }"#;
+        let week_bars = tencent::parse_kline("sh600519", week_json.as_bytes()).unwrap();
+        assert_eq!(week_bars.len(), 2);
+        assert_eq!(week_bars[1].date, "2026-10-23");
+    }
