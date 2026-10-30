@@ -56,6 +56,13 @@ export function fmtMoney(v: number): string {
   return `${sign}¥${abs}`
 }
 
+/** Formats currency amount without positive sign: `¥1,000.00` or `-¥1,000.00`. */
+export function fmtCurrency(v: number): string {
+  const sign = v < 0 ? '-' : ''
+  const abs = Math.abs(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `${sign}¥${abs}`
+}
+
 /** `0930` -> `9:30`. */
 export function fmtHHMM(t: number): string {
   const h = Math.floor(t / 100)

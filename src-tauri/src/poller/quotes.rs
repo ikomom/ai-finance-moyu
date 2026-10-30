@@ -12,10 +12,23 @@ use super::trends::update_trend_signals;
 use super::{emit_snapshot, AlertNotification};
 
 pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
-    let (codes, source) = {
+    let (codes, watchlist_codes, source) = {
         let state = app.state::<AppState>();
         let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
-        (cfg.codes(), cfg.data_source)
+        let portfolio = state.portfolio.lock().unwrap_or_else(|e| e.into_inner());
+        let watchlist_codes = cfg.codes();
+        let mut all_codes = watchlist_codes.clone();
+        for pos in &portfolio.positions {
+            if !all_codes.contains(&pos.code) {
+                all_codes.push(pos.code.clone());
+            }
+        }
+        for ord in &portfolio.pending_orders {
+            if !all_codes.contains(&ord.code) {
+                all_codes.push(ord.code.clone());
+            }
+        }
+        (all_codes, watchlist_codes, cfg.data_source)
     };
     if codes.is_empty() {
         return Ok(());
@@ -73,7 +86,7 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         }
 
         // Forget securities the user removed so they re-arm if re-added.
-        tracker.retain(&codes);
+        tracker.retain(&watchlist_codes);
 
         let names: std::collections::HashMap<&str, &str> =
             quotes.iter().map(|q| (q.code.as_str(), q.name.as_str())).collect();
@@ -185,6 +198,21 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
     }
 
     record_success(app, &quotes);
+
+    // Match pending limit orders against fresh quotes
+    {
+        let state = app.state::<AppState>();
+        let mut portfolio_guard = state.portfolio.lock().unwrap_or_else(|e| e.into_inner());
+        let quotes_guard = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
+        let filled = crate::portfolio::match_pending_orders(&mut portfolio_guard, &quotes_guard);
+        if !filled.is_empty() {
+            let _ = crate::portfolio::storage::save(app, &portfolio_guard);
+            drop(portfolio_guard);
+            drop(quotes_guard);
+            crate::commands::portfolio::sync_watchlist_costs(app, &state);
+        }
+    }
+
     emit_snapshot(app);
     Ok(())
 }

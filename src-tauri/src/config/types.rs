@@ -131,6 +131,9 @@ pub struct Config {
     /// Jev / Laya (System-1) decision model configuration.
     #[serde(default)]
     pub ai_decision: AiDecisionConfig,
+    /// Whether simulated investment and portfolio ledger mode is enabled.
+    #[serde(default)]
+    pub enable_portfolio: bool,
 }
 
 impl Default for Config {
@@ -161,6 +164,7 @@ impl Default for Config {
             iwencai_api_key: None,
             indicator_config: IndicatorConfig::default(),
             ai_decision: AiDecisionConfig::default(),
+            enable_portfolio: false,
         }
     }
 }

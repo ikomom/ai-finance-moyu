@@ -64,6 +64,7 @@ pub struct Snapshot {
     /// absent: `config` is stripped before it is serialized to the webview, so a
     /// single XSS can no longer exfiltrate the user's credentials.
     pub has_iwencai_key: bool,
+    pub pending_orders: Vec<crate::portfolio::PendingOrder>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -128,10 +129,16 @@ pub struct AppState {
     pub market_overview: Mutex<Option<MarketOverview>>,
     pub auction_tracker: Mutex<crate::auction_engine::AuctionTracker>,
     pub hotkey_bindings: Mutex<HotkeyBindings>,
+    pub portfolio: Mutex<crate::portfolio::PortfolioData>,
 }
 
 impl AppState {
-    pub fn new(config: Config, fetcher: Fetcher, cache: crate::config::QuotesCache) -> Self {
+    pub fn new(
+        config: Config,
+        fetcher: Fetcher,
+        cache: crate::config::QuotesCache,
+        portfolio: crate::portfolio::PortfolioData,
+    ) -> Self {
         let mut quotes_map = HashMap::new();
         for q in cache.quotes {
             quotes_map.insert(q.code.clone(), q);
@@ -174,6 +181,7 @@ impl AppState {
             market_overview: Mutex::new(None),
             auction_tracker: Mutex::new(auction_tracker),
             hotkey_bindings: Mutex::new(HotkeyBindings::default()),
+            portfolio: Mutex::new(portfolio),
         }
     }
 
@@ -190,6 +198,7 @@ impl AppState {
         // the settings form to render its state.
         config.iwencai_api_key = None;
 
+        let pending_orders = self.portfolio.lock().unwrap_or_else(|e| e.into_inner()).pending_orders.clone();
         let quotes = self.quotes.lock().unwrap_or_else(|e| e.into_inner());
         let trends = self.trends.lock().unwrap_or_else(|e| e.into_inner());
         let trend_signals = self.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -197,6 +206,7 @@ impl AppState {
         let status = self.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let dock = *self.dock_state.lock().unwrap_or_else(|e| e.into_inner());
         let market_overview = self.market_overview.lock().unwrap_or_else(|e| e.into_inner()).clone();
+
 
         let ordered = config
             .watchlist
@@ -224,6 +234,7 @@ impl AppState {
             dock,
             market_overview,
             has_iwencai_key,
+            pending_orders,
         }
     }
 }

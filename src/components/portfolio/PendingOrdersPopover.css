@@ -1,0 +1,206 @@
+.pending-popover-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pending-pill-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 12px;
+  padding: 1px 7px;
+  color: #fbbf24;
+  font-size: 10px;
+  height: 20px;
+  line-height: 18px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.pending-pill-trigger:hover,
+.pending-pill-trigger.active {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fef08a;
+}
+
+.pending-pill-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #f59e0b;
+  box-shadow: 0 0 4px #f59e0b;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+.pending-pill-text {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pending-pill-arrow {
+  transition: transform 0.15s ease;
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.pending-pill-arrow.open {
+  transform: rotate(180deg);
+}
+
+.pending-dropdown-popover {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 235px;
+  max-width: 275px;
+  background: rgba(22, 27, 34, 0.96);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+  padding: 5px 6px;
+  z-index: 1060;
+  animation: fadeIn 0.12s ease-out;
+}
+
+.pending-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.pending-header-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.pending-header-tip {
+  font-size: 8.5px;
+  color: #94a3b8;
+}
+
+.pending-cancel-all-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pending-cancel-all-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.pending-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 185px;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.pending-popover-list::-webkit-scrollbar {
+  width: 4px;
+}
+.pending-popover-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+.pending-popover-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+.pending-popover-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.pending-popover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 2.5px 6px;
+  font-size: 10px;
+  gap: 5px;
+}
+
+.pending-item-name {
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #cbd5e1;
+  font-size: 9.5px;
+}
+
+.pending-badge {
+  font-size: 8.5px;
+  padding: 0.5px 3.5px;
+  border-radius: 2px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.pending-badge.buy {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.pending-badge.sell {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.pending-item-price {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.pending-item-shares {
+  font-family: ui-monospace, monospace;
+  color: #cbd5e1;
+}
+
+.pending-cancel-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.pending-cancel-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.pending-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

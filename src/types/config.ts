@@ -288,6 +288,7 @@ export interface Config {
   iwencaiApiKey?: string
   indicatorConfig?: IndicatorConfig
   aiDecision?: AiDecisionConfig
+  enablePortfolio?: boolean
 }
 
 export interface AnomalyAlertConfig {

@@ -1,0 +1,152 @@
+.mini-order-book {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 98px;
+  min-width: 98px;
+  max-width: 98px;
+  flex-shrink: 0;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 3px;
+  box-sizing: border-box;
+  font-size: 9.5px;
+  line-height: 1.15;
+  user-select: none;
+  overflow: hidden;
+  position: relative;
+}
+
+.ob-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ob-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 12px;
+  padding: 0 2px;
+  border-radius: 2px;
+  cursor: default;
+  transition: background 0.1s ease;
+}
+
+.ob-row.clickable {
+  cursor: pointer;
+}
+
+.ob-row.clickable:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ob-row.has-order {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ob-order-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-left: 2px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px currentColor;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+.ob-order-dot.buy {
+  background-color: #ef4444;
+  color: #ef4444;
+}
+
+.ob-order-dot.sell {
+  background-color: #10b981;
+  color: #10b981;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
+.ob-depth-bar {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 0;
+  transition: width 0.2s ease-out;
+}
+
+.ob-depth-bar.ask-bar {
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.ob-depth-bar.bid-bar {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.ob-tier-label {
+  position: relative;
+  z-index: 1;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 500;
+  min-width: 17px;
+}
+
+.ob-price {
+  position: relative;
+  z-index: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  text-align: right;
+  flex: 1;
+  padding: 0 3px;
+}
+
+.ob-vol {
+  position: relative;
+  z-index: 1;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8.5px;
+  text-align: right;
+  min-width: 24px;
+}
+
+.ob-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+  padding: 1px 2px;
+  margin: 1px 0;
+  color: #64748b;
+  font-size: 8.5px;
+}
+
+.ob-div-label {
+  font-weight: 500;
+}
+
+.ob-div-price {
+  color: #e2e8f0;
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+}

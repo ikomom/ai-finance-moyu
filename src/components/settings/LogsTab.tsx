@@ -117,6 +117,7 @@ export function LogsTab() {
                 { id: 'ALERT', label: '🚨 盘中异动' },
                 { id: 'AUCTION', label: '⚖️ 集合竞价' },
                 { id: 'SESSION', label: '🕒 时段变迁' },
+                { id: 'TRADE', label: '💰 交易活动' },
                 { id: 'AI', label: '🤖 AI决策' },
                 { id: 'NET', label: '🌐 接口网络' },
                 { id: 'SYSTEM', label: '⚙️ 系统配置' },

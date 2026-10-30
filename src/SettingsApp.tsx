@@ -7,6 +7,7 @@ import { SettingsProvider, useSettings, TABS } from './components/settings/Setti
 import { WatchlistTab } from './components/settings/WatchlistTab'
 import { AppearanceTab } from './components/settings/AppearanceTab'
 import { AlertsTab } from './components/settings/AlertsTab'
+import { PortfolioTab } from './components/settings/PortfolioTab'
 import { AiDecisionTab } from './components/settings/AiDecisionTab'
 import { SystemTab } from './components/settings/SystemTab'
 import { LogsTab } from './components/settings/LogsTab'
@@ -99,6 +100,9 @@ function SettingsContent() {
               </Show>
               <Show when={activeTab() === 'alerts'}>
                 <AlertsTab />
+              </Show>
+              <Show when={activeTab() === 'portfolio'}>
+                <PortfolioTab />
               </Show>
               <Show when={activeTab() === 'ai'}>
                 <AiDecisionTab />

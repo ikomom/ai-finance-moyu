@@ -23,6 +23,25 @@ impl MarketFetcher {
             }
         }
 
+        // Only query during live trading sessions; outside market hours return cached
+        let session = crate::market::session_at(crate::market::beijing_now());
+        if !session.is_live() {
+            let cached = *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner());
+            return Ok(cached);
+        }
+
+        // Throttle queries: market breadth shifts gradually. Refresh at most once every 180s.
+        {
+            let mut last_guard = self.last_breadth_fetch.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(last) = *last_guard {
+                if last.elapsed() < std::time::Duration::from_secs(180) {
+                    let cached = *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner());
+                    return Ok(cached);
+                }
+            }
+            *last_guard = Some(std::time::Instant::now());
+        }
+
         let url = "https://openapi.iwencai.com/v1/query2data";
 
         let now_nanos = std::time::SystemTime::now()
@@ -67,14 +86,15 @@ impl MarketFetcher {
             let sample: String = trimmed.chars().take(80).collect();
             if status == reqwest::StatusCode::UNAUTHORIZED || status.as_u16() == 429 || trimmed.contains("次数已用完") {
                 *self.quota_exhausted_date.lock().unwrap_or_else(|e| e.into_inner()) = Some(today);
-                return Err(format!(
-                    "问财接口配额耗尽/鉴权受限 (HTTP {status}: {sample})。已启动今日熔断保护，暂停后续请求并平滑回退基准缓存，次日自动恢复。"
-                ));
+                log::info!(target: "NET", "问财接口配额耗尽/鉴权受限 (HTTP {status})，已启动今日熔断并平滑回退基准缓存");
+                let cached = *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner());
+                return Ok(cached);
             }
             return Err(format!("问财接口 HTTP {status}: {sample}"));
         }
         if trimmed.is_empty() {
-            return Err("问财接口返回空响应（服务端限流或网络抖动，已自动回退基准缓存）".to_string());
+            let cached = *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner());
+            return Ok(cached);
         }
         if trimmed.starts_with('<') {
             return Err(format!("问财接口返回非 JSON 页面 (HTTP {status})"));
@@ -117,7 +137,8 @@ impl MarketFetcher {
         }
 
         if up_count == 0 && down_count == 0 {
-            return Err("问财涨跌统计解析结果为空".to_string());
+            let cached = *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner());
+            return Ok(cached);
         }
 
         let turnover_change_amount = match (turnover_val, turnover_change_pct) {

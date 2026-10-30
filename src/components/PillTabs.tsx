@@ -62,7 +62,7 @@ export function PillTabs(props: PillTabsProps) {
           <button
             ref={(el) => (tabRefs[i()] = el)}
             type="button"
-            class="mini-tab"
+            class="mini-tab stock-tab"
             classList={{ active: i() === props.selectedIndex }}
             onClick={() => props.onSelect(i())}
             title={item.title ?? item.label}

@@ -1,0 +1,128 @@
+.broker-dropdown-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.broker-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: #f3f4f6;
+  font-size: 11px;
+  height: 22px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.broker-dropdown-trigger:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.broker-name {
+  font-weight: 500;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.broker-arrow {
+  transition: transform 0.15s ease;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.broker-arrow.open {
+  transform: rotate(180deg);
+  color: #ffffff;
+}
+
+.broker-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 140px;
+  background: rgba(22, 27, 34, 0.96);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+  padding: 4px 0;
+  z-index: 1050;
+  animation: fadeIn 0.12s ease-out;
+}
+
+.broker-menu-header {
+  padding: 4px 8px 3px;
+  font-size: 9.5px;
+  color: #6b7280;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+}
+
+.broker-menu-list {
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.broker-menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  color: #d1d5db;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.broker-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.broker-menu-item.selected {
+  color: #38bdf8;
+  font-weight: 600;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.broker-selected-check {
+  font-size: 10px;
+  color: #38bdf8;
+}
+
+.broker-menu-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 3px 6px 1px;
+}
+
+.broker-add-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  color: #60a5fa;
+  font-size: 10px;
+  padding: 3px 4px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.broker-add-btn:hover {
+  background: rgba(96, 165, 250, 0.1);
+  text-decoration: underline;
+}

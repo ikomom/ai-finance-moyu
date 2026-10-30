@@ -1,0 +1,67 @@
+/* MiniTradeToast - Bubble notification and depth warning toast styles */
+.mini-trade-bubble-toast {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  max-width: 250px;
+  background: rgba(28, 32, 42, 0.96);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  white-space: normal;
+  line-height: 1.35;
+  z-index: 1000;
+  animation: bubblePop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes bubblePop {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.mini-trade-bubble-toast::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  right: 18px;
+  width: 7px;
+  height: 7px;
+  background: rgba(28, 32, 42, 0.96);
+  border-right: 1px solid rgba(239, 68, 68, 0.4);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.4);
+  transform: rotate(45deg);
+}
+
+.mini-trade-center-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(16, 185, 129, 0.95);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(16, 185, 129, 0.4);
+  z-index: 1001;
+  pointer-events: none;
+  animation: centerToastPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes centerToastPop {
+  from { opacity: 0; transform: translate(-50%, -40%) scale(0.92); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.mini-trade-depth-hint {
+  font-size: 9px;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 2px 6px;
+  border-radius: 3px;
+  align-self: flex-start;
+  margin-top: -2px;
+}

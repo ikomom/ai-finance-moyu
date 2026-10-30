@@ -4,7 +4,7 @@
 //! §11 colocation + 300-line budget). Every closure the body needs is passed in
 //! explicitly, so this component has no hidden dependency on layout state.
 
-import { Show, type Accessor, type Setter } from 'solid-js'
+import { createSignal, Show, type Accessor, type Setter } from 'solid-js'
 
 import { AuctionBadge } from '../components/AuctionBadge'
 import { Chart, type HoverExtra } from '../components/Chart'
@@ -12,6 +12,8 @@ import { FooterControls } from '../components/FooterControls'
 import { IndexBadge } from '../components/IndexBadge'
 import { KLineBadge } from '../components/KLineBadge'
 import { KlineCanvas } from '../components/KlineCanvas'
+import { MiniOrderBook } from '../components/portfolio/MiniOrderBook'
+import { MiniTradeDrawer } from '../components/portfolio/MiniTradeDrawer'
 import { StatusLine } from '../components/StatusLine'
 import { StockHeader } from '../components/StockHeader'
 import { StockBadge } from '../components/StockBadge'
@@ -103,6 +105,8 @@ export function MiniBody(props: MiniBodyProps) {
   const setHoveredKBar = props.hover.setKbar
   const hoveredKExtra = props.hover.kbarExtra
   const setHoveredKExtra = props.hover.setKbarExtra
+  const [showTrade, setShowTrade] = createSignal(false)
+  const [chosenPrice, setChosenPrice] = createSignal<number | null>(null)
 
   const { cost, pnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra } =
     createMiniDerived({
@@ -184,46 +188,76 @@ export function MiniBody(props: MiniBodyProps) {
                 {fmtMoney(pnl()!)}
               </span>
             </Show>
+            <Show when={s().config.enablePortfolio && !isIndex()}>
+              <button
+                class="mini-trade-badge-btn"
+                title="模拟投资 / 快速买卖"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowTrade(true)
+                }}
+              >
+                买卖
+              </button>
+            </Show>
           </div>
         }
       />
 
-      {/* Unified Chart Canvas: Trend (with seamless Auction) vs KLine */}
-      <Show
-        when={activeMode() === 'kline'}
-        fallback={
-          <Chart
-            trend={trend()}
-            auction={auction()}
+      {/* Unified Chart Canvas & Order Book */}
+      <div class="mini-chart-section" classList={{ 'with-order-book': !!(s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline') }}>
+        <div class="mini-chart-left">
+          <Show
+            when={activeMode() === 'kline'}
+            fallback={
+              <Chart
+                trend={trend()}
+                auction={auction()}
+                preClose={q().preClose}
+                costPrice={cost()}
+                priceLines={item()?.priceLines ?? []}
+                lastPrice={q().price}
+                orbHigh={s().trendSignals?.[q().code]?.orbHigh}
+                orbLow={s().trendSignals?.[q().code]?.orbLow}
+                subchartMode={subchartMode()}
+                macdParams={indicatorParams().macd}
+                onHover={(point, extra) => {
+                  setHoveredPoint(point)
+                  setHoveredPointExtra(extra ?? null)
+                }}
+              />
+            }
+          >
+            <KlineCanvas
+              kline={kline()}
+              quote={q()}
+              costPrice={cost()}
+              priceLines={item()?.priceLines ?? []}
+              subchartMode={subchartMode()}
+              maPeriods={indicatorParams().ma}
+              macdParams={indicatorParams().macd}
+              onHoverBar={(bar, extra) => {
+                setHoveredKBar(bar)
+                setHoveredKExtra(extra ?? null)
+              }}
+            />
+          </Show>
+        </div>
+
+        <Show when={s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline'}>
+          <MiniOrderBook
+            bids={q().bids}
+            asks={q().asks}
             preClose={q().preClose}
-            costPrice={cost()}
-            priceLines={item()?.priceLines ?? []}
-            lastPrice={q().price}
-            orbHigh={s().trendSignals?.[q().code]?.orbHigh}
-            orbLow={s().trendSignals?.[q().code]?.orbLow}
-            subchartMode={subchartMode()}
-            macdParams={indicatorParams().macd}
-            onHover={(point, extra) => {
-              setHoveredPoint(point)
-              setHoveredPointExtra(extra ?? null)
+            currentPrice={q().price}
+            pendingOrders={(s().pendingOrders ?? []).filter((o) => o.code === q().code)}
+            onPickPrice={(p) => {
+              setChosenPrice(p)
+              setShowTrade(true)
             }}
           />
-        }
-      >
-        <KlineCanvas
-          kline={kline()}
-          quote={q()}
-          costPrice={cost()}
-          priceLines={item()?.priceLines ?? []}
-          subchartMode={subchartMode()}
-          maPeriods={indicatorParams().ma}
-          macdParams={indicatorParams().macd}
-          onHoverBar={(bar, extra) => {
-            setHoveredKBar(bar)
-            setHoveredKExtra(extra ?? null)
-          }}
-        />
-      </Show>
+        </Show>
+      </div>
 
       {/* Unified Footer */}
       <div class="mini-footer">
@@ -238,6 +272,22 @@ export function MiniBody(props: MiniBodyProps) {
           onSelectPeriod={props.onSelectPeriod}
         />
       </div>
+
+      <Show when={showTrade()}>
+        <MiniTradeDrawer
+          code={q().code}
+          name={q().name}
+          currentPrice={q().price}
+          initialPrice={chosenPrice() ?? undefined}
+          bids={q().bids}
+          asks={q().asks}
+          preClose={q().preClose}
+          onClose={() => {
+            setShowTrade(false)
+            setChosenPrice(null)
+          }}
+        />
+      </Show>
     </>
   )
 }

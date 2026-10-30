@@ -3,6 +3,7 @@
 //! Split from `types.ts` to stay inside the 300-line budget (AGENTS.md §11).
 
 import type { Config, DockState, MarketOverview, TrendSignal } from './config'
+import type { PendingOrder } from './portfolio'
 
 
 export interface Quote {
@@ -135,6 +136,7 @@ export interface Snapshot {
    * before the snapshot leaves the backend, so it can never reach the webview.
    */
   hasIwenCaiKey?: boolean
+  pendingOrders?: PendingOrder[]
 }
 /** A structured row from the backend ring buffer (`logger::LogEntry`). */
 export interface LogEntry {

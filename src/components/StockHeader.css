@@ -87,12 +87,56 @@
   gap: 4px;
 }
 .profit-badge {
-  font-size: 10.5px;
+  font-size: 10px;
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   font-family: var(--font-mono);
+  font-weight: 600;
+  line-height: 1.3;
+  display: inline-flex;
+  align-items: center;
+}
+.profit-badge.up {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+.profit-badge.down {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+}
+
+/* 模拟买卖按钮 (优雅蓝系列配色，不刺眼) */
+.stock-header-trade-btn,
+.mini-trade-badge-btn {
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #93c5fd;
+  font-size: 10px;
   font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.35;
+  box-shadow: none;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+.stock-header-trade-btn:hover,
+.mini-trade-badge-btn:hover {
+  background: rgba(59, 130, 246, 0.28);
+  border-color: rgba(96, 165, 250, 0.6);
+  color: #bfdbfe;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
+  transform: translateY(-0.5px);
+}
+.stock-header-trade-btn:active,
+.mini-trade-badge-btn:active {
+  transform: translateY(0.5px);
 }
 
 /* 竞价诊断徽标 */

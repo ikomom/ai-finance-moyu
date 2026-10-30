@@ -9,20 +9,16 @@ use super::types::{MarketIndex, MarketOverview, SectorItem};
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
                           (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-/// Whole-market breadth: up / down / flat counts plus turnover change (`None`
-/// when unknown). The inner tuple is unwieldy at call sites, hence the alias.
 pub(super) type BreadthSnapshot = (u32, u32, u32, Option<f64>, Option<f64>);
 
 pub struct MarketFetcher {
     pub(super) client: reqwest::Client,
     pub(super) cached_breadth: std::sync::Mutex<BreadthSnapshot>,
     pub quota_exhausted_date: std::sync::Mutex<Option<String>>,
+    pub(super) last_breadth_fetch: std::sync::Mutex<Option<std::time::Instant>>,
 }
 
 impl Default for MarketFetcher {
-    /// Never panics: with `panic = "abort"` an `expect()` here would take the
-    /// whole process down on a TLS initialisation failure, and the widget can
-    /// still run without the market panorama.
     fn default() -> Self {
         Self::new().unwrap_or_else(|e| {
             log::error!(target: "NET", "大盘全景客户端初始化失败，将展示基准缓存: {e}");
@@ -36,6 +32,7 @@ impl Default for MarketFetcher {
                     Some(-365_890_000_000.0),
                 )),
                 quota_exhausted_date: std::sync::Mutex::new(None),
+                last_breadth_fetch: std::sync::Mutex::new(None),
             }
         })
     }
@@ -60,12 +57,14 @@ impl MarketFetcher {
                 Some(-365890000000.0),
             )),
             quota_exhausted_date: std::sync::Mutex::new(None),
+            last_breadth_fetch: std::sync::Mutex::new(None),
         })
     }
 
     /// Reset quota circuit breaker (e.g. after user updates API Key).
     pub fn reset_quota_circuit_breaker(&self) {
         *self.quota_exhausted_date.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.last_breadth_fetch.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 
     pub async fn fetch_overview(&self, configured_key: Option<&str>) -> Result<MarketOverview, String> {
@@ -95,7 +94,7 @@ impl MarketFetcher {
                 (u, d, f, pct, amt)
             }
             Err(ref e) => {
-                log::warn!(target: "NET", "全市场涨跌统计异常(已回退基准缓存): {e}");
+                log::info!(target: "NET", "全市场涨跌统计回退基准缓存: {e}");
                 *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner())
             }
         };
@@ -247,10 +246,7 @@ impl MarketFetcher {
         Ok(sectors)
     }
 
-
     async fn fetch_north_money(&self) -> Result<f64, String> {
-        // 沪深交易所已停止盘中实时北向资金流向披露
         Ok(0.0)
     }
 }
-

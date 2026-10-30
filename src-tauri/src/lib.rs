@@ -6,6 +6,7 @@ pub mod logger;
 mod market;
 pub mod market_overview;
 mod poller;
+pub mod portfolio;
 mod quote;
 mod search;
 mod state;
@@ -46,10 +47,11 @@ pub fn run() {
             let cfg = config::load(app.handle());
             let fetcher = Fetcher::new().map_err(|e| e.to_string())?;
             let cache = config::load_cache(app.handle());
+            let portfolio_data = portfolio::storage::load(app.handle());
             let rows = cfg.watchlist.len();
             let layout = cfg.layout;
             let hotkeys = cfg.hotkeys.clone();
-            app.manage(AppState::new(cfg, fetcher, cache));
+            app.manage(AppState::new(cfg, fetcher, cache, portfolio_data));
 
             // Registered here rather than in the builder chain so the chords can
             // come from the config file. A failure is reported and survived: the
@@ -178,6 +180,19 @@ pub fn run() {
             commands::get_model_download_status,
             commands::open_models_dir,
             commands::decide_stock_with_ai,
+            commands::get_portfolio_summary,
+            commands::execute_simulated_trade,
+            commands::cancel_simulated_order,
+            commands::cancel_all_simulated_orders,
+            commands::set_portfolio_strict_mode,
+            commands::clear_all_portfolio,
+            commands::create_broker_account,
+            commands::update_broker_account,
+            commands::transfer_broker_cash,
+            commands::delete_broker_account,
+            commands::reset_broker_account,
+            commands::reset_portfolio_position,
+            commands::set_active_broker,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

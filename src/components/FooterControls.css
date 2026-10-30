@@ -93,6 +93,13 @@
   opacity: 1;
 }
 
+.mode-pill.kline-main-pill.active,
+.mode-pill.kline-arrow-pill.active {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  font-weight: 600;
+}
+
 /* KLine Period Popover */
 .kline-period-popover {
   position: absolute;

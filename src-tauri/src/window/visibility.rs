@@ -133,7 +133,7 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
         tauri::WebviewUrl::App("settings.html".into()),
     )
     .title("设置 · A股摸鱼")
-    .inner_size(760.0, 620.0)
+    .inner_size(840.0, 680.0)
     .min_inner_size(680.0, 480.0)
     .center()
     .resizable(true)
