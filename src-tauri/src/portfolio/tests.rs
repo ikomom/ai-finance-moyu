@@ -36,8 +36,10 @@ fn test_fee_calculation_presets() {
 }
 
 fn test_portfolio_with_broker() -> (PortfolioData, String) {
-    let mut data = PortfolioData::default();
-    data.strict_mode = false; // Sandbox mode for non-boundary unit arithmetic
+    let mut data = PortfolioData {
+        strict_mode: false, // Sandbox mode for non-boundary unit arithmetic
+        ..Default::default()
+    };
     let b_id = "default".to_string();
     data.brokers.push(BrokerAccount::new(&b_id, "测试券商", 100_000.0));
     data.active_broker_id = Some(b_id.clone());
@@ -185,8 +187,10 @@ fn test_invalid_price_and_shares_rejection() {
 
 #[test]
 fn test_multi_broker_position_isolation() {
-    let mut data = PortfolioData::default();
-    data.strict_mode = false;
+    let mut data = PortfolioData {
+        strict_mode: false,
+        ..Default::default()
+    };
     let b1 = "b1".to_string();
     let b2 = "b2".to_string();
     data.brokers.push(BrokerAccount::new(&b1, "B1", 50000.0));
