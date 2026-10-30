@@ -8,30 +8,9 @@ use serde::{Deserialize, Serialize};
 use crate::crossing::{PriceLine, WatchSpec};
 
 pub use super::ai::*;
+pub use super::groups::*;
 pub use super::layout::*;
 use super::layout::sizes_are_empty;
-
-/// Indicator strategy configuration (MA periods & MACD parameters).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IndicatorConfig {
-    /// Strategy preset: "ultra_short" | "classic" | "swing" | "custom"
-    pub preset: String,
-    /// Moving average periods, e.g. [5, 10, 20] or [3, 5, 10]
-    pub ma: [u32; 3],
-    /// MACD parameters: [fast, slow, signal], e.g. [12, 26, 9] or [6, 13, 5]
-    pub macd: [u32; 3],
-}
-
-impl Default for IndicatorConfig {
-    fn default() -> Self {
-        Self {
-            preset: "classic".into(),
-            ma: [5, 10, 20],
-            macd: [12, 26, 9],
-        }
-    }
-}
 
 /// One security on the watchlist.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -60,6 +39,9 @@ pub struct WatchItem {
     pub custom_ma: Option<[u32; 3]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_macd: Option<[u32; 3]>,
+    /// Optional assigned watchlist group ID (defaults to "default").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 impl WatchItem {
@@ -74,6 +56,7 @@ impl WatchItem {
             indicator_mode: None,
             custom_ma: None,
             custom_macd: None,
+            group: None,
         }
     }
 
@@ -134,6 +117,12 @@ pub struct Config {
     /// Whether simulated investment and portfolio ledger mode is enabled.
     #[serde(default)]
     pub enable_portfolio: bool,
+    /// Watchlist groups.
+    #[serde(default = "default_groups")]
+    pub groups: Vec<WatchGroup>,
+    /// Currently active foreground group ID (None or "all" means all).
+    #[serde(default)]
+    pub active_group_id: Option<String>,
 }
 
 impl Default for Config {
@@ -165,6 +154,8 @@ impl Default for Config {
             indicator_config: IndicatorConfig::default(),
             ai_decision: AiDecisionConfig::default(),
             enable_portfolio: false,
+            groups: default_groups(),
+            active_group_id: None,
         }
     }
 }
@@ -260,6 +251,28 @@ impl Config {
                 for v in macd {
                     *v = (*v).clamp(1, 250);
                 }
+            }
+        }
+
+        // Watchlist groups sanitization
+        if self.groups.is_empty() {
+            self.groups = default_groups();
+        }
+        if !self.groups.iter().any(|g| g.id == DEFAULT_GROUP_ID) {
+            self.groups.insert(0, WatchGroup::new(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME));
+        }
+        for item in &mut self.watchlist {
+            if let Some(grp) = &item.group {
+                if !self.groups.iter().any(|g| g.id == *grp) {
+                    item.group = Some(DEFAULT_GROUP_ID.to_string());
+                }
+            } else {
+                item.group = Some(DEFAULT_GROUP_ID.to_string());
+            }
+        }
+        if let Some(act) = &self.active_group_id {
+            if act != ALL_GROUP_ID && !self.groups.iter().any(|g| g.id == *act) {
+                self.active_group_id = None;
             }
         }
     }

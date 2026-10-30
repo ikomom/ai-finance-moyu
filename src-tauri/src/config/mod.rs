@@ -6,6 +6,7 @@
 //! - [`store`] holds load/save plus the offline quote cache
 
 mod ai;
+mod groups;
 mod layout;
 mod prefs;
 mod store;

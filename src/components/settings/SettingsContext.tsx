@@ -58,6 +58,7 @@ export function SettingsProvider(props: { children: JSX.Element }) {
       ma: [5, 10, 20],
       macd: [12, 26, 9],
     },
+    groups: [{ id: 'default', name: '默认自选' }],
     window: { x: 0, y: 0, width: 320, height: 170 },
   })
 

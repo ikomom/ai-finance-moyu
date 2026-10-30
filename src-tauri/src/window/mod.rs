@@ -1,6 +1,7 @@
 //! Window management subsystem: geometry, move/resize, edge-docking, visibility,
-//! win32 styles, and hotkeys.
+//! win32 styles, hotkeys, and context menu.
 
+pub mod context_menu;
 pub mod dock;
 pub mod geometry;
 pub mod hotkey;
@@ -8,6 +9,7 @@ pub mod move_resize;
 pub mod platform_win32;
 pub mod visibility;
 
+pub use context_menu::*;
 pub use dock::*;
 pub use geometry::*;
 pub use hotkey::*;

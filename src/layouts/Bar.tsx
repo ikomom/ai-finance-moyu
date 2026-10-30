@@ -1,6 +1,12 @@
 import { For, onMount, Show } from 'solid-js'
+import { invoke } from '@tauri-apps/api/core'
 
 import { setTrendTargets } from '../tauri'
+import {
+  ALL_GROUP_ID,
+  filterQuotesByGroup,
+  filterWatchlistByGroup,
+} from '../services/watchlistGroups'
 import { diagnoseIndex } from '../utils/indexDiagnosis'
 import { diagnoseStock } from '../utils/stockDiagnosis'
 import './Bar.css'
@@ -25,8 +31,12 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
     setTrendTargets([])
   })
 
+  const activeGroupId = () => props.snapshot.config.activeGroupId ?? ALL_GROUP_ID
+  const filteredWatchlist = () => filterWatchlistByGroup(props.snapshot.config.watchlist, activeGroupId())
+  const filteredQuotes = () => filterQuotesByGroup(props.snapshot.quotes, props.snapshot.config.watchlist, activeGroupId())
+
   const itemFor = (code: string) =>
-    props.snapshot.config.watchlist.find((w) => w.code === code)
+    filteredWatchlist().find((w) => w.code === code)
 
   const handleWheel = (e: WheelEvent) => {
     // Enable horizontal scroll with mouse wheel
@@ -45,10 +55,10 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
       onWheel={handleWheel}
     >
       <Show
-        when={props.snapshot.quotes.length > 0}
-        fallback={<div class="bar-item muted">暂无自选股 · 右键设置</div>}
+        when={filteredQuotes().length > 0}
+        fallback={<div class="bar-item muted">该分组暂无自选股 · 右键设置</div>}
       >
-        <For each={props.snapshot.quotes}>
+        <For each={filteredQuotes()}>
           {(q, i) => {
             const item = () => itemFor(q.code)
             const pnlMoney = () =>
@@ -102,7 +112,15 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
                 <Show when={i() > 0}>
                   <span class="bar-sep">/</span>
                 </Show>
-                <div class="bar-item" title={tooltip()}>
+                <div
+                  class="bar-item"
+                  title={tooltip()}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    void invoke('show_context_menu', { code: q.code })
+                  }}
+                >
                   <span class="name">{q.name}</span>
                   <span class={`price ${q.price > 0 ? trendClass(q.changePct) : 'flat'}`}>
                     {q.price > 0 ? fmtPrice(q.price) : '--'}

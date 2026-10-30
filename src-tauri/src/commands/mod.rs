@@ -6,6 +6,7 @@ pub mod log;
 pub mod portfolio;
 pub mod quote;
 pub mod updater;
+pub mod watchlist;
 pub mod window;
 
 pub use ai_decision::*;
@@ -14,4 +15,5 @@ pub use log::*;
 pub use portfolio::*;
 pub use quote::*;
 pub use updater::*;
+pub use watchlist::*;
 pub use window::*;

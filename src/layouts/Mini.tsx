@@ -1,11 +1,18 @@
 import { createEffect, createSignal, Show } from 'solid-js'
+import { invoke } from '@tauri-apps/api/core'
 import './Mini.css'
 
 import { Grip } from '../components/Grip'
 import { MiniBody } from './MiniBody'
 import { PillTabs } from '../components/PillTabs'
 import { StatusLine } from '../components/StatusLine'
+import { GroupDropdown } from '../components/watch/GroupDropdown'
 import { useSubchartMode } from '../hooks/useSubchartMode'
+import {
+  ALL_GROUP_ID,
+  filterQuotesByGroup,
+  filterWatchlistByGroup,
+} from '../services/watchlistGroups'
 import { miniModeOverride, selectedIndex, setMiniModeOverride, setSelected, snapshot } from '../store'
 import { fetchKLine, setTrendTargets } from '../tauri'
 import {
@@ -62,11 +69,20 @@ export function Mini(props: { flash: boolean }) {
     } catch {}
   }
 
-  const quotes = () => s()?.quotes ?? []
+  const activeGroupId = () => s()?.config.activeGroupId ?? ALL_GROUP_ID
+  const watchlist = () => filterWatchlistByGroup(s()?.config.watchlist ?? [], activeGroupId())
+  const quotes = () => filterQuotesByGroup(s()?.quotes ?? [], s()?.config.watchlist ?? [], activeGroupId())
   const item = () => {
-    const list = s()?.config.watchlist ?? []
+    const list = watchlist()
     return list[selectedIndex()] ?? list[0]
   }
+
+  createEffect(() => {
+    const n = quotes().length
+    if (n > 0 && selectedIndex() >= n) {
+      setSelected(0)
+    }
+  })
 
   const indicatorParams = () => resolveIndicatorParams(item(), s()?.config?.indicatorConfig)
 
@@ -149,14 +165,16 @@ export function Mini(props: { flash: boolean }) {
       data-tauri-drag-region
       onWheel={handleWheel}
     >
-      {/* Top stock pill tabs */}
-      <Show when={quotes().length > 1}>
-        <PillTabs
-          items={quotes().map((q) => ({ id: q.code, label: q.name, title: `${q.name} (${q.code})` }))}
-          selectedIndex={selectedIndex()}
-          onSelect={setSelected}
-        />
-      </Show>
+      {/* Top stock pill tabs with GroupDropdown prefix */}
+      <PillTabs
+        prefix={<GroupDropdown />}
+        items={quotes().map((q) => ({ id: q.code, label: q.name, title: `${q.name} (${q.code})` }))}
+        selectedIndex={selectedIndex()}
+        onSelect={setSelected}
+        onItemContextMenu={(tabItem) => {
+          void invoke('show_context_menu', { code: String(tabItem.id) })
+        }}
+      />
 
       <Show
         when={quote()}

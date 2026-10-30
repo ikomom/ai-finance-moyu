@@ -7,6 +7,12 @@ import { IndexBadge } from '../components/IndexBadge'
 import { Sparkline } from '../components/Sparkline'
 import { StatusLine } from '../components/StatusLine'
 import { StockBadge } from '../components/StockBadge'
+import { GroupDropdown } from '../components/watch/GroupDropdown'
+import {
+  ALL_GROUP_ID,
+  filterQuotesByGroup,
+  filterWatchlistByGroup,
+} from '../services/watchlistGroups'
 import { selectedIndex, setSelected, snapshot } from '../store'
 import {
   fmtMoney,
@@ -29,15 +35,19 @@ export function List(props: { flash: boolean }) {
   const s = () => snapshot()!
   let tableBodyRef: HTMLDivElement | undefined
 
+  const activeGroupId = () => s()?.config.activeGroupId ?? ALL_GROUP_ID
+  const filteredWatchlist = () => filterWatchlistByGroup(s()?.config.watchlist ?? [], activeGroupId())
+  const filteredQuotes = () => filterQuotesByGroup(s()?.quotes ?? [], s()?.config.watchlist ?? [], activeGroupId())
+
   const { handleScroll } = useListScroll(
-    () => s()?.quotes,
+    () => filteredQuotes(),
     () => tableBodyRef
   )
 
   const itemFor = (code: string): WatchItem | undefined =>
-    s()?.config.watchlist.find((w) => w.code === code)
+    filteredWatchlist().find((w) => w.code === code)
 
-  const totalStats = () => computeTotalStats(s()?.quotes, s()?.config.watchlist)
+  const totalStats = () => computeTotalStats(filteredQuotes(), filteredWatchlist())
 
   const handleRowDblClick = (e: MouseEvent, index: number) => {
     e.preventDefault()
@@ -51,7 +61,8 @@ export function List(props: { flash: boolean }) {
       <div class="list-head" data-tauri-drag-region>
         <div class="title-group">
           <span class="title">自选看板</span>
-          <span class="count">({s()?.quotes.length ?? 0})</span>
+          <GroupDropdown />
+          <span class="count">({filteredQuotes().length})</span>
         </div>
         <Show when={totalStats()}>
           {(stats) => (
@@ -84,10 +95,10 @@ export function List(props: { flash: boolean }) {
 
         <div class="table-body" ref={tableBodyRef} onScroll={handleScroll}>
           <Show
-            when={(s()?.quotes.length ?? 0) > 0}
-            fallback={<div class="row empty-row">暂无自选股 · 右键添加</div>}
+            when={filteredQuotes().length > 0}
+            fallback={<div class="row empty-row">该分组暂无自选股 · 右键添加</div>}
           >
-            <For each={s().quotes}>
+            <For each={filteredQuotes()}>
               {(q, i) => {
                 const item = () => itemFor(q.code)
                 const cost = () => item()?.costPrice ?? null
@@ -101,7 +112,12 @@ export function List(props: { flash: boolean }) {
                     classList={{ active: i() === selectedIndex() }}
                     onClick={() => setSelected(i())}
                     onDblClick={(e) => handleRowDblClick(e, i())}
-                    title="双击切换至迷你图深入查看"
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void invoke('show_context_menu', { code: q.code })
+                    }}
+                    title="双击切换至迷你图深入查看 · 右键管理"
                   >
                     <div class="col-name cell-name">
                       <span class="name-text">{q.name}</span>

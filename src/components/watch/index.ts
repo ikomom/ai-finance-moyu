@@ -1,5 +1,7 @@
 export * from './types'
 export * from './useWatchDragDrop'
+export * from './GroupDropdown'
+export * from './WatchGroupTabs'
 export * from './WatchSearchBox'
 export * from './WatchToolbar'
 export * from './WatchHoldingSection'

@@ -3,7 +3,6 @@
 use tauri::{AppHandle, Manager};
 
 use crate::config::VisibilityMode;
-use crate::tray;
 use crate::window::{apply_visibility_mode, open_settings, set_dock_collapsed_inner, DISPLAY};
 
 /// Open the settings window from the frontend.
@@ -30,9 +29,9 @@ pub fn set_visibility_mode(app: AppHandle, mode: VisibilityMode) -> Result<(), S
 }
 
 #[tauri::command]
-pub fn show_context_menu(app: AppHandle) -> Result<(), String> {
+pub fn show_context_menu(app: AppHandle, code: Option<String>) -> Result<(), String> {
     if let Some(win) = app.get_webview_window(DISPLAY) {
-        tray::show_context_menu(&app, &win).map_err(|e| e.to_string())?;
+        crate::window::show_context_menu(&app, &win, code.as_deref()).map_err(|e| e.to_string())?;
     }
     Ok(())
 }

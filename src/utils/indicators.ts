@@ -195,3 +195,35 @@ export function computeKLineLevels(
     resistance: res !== -Infinity ? Math.round(res * 100) / 100 : null,
   }
 }
+
+export function resolveIndicatorParams(
+  item?: import('../types').WatchItem | null,
+  global?: import('../types').IndicatorConfig | null
+): { ma: [number, number, number]; macd: [number, number, number] } {
+  const presets = {
+    ultra_short: { ma: [3, 5, 10] as [number, number, number], macd: [6, 13, 5] as [number, number, number] },
+    classic: { ma: [5, 10, 20] as [number, number, number], macd: [12, 26, 9] as [number, number, number] },
+    swing: { ma: [10, 20, 60] as [number, number, number], macd: [12, 26, 9] as [number, number, number] },
+  }
+  const effectiveGlobal = global ?? { preset: 'classic', ma: [5, 10, 20], macd: [12, 26, 9] }
+  const mode = item?.indicatorMode ?? 'inherit'
+
+  if (mode === 'ultra_short') return presets.ultra_short
+  if (mode === 'classic') return presets.classic
+  if (mode === 'swing') return presets.swing
+  if (mode === 'custom') {
+    return {
+      ma: item?.customMa ?? effectiveGlobal.ma ?? [5, 10, 20],
+      macd: item?.customMacd ?? effectiveGlobal.macd ?? [12, 26, 9],
+    }
+  }
+  if (effectiveGlobal.preset === 'ultra_short') return presets.ultra_short
+  if (effectiveGlobal.preset === 'swing') return presets.swing
+  if (effectiveGlobal.preset === 'custom') {
+    return {
+      ma: effectiveGlobal.ma ?? [5, 10, 20],
+      macd: effectiveGlobal.macd ?? [12, 26, 9],
+    }
+  }
+  return presets.classic
+}

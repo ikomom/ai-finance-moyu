@@ -193,6 +193,13 @@ pub fn run() {
             commands::reset_broker_account,
             commands::reset_portfolio_position,
             commands::set_active_broker,
+            commands::create_watch_group,
+            commands::rename_watch_group,
+            commands::delete_watch_group,
+            commands::set_active_watch_group,
+            commands::move_watch_item,
+            commands::pin_watch_item,
+            commands::remove_watch_item,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

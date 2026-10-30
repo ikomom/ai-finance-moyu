@@ -1,4 +1,4 @@
-import { createEffect, For } from 'solid-js'
+import { createEffect, For, type JSX, Show } from 'solid-js'
 import './PillTabs.css'
 
 export interface PillTabItem {
@@ -11,6 +11,8 @@ export interface PillTabsProps {
   items: PillTabItem[]
   selectedIndex: number
   onSelect: (index: number) => void
+  onItemContextMenu?: (item: PillTabItem, index: number, event: MouseEvent) => void
+  prefix?: JSX.Element
   class?: string
 }
 
@@ -52,25 +54,37 @@ export function PillTabs(props: PillTabsProps) {
   })
 
   return (
-    <div
-      class={`mini-tabs ${props.class ?? ''}`}
-      ref={tabsContainerRef}
-      data-tauri-drag-region
-    >
-      <For each={props.items}>
-        {(item, i) => (
-          <button
-            ref={(el) => (tabRefs[i()] = el)}
-            type="button"
-            class="mini-tab stock-tab"
-            classList={{ active: i() === props.selectedIndex }}
-            onClick={() => props.onSelect(i())}
-            title={item.title ?? item.label}
-          >
-            {item.label}
-          </button>
-        )}
-      </For>
+    <div class={`mini-tabs-bar ${props.class ?? ''}`} data-tauri-drag-region>
+      <Show when={props.prefix}>
+        <div class="mini-tabs-prefix">{props.prefix}</div>
+      </Show>
+      <div
+        class="mini-tabs"
+        ref={tabsContainerRef}
+        data-tauri-drag-region
+      >
+        <For each={props.items}>
+          {(item, i) => (
+            <button
+              ref={(el) => (tabRefs[i()] = el)}
+              type="button"
+              class="mini-tab stock-tab"
+              classList={{ active: i() === props.selectedIndex }}
+              onClick={() => props.onSelect(i())}
+              onContextMenu={(e) => {
+                if (props.onItemContextMenu) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  props.onItemContextMenu(item, i(), e)
+                }
+              }}
+              title={item.title ?? item.label}
+            >
+              {item.label}
+            </button>
+          )}
+        </For>
+      </div>
     </div>
   )
 }

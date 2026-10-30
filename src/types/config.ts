@@ -48,48 +48,11 @@ export const INDICATOR_PRESETS: Record<
   },
 }
 
-export function resolveIndicatorParams(
-  item?: WatchItem | null,
-  global?: IndicatorConfig | null
-): { ma: [number, number, number]; macd: [number, number, number] } {
-  const effectiveGlobal: IndicatorConfig = global ?? {
-    preset: 'classic',
-    ma: [5, 10, 20],
-    macd: [12, 26, 9],
-  }
+export { resolveIndicatorParams } from '../utils/indicators'
 
-  const mode = item?.indicatorMode ?? 'inherit'
-
-  if (mode === 'ultra_short') {
-    return { ma: INDICATOR_PRESETS.ultra_short.ma, macd: INDICATOR_PRESETS.ultra_short.macd }
-  }
-  if (mode === 'classic') {
-    return { ma: INDICATOR_PRESETS.classic.ma, macd: INDICATOR_PRESETS.classic.macd }
-  }
-  if (mode === 'swing') {
-    return { ma: INDICATOR_PRESETS.swing.ma, macd: INDICATOR_PRESETS.swing.macd }
-  }
-  if (mode === 'custom') {
-    return {
-      ma: item?.customMa ?? effectiveGlobal.ma ?? [5, 10, 20],
-      macd: item?.customMacd ?? effectiveGlobal.macd ?? [12, 26, 9],
-    }
-  }
-
-  // mode === 'inherit' -> check global preset
-  if (effectiveGlobal.preset === 'ultra_short') {
-    return { ma: INDICATOR_PRESETS.ultra_short.ma, macd: INDICATOR_PRESETS.ultra_short.macd }
-  }
-  if (effectiveGlobal.preset === 'swing') {
-    return { ma: INDICATOR_PRESETS.swing.ma, macd: INDICATOR_PRESETS.swing.macd }
-  }
-  if (effectiveGlobal.preset === 'custom') {
-    return {
-      ma: effectiveGlobal.ma ?? [5, 10, 20],
-      macd: effectiveGlobal.macd ?? [12, 26, 9],
-    }
-  }
-  return { ma: INDICATOR_PRESETS.classic.ma, macd: INDICATOR_PRESETS.classic.macd }
+export interface WatchGroup {
+  id: string
+  name: string
 }
 
 export interface WatchItem {
@@ -105,6 +68,8 @@ export interface WatchItem {
   indicatorMode?: StockIndicatorMode | null
   customMa?: [number, number, number] | null
   customMacd?: [number, number, number] | null
+  /** Assigned group ID (e.g. 'default' or custom) */
+  group?: string | null
 }
 
 export interface SearchResult {
@@ -289,6 +254,8 @@ export interface Config {
   indicatorConfig?: IndicatorConfig
   aiDecision?: AiDecisionConfig
   enablePortfolio?: boolean
+  groups?: WatchGroup[]
+  activeGroupId?: string | null
 }
 
 export interface AnomalyAlertConfig {

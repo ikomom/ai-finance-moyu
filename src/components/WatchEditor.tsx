@@ -3,20 +3,71 @@ import './WatchEditor.css'
 import {
   useWatchDragDrop,
   WatchCard,
+  WatchGroupTabs,
   WatchSearchBox,
   WatchToolbar,
   type SortCriterion,
   type WatchEditorProps,
 } from './watch'
+import {
+  ALL_GROUP_ID,
+  computeGroupCounts,
+  createWatchGroup,
+  DEFAULT_GROUP_ID,
+  deleteWatchGroup,
+  renameWatchGroup,
+} from '../services/watchlistGroups'
 
 export type { SortCriterion }
 
 /**
- * Watchlist editor: quick search-and-add bar, sort toolbar,
+ * Watchlist editor: group tabs, quick search-and-add bar, sort toolbar,
  * sortable drag-and-drop cards, and detail drawer panels.
  */
 export function WatchEditor(props: WatchEditorProps) {
+  const [activeGroupId, setActiveGroupId] = createSignal<string>(ALL_GROUP_ID)
   const [expandedMap, setExpandedMap] = createSignal<Record<string, boolean>>({})
+
+  const groups = () => props.groups ?? [{ id: DEFAULT_GROUP_ID, name: '默认自选' }]
+  const counts = () => computeGroupCounts(props.items, groups())
+
+  const indexedItems = () =>
+    props.items.map((item, originalIndex) => ({ item, originalIndex }))
+
+  const filteredIndexedItems = () => {
+    const aid = activeGroupId()
+    if (aid === ALL_GROUP_ID) return indexedItems()
+    return indexedItems().filter(({ item }) => (item.group ?? DEFAULT_GROUP_ID) === aid)
+  }
+
+  const handleCreateGroup = async (name: string) => {
+    try {
+      const g = await createWatchGroup(name)
+      props.onToast?.(`已创建分组「${name}」`, 'ok')
+      setActiveGroupId(g.id)
+    } catch (e) {
+      props.onToast?.(String(e), 'bad')
+    }
+  }
+
+  const handleRenameGroup = async (id: string, newName: string) => {
+    try {
+      await renameWatchGroup(id, newName)
+      props.onToast?.(`已将分组重命名为「${newName}」`, 'ok')
+    } catch (e) {
+      props.onToast?.(String(e), 'bad')
+    }
+  }
+
+  const handleDeleteGroup = async (id: string, moveToDefault: boolean) => {
+    try {
+      await deleteWatchGroup(id, moveToDefault)
+      props.onToast?.(`已删除分组`, 'ok')
+      setActiveGroupId(ALL_GROUP_ID)
+    } catch (e) {
+      props.onToast?.(String(e), 'bad')
+    }
+  }
 
   const {
     draggingIndex,
@@ -32,70 +83,95 @@ export function WatchEditor(props: WatchEditorProps) {
     setExpandedMap((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const allExpanded = () =>
-    props.items.length > 0 && props.items.every((it, idx) => isExpanded(it.code, idx))
+  const allExpanded = () => {
+    const currentList = filteredIndexedItems()
+    return currentList.length > 0 && currentList.every(({ item, originalIndex }) => isExpanded(item.code, originalIndex))
+  }
 
   const toggleAll = () => {
     const shouldOpen = !allExpanded()
-    const next: Record<string, boolean> = {}
-    if (shouldOpen) {
-      props.items.forEach((it, idx) => {
-        next[it.code || String(idx)] = true
-      })
-    }
+    const next: Record<string, boolean> = { ...expandedMap() }
+    filteredIndexedItems().forEach(({ item, originalIndex }) => {
+      next[item.code || String(originalIndex)] = shouldOpen
+    })
     setExpandedMap(next)
   }
 
   return (
     <div class="watch-editor-wrapper">
-      {/* Quick Search & Add Bar */}
+      {/* 1. Watchlist Groups Tabs */}
+      <WatchGroupTabs
+        groups={groups()}
+        activeGroupId={activeGroupId()}
+        counts={counts()}
+        onSelectGroup={setActiveGroupId}
+        onCreateGroup={handleCreateGroup}
+        onRenameGroup={handleRenameGroup}
+        onDeleteGroup={handleDeleteGroup}
+      />
+
+      {/* 2. Quick Search & Add Bar */}
       <WatchSearchBox
         items={props.items}
+        groups={groups()}
+        activeGroupId={activeGroupId()}
         onAddWithItem={props.addWithItem}
         onToast={props.onToast}
       />
 
-      {/* Quick Sort & Collapse Toolbar */}
+      {/* 3. Quick Sort & Collapse Toolbar */}
       <WatchToolbar
-        totalCount={props.items.length}
+        totalCount={filteredIndexedItems().length}
         allExpanded={allExpanded()}
         onSort={props.sort}
         onToggleAll={toggleAll}
       />
 
-      {/* Watchlist Cards */}
+      {/* 4. Watchlist Cards */}
       <div class="watch-list">
-        <For each={props.items}>
-          {(item, i) => (
+        <For each={filteredIndexedItems()}>
+          {({ item, originalIndex }) => (
             <WatchCard
               item={item}
-              index={i()}
+              groups={groups()}
+              index={originalIndex}
               totalCount={props.items.length}
-              isDragging={draggingIndex() === i()}
-              isDropBefore={isDropBefore(i())}
-              isDropAfter={isDropAfter(i())}
-              isExpanded={isExpanded(item.code, i())}
-              onToggleExpand={() => toggleExpand(item.code, i())}
+              isDragging={draggingIndex() === originalIndex}
+              isDropBefore={isDropBefore(originalIndex)}
+              isDropAfter={isDropAfter(originalIndex)}
+              isExpanded={isExpanded(item.code, originalIndex)}
+              onToggleExpand={() => toggleExpand(item.code, originalIndex)}
               onHandlePointerDown={(e) =>
-                onHandlePointerDown(e, i(), props.items.length, props.move, props.onToast)
+                onHandlePointerDown(e, originalIndex, props.items.length, props.move, props.onToast)
               }
-              onUpdate={(patch) => props.update(i(), patch)}
-              onMove={(to) => props.move(i(), to)}
-              onRemove={() => props.remove(i())}
-              onAddLine={() => props.addLine(i())}
-              onUpdateLine={(li, patch) => props.updateLine(i(), li, patch)}
-              onRemoveLine={(li) => props.removeLine(i(), li)}
+              onUpdate={(patch) => props.update(originalIndex, patch)}
+              onMove={(to) => props.move(originalIndex, to)}
+              onRemove={() => props.remove(originalIndex)}
+              onAddLine={() => props.addLine(originalIndex)}
+              onUpdateLine={(li, patch) => props.updateLine(originalIndex, li, patch)}
+              onRemoveLine={(li) => props.removeLine(originalIndex, li)}
               onToast={props.onToast}
             />
           )}
         </For>
 
-        <Show when={props.items.length === 0}>
-          <p class="muted">还没有自选股，请使用上方搜索栏或点下方「＋ 添加空白项」。</p>
+        <Show when={filteredIndexedItems().length === 0}>
+          <p class="muted">当前分组暂无自选股，请使用上方搜索栏或点下方「＋ 添加空白项」。</p>
         </Show>
 
         <div>
-          <button type="button" class="ghost" onClick={() => props.add()}>
+          <button
+            type="button"
+            class="ghost"
+            onClick={() => {
+              const gid = activeGroupId() === ALL_GROUP_ID ? DEFAULT_GROUP_ID : activeGroupId()
+              props.addWithItem({
+                code: '',
+                group: gid,
+                priceLines: [],
+              })
+            }}
+          >
             ＋ 添加空白项
           </button>
         </div>

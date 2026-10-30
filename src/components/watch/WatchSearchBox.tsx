@@ -1,9 +1,12 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
-import type { SearchResult, WatchItem } from '../../types'
+import type { SearchResult, WatchGroup, WatchItem } from '../../types'
+import { DEFAULT_GROUP_ID } from '../../services/watchlistGroups'
 
 export interface WatchSearchBoxProps {
   items: WatchItem[]
+  groups?: WatchGroup[]
+  activeGroupId?: string
   onAddWithItem: (item: WatchItem) => void
   onToast?: (msg: string, kind?: '' | 'ok' | 'bad') => void
 }
@@ -14,6 +17,8 @@ export function WatchSearchBox(props: WatchSearchBoxProps) {
   const [isSearching, setIsSearching] = createSignal(false)
   const [showDropdown, setShowDropdown] = createSignal(false)
   const [highlightedIndex, setHighlightedIndex] = createSignal(0)
+  const [pendingTargetItem, setPendingTargetItem] = createSignal<SearchResult | null>(null)
+  const [targetGroupId, setTargetGroupId] = createSignal(DEFAULT_GROUP_ID)
 
   let searchBoxRef: HTMLDivElement | undefined
   let debounceTimer: number | undefined
@@ -68,15 +73,26 @@ export function WatchSearchBox(props: WatchSearchBoxProps) {
       return
     }
 
+    setShowDropdown(false)
+    const initGid = props.activeGroupId && props.activeGroupId !== 'all' ? props.activeGroupId : DEFAULT_GROUP_ID
+    setTargetGroupId(initGid)
+    setPendingTargetItem(item)
+  }
+
+  const confirmAddWithGroup = () => {
+    const item = pendingTargetItem()
+    if (!item) return
+
     props.onAddWithItem({
       code: item.code,
       name: item.name,
+      group: targetGroupId(),
       priceLines: [],
     })
     props.onToast?.(`已将「${item.name}」加入自选池`, 'ok')
     setQuery('')
     setResults([])
-    setShowDropdown(false)
+    setPendingTargetItem(null)
   }
 
   const triggerImmediateSearch = async () => {
@@ -209,6 +225,47 @@ export function WatchSearchBox(props: WatchSearchBoxProps) {
                 )
               }}
             </For>
+          </div>
+        </div>
+      </Show>
+
+      {/* Target group picker confirm modal */}
+      <Show when={pendingTargetItem()}>
+        <div class="group-modal-backdrop" onClick={() => setPendingTargetItem(null)}>
+          <div class="group-modal" onClick={(e) => e.stopPropagation()}>
+            <div class="group-modal-title">加入自选股票</div>
+            <p style={{ 'font-size': '12px', color: '#e2e8f0', margin: '4px 0' }}>
+              标的：<span style={{ color: '#38bdf8', 'font-weight': 600 }}>{pendingTargetItem()?.name}</span> ({pendingTargetItem()?.code})
+            </p>
+            <div style={{ 'margin-top': '6px', display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
+              <span style={{ 'font-size': '11px', color: '#94a3b8' }}>选择归属分组：</span>
+              <select
+                class="group-modal-input"
+                style={{ cursor: 'pointer' }}
+                value={targetGroupId()}
+                onChange={(e) => setTargetGroupId(e.currentTarget.value)}
+              >
+                <For each={props.groups ?? [{ id: DEFAULT_GROUP_ID, name: '默认自选' }]}>
+                  {(g) => <option value={g.id}>{g.name}</option>}
+                </For>
+              </select>
+            </div>
+            <div class="group-modal-actions" style={{ 'margin-top': '10px' }}>
+              <button
+                type="button"
+                class="group-modal-btn cancel"
+                onClick={() => setPendingTargetItem(null)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                class="group-modal-btn confirm"
+                onClick={confirmAddWithGroup}
+              >
+                确认加入
+              </button>
+            </div>
           </div>
         </div>
       </Show>

@@ -1,11 +1,12 @@
-import { Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { indicatorPresetBadge, numOrNull } from './types'
 import { WatchDrawer } from './WatchDrawer'
-import type { PriceLine, SearchResult, WatchItem } from '../../types'
+import type { PriceLine, SearchResult, WatchGroup, WatchItem } from '../../types'
 
 export interface WatchCardProps {
   item: WatchItem
+  groups?: WatchGroup[]
   index: number
   totalCount: number
   isDragging: boolean
@@ -136,6 +137,20 @@ export function WatchCard(props: WatchCardProps) {
               </span>
             </Show>
           </div>
+        </Show>
+
+        {/* Group selector tag */}
+        <Show when={props.groups && props.groups.length > 1}>
+          <select
+            class="watch-group-select"
+            value={props.item.group ?? 'default'}
+            onChange={(e) => props.onUpdate({ group: e.currentTarget.value })}
+            title="修改所属分组"
+          >
+            <For each={props.groups}>
+              {(g) => <option value={g.id}>{g.name}</option>}
+            </For>
+          </select>
         </Show>
 
         {/* Collapse / Expand Toggle Button */}

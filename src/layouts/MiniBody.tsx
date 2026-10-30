@@ -4,7 +4,8 @@
 //! §11 colocation + 300-line budget). Every closure the body needs is passed in
 //! explicitly, so this component has no hidden dependency on layout state.
 
-import { createSignal, Show, type Accessor, type Setter } from 'solid-js'
+import { createSignal, onCleanup, onMount, Show, type Accessor, type Setter } from 'solid-js'
+import { listen } from '@tauri-apps/api/event'
 
 import { AuctionBadge } from '../components/AuctionBadge'
 import { Chart, type HoverExtra } from '../components/Chart'
@@ -40,6 +41,11 @@ export interface MiniIndicatorParams {
   macd: [number, number, number]
 }
 
+export type KbarExtra = {
+  ma5?: number | null; ma10?: number | null; ma20?: number | null;
+  dif?: number | null; dea?: number | null; macd?: number | null; chgPct?: number | null;
+} | null
+
 export interface MiniHoverState {
   point: Accessor<TrendPoint | null>
   setPoint: Setter<TrendPoint | null>
@@ -49,24 +55,8 @@ export interface MiniHoverState {
   setAuctionPoint: Setter<AuctionPoint | null>
   kbar: Accessor<KLineBar | null>
   setKbar: Setter<KLineBar | null>
-  kbarExtra: Accessor<{
-    ma5?: number | null
-    ma10?: number | null
-    ma20?: number | null
-    dif?: number | null
-    dea?: number | null
-    macd?: number | null
-    chgPct?: number | null
-  } | null>
-  setKbarExtra: Setter<{
-    ma5?: number | null
-    ma10?: number | null
-    ma20?: number | null
-    dif?: number | null
-    dea?: number | null
-    macd?: number | null
-    chgPct?: number | null
-  } | null>
+  kbarExtra: Accessor<KbarExtra>
+  setKbarExtra: Setter<KbarExtra>
 }
 
 export interface MiniBodyProps {
@@ -107,6 +97,22 @@ export function MiniBody(props: MiniBodyProps) {
   const setHoveredKExtra = props.hover.setKbarExtra
   const [showTrade, setShowTrade] = createSignal(false)
   const [chosenPrice, setChosenPrice] = createSignal<number | null>(null)
+
+  onMount(() => {
+    let unlisten: (() => void) | undefined
+    try {
+      listen<{ code?: string }>('trigger-open-trade', (evt) => {
+        if (evt.payload?.code === q().code) {
+          setShowTrade(true)
+        }
+      }).then((fn) => {
+        unlisten = fn
+      }).catch(() => {})
+    } catch {}
+    onCleanup(() => {
+      unlisten?.()
+    })
+  })
 
   const { cost, pnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra } =
     createMiniDerived({

@@ -70,3 +70,25 @@ impl Default for AnomalyAlertConfig {
         }
     }
 }
+
+/// Indicator strategy configuration (MA periods & MACD parameters).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndicatorConfig {
+    /// Strategy preset: "ultra_short" | "classic" | "swing" | "custom"
+    pub preset: String,
+    /// Moving average periods, e.g. [5, 10, 20] or [3, 5, 10]
+    pub ma: [u32; 3],
+    /// MACD parameters: [fast, slow, signal], e.g. [12, 26, 9] or [6, 13, 5]
+    pub macd: [u32; 3],
+}
+
+impl Default for IndicatorConfig {
+    fn default() -> Self {
+        Self {
+            preset: "classic".into(),
+            ma: [5, 10, 20],
+            macd: [12, 26, 9],
+        }
+    }
+}

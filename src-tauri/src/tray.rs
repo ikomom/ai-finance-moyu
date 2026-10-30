@@ -2,7 +2,7 @@
 //! window is hidden or off-screen.
 
 use tauri::{
-    menu::{CheckMenuItemBuilder, ContextMenu, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
+    menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, AppHandle, Emitter, Manager,
 };
@@ -60,10 +60,7 @@ pub fn build(app: &App) -> tauri::Result<()> {
         .tooltip(format!("A股摸鱼 · 数据源 {source}"))
         .menu(&menu)
         .show_menu_on_left_click(false)
-        // Note: Do not register on_menu_event here. Global builder in lib.rs already handles all menu events;
-        // registering here as well causes Tauri v2 to invoke handle_menu twice for each click.
         .on_tray_icon_event(|tray, event| {
-            // Left click toggles the window, the familiar tray behaviour.
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
@@ -78,12 +75,6 @@ pub fn build(app: &App) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Run a window-opening call off the native menu callback.
-///
-/// Building a webview window from inside the menu callback means Windows is
-/// still unwinding its modal menu loop, and WebView2 can finish initialising
-/// into a window that never composites (a pure white rectangle). Deferring to
-/// the async runtime moves creation out of that loop.
 fn deferred<F>(app: &AppHandle, what: &'static str, open: F)
 where
     F: FnOnce(AppHandle) -> Result<(), String> + Send + 'static,
@@ -146,152 +137,59 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
                 poller::emit_snapshot(app);
             }
         }
+        other if other.starts_with("stock:group:") => {
+            let rest = other.trim_start_matches("stock:group:");
+            if let Some((code, group_id)) = rest.split_once(':') {
+                let state = app.state::<crate::state::AppState>();
+                let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(item) = cfg.watchlist.iter_mut().find(|w| w.code == code) {
+                    item.group = Some(group_id.to_string());
+                }
+                let _ = config::save(app, &cfg);
+                drop(cfg);
+                poller::emit_snapshot(app);
+                log::info!(target: "USER", "右键移动股票 {code} 至分组 {group_id}");
+            }
+        }
+        other if other.starts_with("stock:new_group:") => {
+            let code = other.trim_start_matches("stock:new_group:");
+            let _ = app.emit("open-new-group-modal", serde_json::json!({ "code": code }));
+        }
+        other if other.starts_with("stock:pin:") => {
+            let code = other.trim_start_matches("stock:pin:");
+            let state = app.state::<crate::state::AppState>();
+            let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(pos) = cfg.watchlist.iter().position(|w| w.code == code) {
+                let item = cfg.watchlist.remove(pos);
+                cfg.watchlist.insert(0, item);
+            }
+            let _ = config::save(app, &cfg);
+            drop(cfg);
+            poller::emit_snapshot(app);
+            log::info!(target: "USER", "右键置顶股票 {code}");
+        }
+        other if other.starts_with("stock:remove:") => {
+            let code = other.trim_start_matches("stock:remove:");
+            let state = app.state::<crate::state::AppState>();
+            let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+            cfg.watchlist.retain(|w| w.code != code);
+            let _ = config::save(app, &cfg);
+            drop(cfg);
+            poller::emit_snapshot(app);
+            log::info!(target: "USER", "右键移除股票 {code}");
+        }
+        other if other.starts_with("stock:trade:") => {
+            let code = other.trim_start_matches("stock:trade:");
+            let _ = app.emit("trigger-open-trade", serde_json::json!({ "code": code }));
+        }
+        other if other.starts_with("stock:settings:") => {
+            let code = other.trim_start_matches("stock:settings:").to_string();
+            deferred(app, "设置", move |h| {
+                crate::open_settings(&h)?;
+                let _ = h.emit("select-watch-item", serde_json::json!({ "code": code }));
+                Ok(())
+            });
+        }
         _ => {}
     }
-}
-
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
-
-static IS_SHOWING_MENU: AtomicBool = AtomicBool::new(false);
-static LAST_MENU_CLOSED_MILLIS: AtomicI64 = AtomicI64::new(0);
-
-pub fn show_context_menu(app: &AppHandle, win: &tauri::WebviewWindow) -> tauri::Result<()> {
-    let now = chrono::Utc::now().timestamp_millis();
-    if now - LAST_MENU_CLOSED_MILLIS.load(Ordering::SeqCst) < 250 {
-        return Ok(());
-    }
-    if IS_SHOWING_MENU.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
-        return Ok(());
-    }
-
-    struct MenuGuard;
-    impl Drop for MenuGuard {
-        fn drop(&mut self) {
-            LAST_MENU_CLOSED_MILLIS.store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
-            IS_SHOWING_MENU.store(false, Ordering::SeqCst);
-        }
-    }
-    let _guard = MenuGuard;
-
-    let state = app.state::<crate::state::AppState>();
-    let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner()).clone();
-    let current_layout = cfg.layout;
-    let current_mode = cfg.visibility_mode;
-
-    let refresh = MenuItemBuilder::with_id("refresh", "立即刷新").build(app)?;
-    let sep1 = tauri::menu::PredefinedMenuItem::separator(app)?;
-
-    let bar = CheckMenuItemBuilder::with_id("layout:bar", "数字条")
-        .checked(current_layout == crate::config::Layout::Bar)
-        .build(app)?;
-    let mini = CheckMenuItemBuilder::with_id("layout:mini", "迷你图")
-        .checked(current_layout == crate::config::Layout::Mini)
-        .build(app)?;
-    let list = CheckMenuItemBuilder::with_id("layout:list", "列表")
-        .checked(current_layout == crate::config::Layout::List)
-        .build(app)?;
-    let market = CheckMenuItemBuilder::with_id("layout:market", "大盘全景")
-        .checked(current_layout == crate::config::Layout::Market)
-        .build(app)?;
-    let global = CheckMenuItemBuilder::with_id("layout:global", "全球股指")
-        .checked(current_layout == crate::config::Layout::Global)
-        .build(app)?;
-    let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
-
-    let mode_sub = SubmenuBuilder::new(app, "显隐模式")
-        .item(&CheckMenuItemBuilder::with_id("mode:always", "常驻显示").checked(current_mode == crate::config::VisibilityMode::Always).build(app)?)
-        .item(&CheckMenuItemBuilder::with_id("mode:hover", "鼠标悬停展开").checked(current_mode == crate::config::VisibilityMode::Hover).build(app)?)
-        .item(&CheckMenuItemBuilder::with_id("mode:dblclick", "双击把手展开").checked(current_mode == crate::config::VisibilityMode::DblClick).build(app)?)
-        .item(&CheckMenuItemBuilder::with_id("mode:hotkey", "仅快捷键控制").checked(current_mode == crate::config::VisibilityMode::Hotkey).build(app)?)
-        .build()?;
-    let sep_mode = tauri::menu::PredefinedMenuItem::separator(app)?;
-
-    let opacity_sub = SubmenuBuilder::new(app, "透明度")
-        .item(&MenuItemBuilder::with_id("opacity:100", "100%").build(app)?)
-        .item(&MenuItemBuilder::with_id("opacity:85", "85%").build(app)?)
-        .item(&MenuItemBuilder::with_id("opacity:70", "70%").build(app)?)
-        .item(&MenuItemBuilder::with_id("opacity:50", "50%").build(app)?)
-        .build()?;
-    let sep_opacity = tauri::menu::PredefinedMenuItem::separator(app)?;
-
-    let settings = MenuItemBuilder::with_id("settings", "自选股与设置…").build(app)?;
-    let sep_settings = tauri::menu::PredefinedMenuItem::separator(app)?;
-
-    let autostart = CheckMenuItemBuilder::with_id("autostart", "开机自启")
-        .checked(cfg.autostart)
-        .build(app)?;
-    let sep3 = tauri::menu::PredefinedMenuItem::separator(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
-
-    let menu = MenuBuilder::new(app)
-        .items(&[
-            &refresh, &sep1, &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode,
-            &opacity_sub, &sep_opacity, &settings, &sep_settings, &autostart, &sep3, &quit,
-        ])
-        .build()?;
-
-    #[cfg(windows)]
-    let raw_hwnd = win.hwnd().ok().map(|h| h.0);
-
-    #[cfg(windows)]
-    let orig_ex = raw_hwnd.map(|raw| {
-        use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, SetForegroundWindow,
-            SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE,
-            SWP_NOZORDER, WS_EX_NOACTIVATE,
-        };
-        unsafe {
-            let ex = GetWindowLongPtrW(raw, GWL_EXSTYLE);
-            // Temporarily strip WS_EX_NOACTIVATE so Windows permits SetForegroundWindow and outside-click dismissal
-            SetWindowLongPtrW(raw, GWL_EXSTYLE, ex & !(WS_EX_NOACTIVATE as isize));
-            SetWindowPos(
-                raw,
-                0 as _,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
-            );
-
-            let fg_hwnd = GetForegroundWindow();
-            let cur_thread = GetCurrentThreadId();
-            let fg_thread = GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut());
-            if fg_thread != 0 && fg_thread != cur_thread {
-                AttachThreadInput(cur_thread, fg_thread, 1);
-                SetForegroundWindow(raw);
-                AttachThreadInput(cur_thread, fg_thread, 0);
-            } else {
-                SetForegroundWindow(raw);
-            }
-
-            ex
-        }
-    });
-
-    let result = menu.popup(win.as_ref().window().clone());
-
-    #[cfg(windows)]
-    if let (Some(raw), Some(orig_ex)) = (raw_hwnd, orig_ex) {
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            PostMessageW, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, SWP_FRAMECHANGED,
-            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WM_NULL,
-        };
-        unsafe {
-            PostMessageW(raw, WM_NULL, 0, 0);
-            SetWindowLongPtrW(raw, GWL_EXSTYLE, orig_ex);
-            SetWindowPos(
-                raw,
-                0 as _,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
-            );
-        }
-    }
-
-    result
 }

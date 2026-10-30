@@ -257,6 +257,7 @@ export function WatchlistTab() {
         </p>
         <WatchEditor
           items={form.watchlist}
+          groups={form.groups}
           update={updateItem}
           add={addItem}
           addWithItem={addItemWith}
