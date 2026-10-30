@@ -13,7 +13,7 @@ import { KlineCanvas } from '../components/KlineCanvas'
 import { StatusLine } from '../components/StatusLine'
 import { StockHeader } from '../components/StockHeader'
 import { getGlobalMarketStatus } from '../utils/globalMarket'
-import type { KLineBar, KLineData, MarketIndex, Quote, Snapshot, Trend, TrendPoint } from '../types'
+import type { KLineBar, KLineData, KlinePeriod, MarketIndex, Quote, Snapshot, Trend, TrendPoint } from '../types'
 
 export interface GlobalHover {
   point: Accessor<TrendPoint | null>
@@ -57,6 +57,8 @@ export interface GlobalDetailProps {
   preClose: Accessor<number>
   loading: Accessor<boolean>
   subchartMode: Accessor<'vol' | 'macd'>
+  klinePeriod: Accessor<KlinePeriod>
+  onSelectPeriod: (period: KlinePeriod) => void
   onReloadTrend: () => void
   onReloadKline: () => void
   onSelectMode: (mode: 'trend' | 'kline') => void
@@ -153,7 +155,7 @@ export function GlobalDetail(props: GlobalDetailProps) {
                         when={loading()}
                         fallback={
                           <>
-                            <span>⚠️ 暂无日K数据</span>
+                            <span>⚠️ 暂无K线数据</span>
                             <button
                               type="button"
                               class="global-retry-btn"
@@ -165,7 +167,7 @@ export function GlobalDetail(props: GlobalDetailProps) {
                         }
                       >
                         <span class="loading-spinner">⌛</span>
-                        <span>加载日K数据中…</span>
+                        <span>加载K线数据中…</span>
                       </Show>
                     </div>
                   }
@@ -189,6 +191,8 @@ export function GlobalDetail(props: GlobalDetailProps) {
                   onToggleView={(m) => {
                     if (m === 'trend' || m === 'kline') props.onSelectMode(m)
                   }}
+                  klinePeriod={props.klinePeriod()}
+                  onSelectPeriod={(p) => props.onSelectPeriod(p)}
                   showSubchart={true}
                   showAuction={false}
                 />

@@ -66,13 +66,16 @@ export function List(props: { flash: boolean }) {
         </div>
         <Show when={totalStats()}>
           {(stats) => (
-            <div class="summary-pnl">
+            <div
+              class="summary-pnl"
+              title={`今日: ${fmtMoney(stats().totalToday)} | 总浮盈: ${fmtMoney(stats().totalFloating)}${stats().floatingPct !== null ? ` (${fmtPct(stats().floatingPct!)})` : ''}`}
+            >
               <span class="pnl-item">
-                今日: <span class={trendClass(stats().totalToday)}>{fmtMoney(stats().totalToday)}</span>
+                日 <span class={trendClass(stats().totalToday)}>{fmtMoney(stats().totalToday)}</span>
               </span>
               <span class="pnl-sep">|</span>
               <span class="pnl-item">
-                总浮盈: <span class={trendClass(stats().totalFloating)}>{fmtMoney(stats().totalFloating)}</span>
+                总 <span class={trendClass(stats().totalFloating)}>{fmtMoney(stats().totalFloating)}</span>
                 <Show when={stats().floatingPct !== null}>
                   <span class={`pnl-sub-pct ${trendClass(stats().floatingPct!)}`}>
                     {' '}({fmtPct(stats().floatingPct!)})
@@ -152,7 +155,16 @@ export function List(props: { flash: boolean }) {
                         lastPrice={q.price}
                       />
                     </div>
-                    <div class="col-pnl cell-pnl">
+                    <div
+                      class="col-pnl cell-pnl"
+                      title={
+                        pnl() !== null
+                          ? `总盈亏: ${fmtMoney(pnl()!)} (${cost() && profitPct(q.price, cost()!) !== null ? fmtPct(profitPct(q.price, cost()!)!) : '--'})${todayPnl() !== null ? ` | 今日盈亏: ${fmtMoney(todayPnl()!)}` : ''}`
+                          : cost() && profitPct(q.price, cost()!) !== null
+                            ? `浮盈: ${fmtPct(profitPct(q.price, cost()!)!)}`
+                            : undefined
+                      }
+                    >
                       <Show
                         when={pnl() !== null}
                         fallback={

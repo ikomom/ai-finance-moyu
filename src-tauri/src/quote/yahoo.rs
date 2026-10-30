@@ -147,7 +147,7 @@ pub fn global_code_to_yahoo_symbol(code: &str) -> Option<&'static str> {
     }
 }
 
-pub fn parse_yahoo_chart(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, FetchError> {
+pub fn parse_yahoo_chart(code: &str, bytes: &[u8], is_minute: bool) -> Result<Vec<KLineBar>, FetchError> {
     let resp: YahooChartResponse = serde_json::from_slice(bytes)
         .map_err(|e| parse_err(format!("Yahoo Finance K线 JSON解析失败: {e}")))?;
 
@@ -156,6 +156,9 @@ pub fn parse_yahoo_chart(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, Fetc
         .result
         .and_then(|r| r.into_iter().next())
         .ok_or_else(|| parse_err("Yahoo Finance 未返回有效图表数据"))?;
+
+    let meta = result.meta.unwrap_or_default();
+    let gmtoffset = meta.gmtoffset.unwrap_or(0);
 
     let timestamps = result.timestamp.unwrap_or_default();
     let quote_data = result
@@ -184,9 +187,16 @@ pub fn parse_yahoo_chart(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, Fetc
             continue;
         }
 
-        let date = DateTime::from_timestamp(ts, 0)
-            .map(|dt| dt.format("%Y-%m-%d").to_string())
-            .unwrap_or_default();
+        let local_ts = ts + gmtoffset;
+        let date = if is_minute {
+            DateTime::from_timestamp(local_ts, 0)
+                .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or_default()
+        } else {
+            DateTime::from_timestamp(local_ts, 0)
+                .map(|dt| dt.format("%Y-%m-%d").to_string())
+                .unwrap_or_default()
+        };
 
         if date.is_empty() {
             continue;
@@ -212,7 +222,7 @@ pub fn parse_yahoo_chart(code: &str, bytes: &[u8]) -> Result<Vec<KLineBar>, Fetc
     }
 
     if bars.is_empty() {
-        return Err(parse_err(format!("{code} 有效日K线数据为空")));
+        return Err(parse_err(format!("{code} 有效K线数据为空")));
     }
 
     Ok(bars)

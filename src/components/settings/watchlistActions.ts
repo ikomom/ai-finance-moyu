@@ -1,10 +1,16 @@
-//! Watchlist mutation helpers for the settings store.
+//! Watchlist and group mutation helpers for the settings store.
 //!
 //! Extracted from `SettingsContext.tsx` so the provider keeps orchestration
 //! only (AGENTS.md §11 colocation guidance).
 
 import type { SetStoreFunction } from 'solid-js/store'
-import type { Config, PriceLine, WatchItem } from '../../types'
+import {
+  createWatchGroup,
+  DEFAULT_GROUP_ID,
+  deleteWatchGroup,
+  renameWatchGroup,
+} from '../../services/watchlistGroups'
+import type { Config, PriceLine, WatchGroup, WatchItem } from '../../types'
 
 export type SortCriterion = 'code-asc' | 'code-desc' | 'name' | 'holding' | 'reverse'
 
@@ -62,6 +68,30 @@ export function createWatchlistActions(
   const removeLine = (i: number, li: number) =>
     setForm('watchlist', i, 'priceLines', (lines) => (lines ?? []).filter((_, n) => n !== li))
 
+  const createGroup = async (name: string): Promise<WatchGroup> => {
+    const g = await createWatchGroup(name)
+    setForm('groups', (list) => {
+      const existing = list ?? []
+      if (existing.some((it) => it.id === g.id)) return existing
+      return [...existing, g]
+    })
+    return g
+  }
+
+  const renameGroup = async (id: string, name: string): Promise<void> => {
+    await renameWatchGroup(id, name)
+    setForm('groups', (g) => g.id === id, 'name', name)
+  }
+
+  const deleteGroup = async (id: string, moveToDefault: boolean): Promise<void> => {
+    await deleteWatchGroup(id, moveToDefault)
+    setForm('groups', (list) => (list ?? []).filter((g) => g.id !== id))
+    if (moveToDefault) {
+      setForm('watchlist', (item) => (item.group ?? DEFAULT_GROUP_ID) === id, 'group', DEFAULT_GROUP_ID)
+    } else {
+      setForm('watchlist', (list) => list.filter((item) => (item.group ?? DEFAULT_GROUP_ID) !== id))
+    }
+  }
 
   return {
     updateItem,
@@ -73,5 +103,8 @@ export function createWatchlistActions(
     addLine,
     updateLine,
     removeLine,
+    createGroup,
+    renameGroup,
+    deleteGroup,
   }
 }

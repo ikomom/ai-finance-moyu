@@ -17,6 +17,9 @@ export function WatchlistTab() {
     addLine,
     updateLine,
     removeLine,
+    createGroup,
+    renameGroup,
+    deleteGroup,
     say,
   } = useSettings()
 
@@ -267,6 +270,9 @@ export function WatchlistTab() {
           addLine={addLine}
           updateLine={updateLine}
           removeLine={removeLine}
+          onCreateGroup={createGroup}
+          onRenameGroup={renameGroup}
+          onDeleteGroup={deleteGroup}
           onToast={(text, kind) => say(text, kind)}
         />
       </div>

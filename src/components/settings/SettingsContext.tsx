@@ -198,7 +198,11 @@ export function SettingsProvider(props: { children: JSX.Element }) {
     addLine,
     updateLine,
     removeLine,
+    createGroup,
+    renameGroup,
+    deleteGroup,
   } = createWatchlistActions(setForm, say)
+
   const save = async () => {
     if (form.watchlist.length === 0) {
       say('至少保留一只自选股', 'bad')
@@ -265,6 +269,9 @@ export function SettingsProvider(props: { children: JSX.Element }) {
     addLine,
     updateLine,
     removeLine,
+    createGroup,
+    renameGroup,
+    deleteGroup,
   }
 
   return <SettingsContext.Provider value={value}>{props.children}</SettingsContext.Provider>

@@ -201,6 +201,8 @@ pub struct TradeOrder {
     pub bids: Option<Vec<(f64, f64)>>,
     #[serde(default)]
     pub asks: Option<Vec<(f64, f64)>>,
+    #[serde(default)]
+    pub order_id: Option<String>,
 }
 
 fn default_strict_mode() -> bool {

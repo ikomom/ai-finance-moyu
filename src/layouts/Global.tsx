@@ -10,14 +10,27 @@ import {
   fmtHHMM,
   fmtVol,
   type KLineBar,
+  type KlinePeriod,
   type Quote,
   type TrendPoint,
 } from '../types'
 import { useGlobalChart } from './useGlobalChart'
 
+const STORAGE_KEY_GLOBAL_KLINE_PERIOD = 'global_kline_period'
+const getSavedGlobalKlinePeriod = (): KlinePeriod => {
+  try {
+    const p = localStorage.getItem(STORAGE_KEY_GLOBAL_KLINE_PERIOD) as KlinePeriod
+    if (p && ['15m', '30m', '60m', '120m', 'day', 'week'].includes(p)) {
+      return p
+    }
+  } catch {}
+  return 'day'
+}
+
 // Module-level persistent state across unmount/remount (dock collapse/expand)
 const [selectedGlobalIndex, setSelectedGlobalIndex] = createSignal(0)
 const [persistedChartTab, setPersistedChartTab] = createSignal<'trend' | 'kline'>('trend')
+const [globalKlinePeriod, setGlobalKlinePeriod] = createSignal<KlinePeriod>(getSavedGlobalKlinePeriod())
 
 /**
  * Layout 5 — 全球股指看板 (复用迷你图通用组件架构，具备胶囊切页、大字行情、副图及分时/日K模式).
@@ -34,6 +47,13 @@ export function Global(props: { flash: boolean }) {
   const currentIdx = () => indices()[selectedIndex()] ?? null
   const activeMode = () => persistedChartTab()
   const setActiveMode = (m: 'trend' | 'kline') => setPersistedChartTab(m)
+
+  const handleSelectPeriod = (p: KlinePeriod) => {
+    setGlobalKlinePeriod(p)
+    try {
+      localStorage.setItem(STORAGE_KEY_GLOBAL_KLINE_PERIOD, p)
+    } catch {}
+  }
 
   const { subchartMode, setSubchartMode: toggleSubchartMode } = useSubchartMode()
 
@@ -61,7 +81,7 @@ export function Global(props: { flash: boolean }) {
   const currentCode = () => currentIdx()?.code ?? ''
 
   // Lazy per-index trend / K-line loading lives in its own hook.
-  const globalChart = useGlobalChart(currentCode, activeMode)
+  const globalChart = useGlobalChart(currentCode, activeMode, globalKlinePeriod)
   const trend = () => globalChart.trend()
   const kline = () => globalChart.kline()
 
@@ -204,6 +224,8 @@ export function Global(props: { flash: boolean }) {
     preClose,
     loading: globalChart.loading,
     subchartMode,
+    klinePeriod: globalKlinePeriod,
+    onSelectPeriod: handleSelectPeriod,
     onReloadTrend: () => globalChart.reload(),
     onReloadKline: () => globalChart.reload(),
     onSelectMode: (m: 'trend' | 'kline') => setActiveMode(m),

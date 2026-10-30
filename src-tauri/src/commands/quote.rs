@@ -64,9 +64,17 @@ pub async fn get_kline(
 }
 
 #[tauri::command]
-pub async fn get_global_kline(app: AppHandle, code: String) -> Result<quote::KLineData, String> {
+pub async fn get_global_kline(
+    app: AppHandle,
+    code: String,
+    period: Option<String>,
+) -> Result<quote::KLineData, String> {
     let state = app.state::<AppState>();
-    state.fetcher.fetch_global_kline(&code).await.map_err(|e| e.to_string())
+    state
+        .fetcher
+        .fetch_global_kline(&code, period.as_deref())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

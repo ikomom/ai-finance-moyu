@@ -1,14 +1,10 @@
 //! Unit tests for portfolio simulation, commission calculations, and trade execution.
 
 use super::account::*;
-use super::cancellation::*;
 use super::engine::*;
 use super::fee::*;
-use super::matcher::*;
 use super::rules::*;
-use super::summary::*;
 use super::types::*;
-use crate::quote::Quote;
 
 #[test]
 fn test_asset_class_classification() {
@@ -57,6 +53,7 @@ fn mock_order(b: &str, c: &str, act: TradeAction, p: f64, s: u32) -> TradeOrder 
         pre_close: None,
         bids: None,
         asks: None,
+        order_id: None,
     }
 }
 
@@ -158,21 +155,6 @@ fn test_t_plus_one_and_available_shares() {
     assert_eq!(avail_etf, 1000);
 }
 
-#[test]
-fn test_boundary_order_validations() {
-    let order_odd_buy = mock_order("b1", "sh600000", TradeAction::Buy, 10.0, 150);
-    // 150 shares buy rejected in strict mode
-    let res = validate_order_boundaries(&order_odd_buy, None, &[], None, true);
-    assert!(res.is_err());
-
-    // Price limits check
-    let order_limit_up = mock_order("b1", "sh600000", TradeAction::Buy, 11.50, 100);
-    let res_limit = validate_order_boundaries(&order_limit_up, None, &[], Some(10.0), true);
-    assert!(res_limit.is_err());
-
-    // Sandbox mode disables all checks
-    assert!(validate_order_boundaries(&order_odd_buy, None, &[], None, false).is_ok());
-}
 
 #[test]
 fn test_invalid_price_and_shares_rejection() {
@@ -200,95 +182,6 @@ fn test_multi_broker_position_isolation() {
     assert_eq!(data.positions.iter().find(|p| p.broker_id == b1 && p.code == "sz002428").unwrap().shares, 200);
     assert!(!data.positions.iter().any(|p| p.broker_id == b2 && p.code == "sz002428"));
     assert!(execute_trade(&mut data, mock_order(&b2, "sz002428", TradeAction::Sell, 55.0, 100)).is_err());
-}
-
-#[test]
-fn test_liquidity_depth_and_limit_board_rules() {
-    let mut order = mock_order("b1", "sh600000", TradeAction::Buy, 10.0, 500);
-    // ask1 is 2 hands = 200 shares. 50% is 100 shares. Buying 500 shares exceeds 50% depth cap
-    order.asks = Some(vec![(10.0, 2.0)]);
-    let err = validate_order_boundaries(&order, None, &[], Some(10.0), true).unwrap_err();
-    assert!(err.contains("盘口吃单深度受限") || err.contains("非连续交易时段"));
-
-    // In sandbox mode, boundaries are bypassed
-    assert!(validate_order_boundaries(&order, None, &[], Some(10.0), false).is_ok());
-
-    // Test limit-up with empty asks in strict mode
-    let mut limit_up_order = mock_order("b1", "sh600000", TradeAction::Buy, 11.0, 100);
-    limit_up_order.asks = Some(vec![]);
-    let up_err = validate_order_boundaries(&limit_up_order, None, &[], Some(10.0), true).unwrap_err();
-    assert!(up_err.contains("流动性封锁") || up_err.contains("非连续交易时段"));
-}
-
-#[test]
-fn test_order_activity_records_pending_and_cancel() {
-    let (mut data, b_id) = test_portfolio_with_broker();
-    let mut order = mock_order(&b_id, "sh600000", TradeAction::Buy, 9.0, 100);
-    order.asks = Some(vec![(10.0, 100.0)]);
-    let res = execute_trade(&mut data, order).unwrap();
-    match res {
-        OrderExecutionStatus::Pending { order: pending } => {
-            assert_eq!(data.trades.len(), 1);
-            assert_eq!(data.trades[0].status, TradeRecordStatus::Pending);
-            assert_eq!(data.trades[0].shares, 100);
-
-            data.strict_mode = false;
-            cancel_pending_order(&mut data, &pending.id).unwrap();
-            assert_eq!(data.trades.len(), 2);
-            assert_eq!(data.trades[0].status, TradeRecordStatus::Cancelled);
-        }
-        _ => panic!("Expected pending status"),
-    }
-}
-
-#[test]
-fn test_summary_frozen_cash_and_price_fallback() {
-    let (mut data, b_id) = test_portfolio_with_broker();
-    data.positions.push(PortfolioPosition {
-        broker_id: b_id.clone(), code: "sh600000".into(), name: "浦发银行".into(),
-        shares: 1000, cost_price: 10.0, updated_at: "2026-10-30 09:30:00".into(),
-    });
-    data.pending_orders.push(PendingOrder {
-        id: "order_1".into(), broker_id: b_id.clone(), broker_name: "测试券商".into(),
-        code: "sz000001".into(), name: "平安银行".into(), action: TradeAction::Buy,
-        price: 10.0, shares: 1000, frozen_cash: 10005.0, created_at: "2026-10-30 09:35:00".into(),
-    });
-
-    let mut quotes = std::collections::HashMap::new();
-    quotes.insert("sh600000".into(), Quote {
-        code: "sh600000".into(), name: "浦发银行".into(), price: 0.0, pre_close: 12.0, ..Default::default()
-    });
-
-    let sum = compute_portfolio_summary(&data, &quotes);
-    assert_eq!(sum.positions[0].current_price, 12.0);
-    assert_eq!(sum.positions[0].market_value, 12000.0);
-    assert_eq!(sum.total_cash, 110005.0);
-    assert_eq!(sum.total_equity, 122005.0);
-}
-
-#[test]
-fn test_matcher_restores_frozen_cash_on_execution_failure() {
-    let (mut data, b_id) = test_portfolio_with_broker();
-    data.brokers[0].available_cash = 5000.0;
-    data.pending_orders.push(PendingOrder {
-        id: "order_fail".into(), broker_id: b_id.clone(), broker_name: "测试券商".into(),
-        code: "sh600000".into(), name: "浦发银行".into(), action: TradeAction::Buy,
-        price: 10.0, shares: 1000, frozen_cash: 10005.0, created_at: "2026-10-30 09:30:00".into(),
-    });
-
-    let mut quotes = std::collections::HashMap::new();
-    quotes.insert("sh600000".into(), Quote {
-        code: "sh600000".into(), name: "浦发银行".into(), price: 9.8, pre_close: 10.0,
-        asks: vec![(9.8, 100.0)], ..Default::default()
-    });
-
-    data.strict_mode = true;
-    let initial_cash = data.brokers[0].available_cash;
-    let filled = match_pending_orders(&mut data, &quotes);
-
-    assert!(filled.is_empty());
-    assert_eq!(data.pending_orders.len(), 1);
-    assert_eq!(data.brokers[0].available_cash, initial_cash);
 }
 
 

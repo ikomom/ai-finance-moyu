@@ -42,4 +42,7 @@ export interface SettingsContextValue {
   addLine: (i: number) => void
   updateLine: (i: number, li: number, patch: Partial<PriceLine>) => void
   removeLine: (i: number, li: number) => void
+  createGroup: (name: string) => Promise<import('../../types').WatchGroup>
+  renameGroup: (id: string, name: string) => Promise<void>
+  deleteGroup: (id: string, moveToDefault: boolean) => Promise<void>
 }

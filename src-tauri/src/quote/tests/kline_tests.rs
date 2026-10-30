@@ -147,12 +147,16 @@
                 "error": null
             }
         }"#;
-        let bars = parse_yahoo_chart("gzKS11", json.as_bytes()).unwrap();
+        let bars = parse_yahoo_chart("gzKS11", json.as_bytes(), false).unwrap();
         assert_eq!(bars.len(), 2);
         assert_eq!(bars[0].open, 5673.0);
         assert_eq!(bars[0].close, 5554.22);
         assert_eq!(bars[1].high, 5809.94);
         assert_eq!(bars[1].volume, 286453.0);
+
+        let minute_bars = parse_yahoo_chart("gzKS11", json.as_bytes(), true).unwrap();
+        assert_eq!(minute_bars.len(), 2);
+        assert!(minute_bars[0].date.contains(':'));
     }
 
     #[test]
@@ -233,3 +237,48 @@
         assert_eq!(week_bars.len(), 2);
         assert_eq!(week_bars[1].date, "2026-10-23");
     }
+
+    #[test]
+    fn test_merge_60m_to_120m_preserves_day_boundaries() {
+        use crate::quote::global::merge_60m_to_120m;
+        let make_bar = |date: &str, open: f64, close: f64| KLineBar {
+            date: date.to_string(),
+            open,
+            close,
+            high: open.max(close) + 1.0,
+            low: open.min(close) - 1.0,
+            volume: 1000.0,
+            ma5: None,
+            ma10: None,
+            ma20: None,
+            dif: None,
+            dea: None,
+            macd: None,
+            k: None,
+            d: None,
+            j: None,
+        };
+
+        // Day 1 has 3 bars (odd count), Day 2 has 2 bars.
+        // Remainder of Day 1 must never merge with the 1st bar of Day 2.
+        let bars = vec![
+            make_bar("2026-10-29 09:30", 10.0, 11.0),
+            make_bar("2026-10-29 10:30", 11.0, 12.0),
+            make_bar("2026-10-29 11:30", 12.0, 13.0),
+            make_bar("2026-10-30 09:30", 20.0, 21.0),
+            make_bar("2026-10-30 10:30", 21.0, 22.0),
+        ];
+
+        let merged = merge_60m_to_120m(bars);
+        assert_eq!(merged.len(), 3);
+        assert_eq!(merged[0].date, "2026-10-29 10:30");
+        assert_eq!(merged[0].open, 10.0);
+        assert_eq!(merged[0].close, 12.0);
+        assert_eq!(merged[1].date, "2026-10-29 11:30");
+        assert_eq!(merged[1].open, 12.0);
+        assert_eq!(merged[1].close, 13.0);
+        assert_eq!(merged[2].date, "2026-10-30 10:30");
+        assert_eq!(merged[2].open, 20.0);
+        assert_eq!(merged[2].close, 22.0);
+    }
+

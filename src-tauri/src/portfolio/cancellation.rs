@@ -20,23 +20,29 @@ pub fn cancel_pending_order(data: &mut PortfolioData, order_id: &str) -> Result<
         }
     }
 
-    let cancel_rec = TradeRecord {
-        id: format!("cancel_{}", chrono::Local::now().timestamp_millis()),
-        broker_id: order.broker_id.clone(),
-        broker_name: order.broker_name.clone(),
-        code: order.code.clone(),
-        name: order.name.clone(),
-        action: order.action,
-        price: order.price,
-        shares: order.shares,
-        amount: order.price * (order.shares as f64),
-        fee: 0.0,
-        realized_pnl: None,
-        realized_pct: None,
-        timestamp: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        status: TradeRecordStatus::Cancelled,
-    };
-    data.trades.insert(0, cancel_rec);
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    if let Some(existing) = data.trades.iter_mut().find(|t| t.id == order.id) {
+        existing.status = TradeRecordStatus::Cancelled;
+        existing.timestamp = now;
+    } else {
+        let cancel_rec = TradeRecord {
+            id: format!("cancel_{}", chrono::Local::now().timestamp_millis()),
+            broker_id: order.broker_id.clone(),
+            broker_name: order.broker_name.clone(),
+            code: order.code.clone(),
+            name: order.name.clone(),
+            action: order.action,
+            price: order.price,
+            shares: order.shares,
+            amount: order.price * (order.shares as f64),
+            fee: 0.0,
+            realized_pnl: None,
+            realized_pct: None,
+            timestamp: now,
+            status: TradeRecordStatus::Cancelled,
+        };
+        data.trades.insert(0, cancel_rec);
+    }
 
     let action_str = if order.action == TradeAction::Buy { "买入" } else { "卖出" };
     log::info!(
@@ -68,23 +74,28 @@ pub fn cancel_all_pending_orders(
                     broker.available_cash = (broker.available_cash * 100.0).round() / 100.0;
                 }
             }
-            let cancel_rec = TradeRecord {
-                id: format!("cancel_{}_{}", chrono::Local::now().timestamp_millis(), order.id),
-                broker_id: order.broker_id.clone(),
-                broker_name: order.broker_name.clone(),
-                code: order.code.clone(),
-                name: order.name.clone(),
-                action: order.action,
-                price: order.price,
-                shares: order.shares,
-                amount: order.price * (order.shares as f64),
-                fee: 0.0,
-                realized_pnl: None,
-                realized_pct: None,
-                timestamp: now.clone(),
-                status: TradeRecordStatus::Cancelled,
-            };
-            data.trades.insert(0, cancel_rec);
+            if let Some(existing) = data.trades.iter_mut().find(|t| t.id == order.id) {
+                existing.status = TradeRecordStatus::Cancelled;
+                existing.timestamp = now.clone();
+            } else {
+                let cancel_rec = TradeRecord {
+                    id: format!("cancel_{}_{}", chrono::Local::now().timestamp_millis(), order.id),
+                    broker_id: order.broker_id.clone(),
+                    broker_name: order.broker_name.clone(),
+                    code: order.code.clone(),
+                    name: order.name.clone(),
+                    action: order.action,
+                    price: order.price,
+                    shares: order.shares,
+                    amount: order.price * (order.shares as f64),
+                    fee: 0.0,
+                    realized_pnl: None,
+                    realized_pct: None,
+                    timestamp: now.clone(),
+                    status: TradeRecordStatus::Cancelled,
+                };
+                data.trades.insert(0, cancel_rec);
+            }
 
             let action_str = if order.action == TradeAction::Buy { "买入" } else { "卖出" };
             log::info!(
@@ -118,23 +129,28 @@ pub fn expire_stale_pending_orders(data: &mut PortfolioData) -> usize {
                     broker.available_cash = (broker.available_cash * 100.0).round() / 100.0;
                 }
             }
-            let expire_rec = TradeRecord {
-                id: format!("expire_{}", order.id),
-                broker_id: order.broker_id.clone(),
-                broker_name: order.broker_name.clone(),
-                code: order.code.clone(),
-                name: order.name.clone(),
-                action: order.action,
-                price: order.price,
-                shares: order.shares,
-                amount: order.price * (order.shares as f64),
-                fee: 0.0,
-                realized_pnl: None,
-                realized_pct: None,
-                timestamp: now.clone(),
-                status: TradeRecordStatus::Expired,
-            };
-            data.trades.insert(0, expire_rec);
+            if let Some(existing) = data.trades.iter_mut().find(|t| t.id == order.id) {
+                existing.status = TradeRecordStatus::Expired;
+                existing.timestamp = now.clone();
+            } else {
+                let expire_rec = TradeRecord {
+                    id: format!("expire_{}", order.id),
+                    broker_id: order.broker_id.clone(),
+                    broker_name: order.broker_name.clone(),
+                    code: order.code.clone(),
+                    name: order.name.clone(),
+                    action: order.action,
+                    price: order.price,
+                    shares: order.shares,
+                    amount: order.price * (order.shares as f64),
+                    fee: 0.0,
+                    realized_pnl: None,
+                    realized_pct: None,
+                    timestamp: now.clone(),
+                    status: TradeRecordStatus::Expired,
+                };
+                data.trades.insert(0, expire_rec);
+            }
 
             log::info!(
                 target: "TRADE",

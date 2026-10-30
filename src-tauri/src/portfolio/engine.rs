@@ -27,16 +27,42 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
         &order,
         existing_pos,
         &data.trades,
+        &data.pending_orders,
         order.pre_close,
         data.strict_mode,
     )?;
+
+    if order.action == TradeAction::Sell {
+        let pos = existing_pos.ok_or_else(|| format!("当前券商未持有标的 {}", order.code))?;
+        let pending_sell: u32 = data
+            .pending_orders
+            .iter()
+            .filter(|p| {
+                p.broker_id == order.broker_id
+                    && p.code == order.code
+                    && p.action == TradeAction::Sell
+                    && order.order_id.as_deref() != Some(&p.id)
+            })
+            .map(|p| p.shares)
+            .sum();
+        let avail = pos.shares.saturating_sub(pending_sell);
+        if order.shares > avail {
+            return Err(format!(
+                "持仓可用股数不足: 持有 {} 股（已挂单冻结 {} 股），可用仅剩 {} 股，无法卖出 {} 股",
+                pos.shares, pending_sell, avail, order.shares
+            ));
+        }
+    }
 
     let asset_class = AssetClass::from_code(&order.code);
     let broker = &mut data.brokers[broker_idx];
     let fee = calculate_fee(asset_class, order.action, order.price, order.shares, &broker.fee_config);
     let gross_amount = order.price * (order.shares as f64);
     let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let record_id = format!("trade_{}", chrono::Local::now().timestamp_millis());
+    let (record_id, is_inplace_fill) = match &order.order_id {
+        Some(oid) => (oid.clone(), true),
+        None => (format!("trade_{}", chrono::Local::now().timestamp_millis()), false),
+    };
     let broker_name = broker.name.clone();
     let stock_name = order.name.clone().unwrap_or_else(|| order.code.clone());
 
@@ -154,7 +180,7 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
             }
 
             let record = TradeRecord {
-                id: record_id,
+                id: record_id.clone(),
                 broker_id: order.broker_id,
                 broker_name: broker_name.clone(),
                 code: order.code.clone(),
@@ -169,7 +195,15 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                 timestamp: now,
                 status: TradeRecordStatus::Filled,
             };
-            data.trades.insert(0, record.clone());
+            if is_inplace_fill {
+                if let Some(existing) = data.trades.iter_mut().find(|t| t.id == record_id) {
+                    *existing = record.clone();
+                } else {
+                    data.trades.insert(0, record.clone());
+                }
+            } else {
+                data.trades.insert(0, record.clone());
+            }
             log::info!(
                 target: "TRADE",
                 "【成交】券商={}: {} ({}) 买入成交 ¥{:.2} x {}股，金额¥{:.2}，手续费¥{:.2}",
@@ -209,7 +243,7 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
             }
 
             let record = TradeRecord {
-                id: record_id,
+                id: record_id.clone(),
                 broker_id: order.broker_id,
                 broker_name: broker_name.clone(),
                 code: order.code.clone(),
@@ -224,7 +258,15 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                 timestamp: now,
                 status: TradeRecordStatus::Filled,
             };
-            data.trades.insert(0, record.clone());
+            if is_inplace_fill {
+                if let Some(existing) = data.trades.iter_mut().find(|t| t.id == record_id) {
+                    *existing = record.clone();
+                } else {
+                    data.trades.insert(0, record.clone());
+                }
+            } else {
+                data.trades.insert(0, record.clone());
+            }
             log::info!(
                 target: "TRADE",
                 "【成交】券商={}: {} ({}) 卖出成交 ¥{:.2} x {}股，金额¥{:.2}，手续费¥{:.2}，实现盈亏¥{:.2}",

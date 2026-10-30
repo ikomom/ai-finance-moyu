@@ -42,7 +42,7 @@ export function WatchEditor(props: WatchEditorProps) {
 
   const handleCreateGroup = async (name: string) => {
     try {
-      const g = await createWatchGroup(name)
+      const g = props.onCreateGroup ? await props.onCreateGroup(name) : await createWatchGroup(name)
       props.onToast?.(`已创建分组「${name}」`, 'ok')
       setActiveGroupId(g.id)
     } catch (e) {
@@ -52,7 +52,11 @@ export function WatchEditor(props: WatchEditorProps) {
 
   const handleRenameGroup = async (id: string, newName: string) => {
     try {
-      await renameWatchGroup(id, newName)
+      if (props.onRenameGroup) {
+        await props.onRenameGroup(id, newName)
+      } else {
+        await renameWatchGroup(id, newName)
+      }
       props.onToast?.(`已将分组重命名为「${newName}」`, 'ok')
     } catch (e) {
       props.onToast?.(String(e), 'bad')
@@ -61,7 +65,11 @@ export function WatchEditor(props: WatchEditorProps) {
 
   const handleDeleteGroup = async (id: string, moveToDefault: boolean) => {
     try {
-      await deleteWatchGroup(id, moveToDefault)
+      if (props.onDeleteGroup) {
+        await props.onDeleteGroup(id, moveToDefault)
+      } else {
+        await deleteWatchGroup(id, moveToDefault)
+      }
       props.onToast?.(`已删除分组`, 'ok')
       setActiveGroupId(ALL_GROUP_ID)
     } catch (e) {
@@ -75,6 +83,14 @@ export function WatchEditor(props: WatchEditorProps) {
     isDropAfter,
     onHandlePointerDown,
   } = useWatchDragDrop()
+
+  const handleLocalMove = (fromLocal: number, toLocal: number) => {
+    const list = filteredIndexedItems()
+    if (fromLocal < 0 || fromLocal >= list.length || toLocal < 0 || toLocal >= list.length) return
+    const fromGlobal = list[fromLocal].originalIndex
+    const toGlobal = list[toLocal].originalIndex
+    props.move(fromGlobal, toGlobal)
+  }
 
   const isExpanded = (code: string, idx: number) => Boolean(expandedMap()[code || String(idx)])
 
@@ -130,22 +146,28 @@ export function WatchEditor(props: WatchEditorProps) {
       {/* 4. Watchlist Cards */}
       <div class="watch-list">
         <For each={filteredIndexedItems()}>
-          {({ item, originalIndex }) => (
+          {({ item, originalIndex }, localIndex) => (
             <WatchCard
               item={item}
               groups={groups()}
-              index={originalIndex}
-              totalCount={props.items.length}
-              isDragging={draggingIndex() === originalIndex}
-              isDropBefore={isDropBefore(originalIndex)}
-              isDropAfter={isDropAfter(originalIndex)}
+              index={localIndex()}
+              totalCount={filteredIndexedItems().length}
+              isDragging={draggingIndex() === localIndex()}
+              isDropBefore={isDropBefore(localIndex())}
+              isDropAfter={isDropAfter(localIndex())}
               isExpanded={isExpanded(item.code, originalIndex)}
               onToggleExpand={() => toggleExpand(item.code, originalIndex)}
               onHandlePointerDown={(e) =>
-                onHandlePointerDown(e, originalIndex, props.items.length, props.move, props.onToast)
+                onHandlePointerDown(
+                  e,
+                  localIndex(),
+                  filteredIndexedItems().length,
+                  handleLocalMove,
+                  props.onToast
+                )
               }
               onUpdate={(patch) => props.update(originalIndex, patch)}
-              onMove={(to) => props.move(originalIndex, to)}
+              onMove={(toLocal) => handleLocalMove(localIndex(), toLocal)}
               onRemove={() => props.remove(originalIndex)}
               onAddLine={() => props.addLine(originalIndex)}
               onUpdateLine={(li, patch) => props.updateLine(originalIndex, li, patch)}

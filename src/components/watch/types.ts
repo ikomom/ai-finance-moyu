@@ -14,6 +14,9 @@ export interface WatchEditorProps {
   addLine: (index: number) => void
   updateLine: (index: number, lineIndex: number, patch: Partial<PriceLine>) => void
   removeLine: (index: number, lineIndex: number) => void
+  onCreateGroup?: (name: string) => Promise<WatchGroup>
+  onRenameGroup?: (id: string, name: string) => Promise<void>
+  onDeleteGroup?: (id: string, moveToDefault: boolean) => Promise<void>
   onToast?: (msg: string, kind?: '' | 'ok' | 'bad') => void
 }
 

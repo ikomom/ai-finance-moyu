@@ -40,14 +40,14 @@ export async function fetchKLine(code: string, period?: KlinePeriod): Promise<KL
 }
 
 /**
- * Request daily candlestick series for global indices from backend.
+ * Request candlestick series for global indices from backend with optional period.
  */
-export async function fetchGlobalKLine(code: string): Promise<KLineData | null> {
+export async function fetchGlobalKLine(code: string, period?: KlinePeriod): Promise<KLineData | null> {
   if (!inTauri()) return null
   try {
-    return await invoke<KLineData>('get_global_kline', { code })
+    return await invoke<KLineData>('get_global_kline', { code, period: period ?? 'day' })
   } catch (e) {
-    logToBackend(`fetchGlobalKLine failed for ${code}: ${e}`)
+    logToBackend(`fetchGlobalKLine failed for ${code} (${period ?? 'day'}): ${e}`)
     return null
   }
 }

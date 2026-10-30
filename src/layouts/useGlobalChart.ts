@@ -7,7 +7,7 @@
 import { createEffect, createSignal, type Accessor } from 'solid-js'
 
 import { fetchGlobalKLine, fetchGlobalTrend } from '../tauri'
-import type { KLineData, Trend } from '../types'
+import type { KlinePeriod, KLineData, Trend } from '../types'
 
 type ChartMode = 'trend' | 'kline'
 
@@ -20,11 +20,12 @@ export interface GlobalChartCache {
 
 /**
  * Lazily fetch the chart data for whichever index/code is currently selected,
- * and re-fetch when the mode or the selection changes.
+ * and re-fetch when the mode, selection, or K-line period changes.
  */
 export function useGlobalChart(
   currentCode: Accessor<string>,
-  mode: Accessor<ChartMode>
+  mode: Accessor<ChartMode>,
+  period: Accessor<KlinePeriod>
 ): GlobalChartCache {
   const [trendMap, setTrendMap] = createSignal<Record<string, Trend>>({})
   const [klineMap, setKlineMap] = createSignal<Record<string, KLineData>>({})
@@ -41,12 +42,13 @@ export function useGlobalChart(
       .finally(() => setTrendLoading(false))
   }
 
-  const loadKLine = (code: string, force = false) => {
-    if (!force && klineMap()[code]) return
+  const loadKLine = (code: string, p: KlinePeriod, force = false) => {
+    const key = `${code}:${p}`
+    if (!force && klineMap()[key]) return
     setKlineLoading(true)
-    fetchGlobalKLine(code)
+    fetchGlobalKLine(code, p)
       .then((data) => {
-        if (data) setKlineMap((prev) => ({ ...prev, [code]: data }))
+        if (data) setKlineMap((prev) => ({ ...prev, [key]: data }))
       })
       .finally(() => setKlineLoading(false))
   }
@@ -57,19 +59,19 @@ export function useGlobalChart(
     if (mode() === 'trend') {
       loadTrend(code)
     } else {
-      loadKLine(code)
+      loadKLine(code, period())
     }
   })
 
   return {
     trend: () => trendMap()[currentCode()],
-    kline: () => klineMap()[currentCode()],
+    kline: () => klineMap()[`${currentCode()}:${period()}`],
     loading: () => (mode() === 'trend' ? trendLoading() : klineLoading()),
     reload: () => {
       const code = currentCode()
       if (!code) return
       if (mode() === 'trend') loadTrend(code, true)
-      else loadKLine(code, true)
+      else loadKLine(code, period(), true)
     },
   }
 }

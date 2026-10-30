@@ -13,6 +13,8 @@ pub mod types;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod order_tests;
 
 pub use account::*;
 pub use cancellation::*;

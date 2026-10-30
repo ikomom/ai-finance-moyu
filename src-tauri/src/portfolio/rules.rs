@@ -68,6 +68,7 @@ pub fn validate_order_boundaries(
     order: &TradeOrder,
     existing_pos: Option<&PortfolioPosition>,
     trades: &[TradeRecord],
+    pending_orders: &[super::types::PendingOrder],
     pre_close: Option<f64>,
     strict_mode: bool,
 ) -> Result<(), String> {
@@ -88,20 +89,32 @@ pub fn validate_order_boundaries(
         ));
     }
 
-    // 3. T+1 check on Sell for stocks
+    // 3. T+1 and frozen pending shares check on Sell
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     if order.action == TradeAction::Sell {
         if let Some(pos) = existing_pos {
+            let pending_sell: u32 = pending_orders
+                .iter()
+                .filter(|p| {
+                    p.broker_id == order.broker_id
+                        && p.code == order.code
+                        && p.action == TradeAction::Sell
+                        && order.order_id.as_deref() != Some(&p.id)
+                })
+                .map(|p| p.shares)
+                .sum();
+
             let asset_class = AssetClass::from_code(&order.code);
-            if asset_class == AssetClass::Stock {
-                let avail = calculate_available_shares(pos, trades, &today);
-                if order.shares > avail {
-                    let today_bought = pos.shares.saturating_sub(avail);
-                    return Err(format!(
-                        "A股股票实行 T+1 交易制度，当日买入的股票不可在当日卖出（今日已买入 {} 股，当前可用可卖仅 {} 股）。如需当日卖出，可切换为自由沙盒模式。",
-                        today_bought, avail
-                    ));
-                }
+            let base_avail = match asset_class {
+                AssetClass::Stock => calculate_available_shares(pos, trades, &today),
+                AssetClass::Etf | AssetClass::ConvertibleBond => pos.shares,
+            };
+            let avail = base_avail.saturating_sub(pending_sell);
+            if order.shares > avail {
+                return Err(format!(
+                    "可用持仓不足: 持有 {} 股（已挂单冻结 {} 股），当前可用仅剩 {} 股，无法卖出 {} 股。如需当日卖出，可切换为自由沙盒模式。",
+                    pos.shares, pending_sell, avail, order.shares
+                ));
             }
         }
     }

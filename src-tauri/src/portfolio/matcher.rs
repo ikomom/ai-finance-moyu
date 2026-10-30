@@ -54,6 +54,7 @@ pub fn match_pending_orders(data: &mut PortfolioData, quotes: &HashMap<String, Q
                 pre_close: quote.map(|q| q.pre_close),
                 bids: None,
                 asks: None,
+                order_id: Some(order.id.clone()),
             };
 
             match execute_trade(data, trade_order) {

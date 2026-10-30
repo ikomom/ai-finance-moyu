@@ -92,16 +92,16 @@
   transition: all 0.15s ease;
 }
 .direction-tab.buy.active {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.2));
-  border-color: rgba(239, 68, 68, 0.6);
-  color: #fca5a5;
-  box-shadow: 0 1px 6px rgba(239, 68, 68, 0.2);
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.32), rgba(3, 105, 161, 0.22));
+  border-color: rgba(2, 132, 199, 0.65);
+  color: #7dd3fc;
+  box-shadow: 0 1px 6px rgba(2, 132, 199, 0.25);
 }
 .direction-tab.sell.active {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.2));
-  border-color: rgba(16, 185, 129, 0.6);
-  color: #6ee7b7;
-  box-shadow: 0 1px 6px rgba(16, 185, 129, 0.2);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.32), rgba(67, 56, 202, 0.22));
+  border-color: rgba(79, 70, 229, 0.65);
+  color: #a5b4fc;
+  box-shadow: 0 1px 6px rgba(79, 70, 229, 0.25);
 }
 
 /* Tier 3 & 4: Form Rows */
@@ -256,14 +256,14 @@
   letter-spacing: 0.5px;
 }
 .mini-trade-action-btn.buy {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.35);
 }
 .mini-trade-action-btn.sell {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
 }
 .mini-trade-action-btn.success {
   background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;

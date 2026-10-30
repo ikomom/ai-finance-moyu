@@ -47,7 +47,14 @@ pub fn compute_portfolio_summary(
         let float_pnl_pct = if cost_val > 0.0 { (float_pnl / cost_val) * 100.0 } else { 0.0 };
 
         let pos_today_pnl = compute_position_today_pnl(pos, &portfolio.trades, current_price, pre_close, &today_date);
-        let available_shares = calculate_available_shares(pos, &portfolio.trades, &today_date);
+        let base_avail = calculate_available_shares(pos, &portfolio.trades, &today_date);
+        let pending_sell: u32 = portfolio
+            .pending_orders
+            .iter()
+            .filter(|p| p.broker_id == pos.broker_id && p.code == pos.code && p.action == TradeAction::Sell)
+            .map(|p| p.shares)
+            .sum();
+        let available_shares = base_avail.saturating_sub(pending_sell);
         total_market_value += market_val;
         total_cost_value += cost_val;
         today_pnl += pos_today_pnl;

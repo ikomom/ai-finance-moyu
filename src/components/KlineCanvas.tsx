@@ -60,6 +60,10 @@ export function KlineCanvas(props: KlineCanvasProps) {
       : `${q.date.slice(0, 4)}-${q.date.slice(4, 6)}-${q.date.slice(6, 8)}`
 
     const last = raw[raw.length - 1]
+    // Intraday minute series bars have time components (e.g. "2026-10-30 14:30") and should not be merged with daily quote
+    if (last.date.includes(' ') || last.date.includes(':')) {
+      return raw
+    }
     const list = [...raw]
 
     if (last.date === qDate) {

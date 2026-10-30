@@ -6,33 +6,52 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 6px;
   padding: 2px 4px 6px;
   border-bottom: 1px solid var(--surface-border-divider);
-  font-size: 11.5px;
+  font-size: 11px;
+  white-space: nowrap;
+  min-width: 0;
 }
 .list-head .title-group {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .list-head .title {
   font-weight: 600;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .list-head .count {
   opacity: 0.6;
-  font-size: 11px;
+  font-size: 10px;
+  flex-shrink: 0;
 }
 .summary-pnl {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: flex-end;
+  gap: 4px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 10px;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+.summary-pnl .pnl-item {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .summary-pnl .pnl-sep {
   opacity: 0.3;
+  flex-shrink: 0;
 }
 
 .table-container {
@@ -44,14 +63,26 @@
   margin: 3px 0;
 }
 .table-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(64px, 1.3fr) minmax(42px, 0.85fr) minmax(46px, 0.85fr) 48px minmax(72px, 1.4fr);
   align-items: center;
+  column-gap: 4px;
   padding: 3px 6px;
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--text-muted);
   border-bottom: 1px solid var(--surface-border-divider);
   user-select: none;
+  white-space: nowrap;
 }
+.table-head .col-price,
+.table-head .col-pct,
+.table-head .col-pnl {
+  text-align: right;
+}
+.table-head .col-trend {
+  text-align: center;
+}
+
 .table-body {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -66,12 +97,14 @@
 }
 
 .table-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(64px, 1.3fr) minmax(42px, 0.85fr) minmax(46px, 0.85fr) 48px minmax(72px, 1.4fr);
   align-items: center;
+  column-gap: 4px;
   padding: 3px 6px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 11px;
   cursor: pointer;
   white-space: nowrap;
   transition: background var(--transition-fast);
@@ -85,51 +118,52 @@
 
 /* Table columns */
 .col-name {
-  flex: 1.4;
-  min-width: 82px;
+  min-width: 0;
   overflow: hidden;
 }
 .col-price {
-  flex: 0.85;
-  min-width: 48px;
+  min-width: 0;
   text-align: right;
   font-weight: 600;
+  white-space: nowrap;
 }
 .col-pct {
-  flex: 0.9;
-  min-width: 50px;
+  min-width: 0;
   text-align: right;
+  white-space: nowrap;
 }
 .col-trend {
-  flex: 0 0 54px;
-  width: 54px;
-  padding: 0 2px;
+  width: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 .col-pnl {
-  flex: 1.25;
-  min-width: 64px;
+  min-width: 0;
   text-align: right;
+  overflow: hidden;
 }
 
 .cell-name {
   display: flex;
   flex-direction: column;
   line-height: 1.2;
+  min-width: 0;
 }
 .cell-name .name-text {
   font-family: var(--font-sans);
   color: var(--text-primary);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cell-name .code-text {
-  font-size: 9.5px;
+  font-size: 9px;
   opacity: 0.55;
+  white-space: nowrap;
 }
 .code-and-signal {
   display: flex;
@@ -143,33 +177,37 @@
   padding: 1px 3px;
   border-radius: var(--radius-xs);
   font-weight: 600;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
 .pnl-stack {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.15;
   align-items: flex-end;
+  min-width: 0;
+  max-width: 100%;
 }
 .pnl-val {
   font-weight: 500;
-  font-size: 11px;
+  font-size: 10.5px;
+  white-space: nowrap;
 }
 .pnl-sub-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  font-size: 9.5px;
-  line-height: 1.15;
+  display: block;
+  text-align: right;
+  font-size: 8.5px;
+  line-height: 1.1;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pnl-pct {
   font-weight: 500;
 }
 .pnl-sub {
-  font-size: 9.5px;
+  font-size: 8.5px;
   opacity: 0.85;
 }
 .summary-pnl .pnl-sub-pct {
@@ -182,8 +220,9 @@
 /* Sparkline canvas wrapper */
 .sparkline-wrap {
   position: relative;
-  width: 54px;
+  width: 48px;
   height: 18px;
+  overflow: hidden;
 }
 .sparkline {
   position: absolute;
@@ -197,5 +236,5 @@
   padding: 16px 8px;
   text-align: center;
   opacity: 0.5;
-  font-size: 11.5px;
+  font-size: 11px;
 }
