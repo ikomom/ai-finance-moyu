@@ -196,4 +196,5 @@ export interface PortfolioSummary {
   trades: TradeRecord[]
   pendingOrders: PendingOrder[]
   strictMode: boolean
+  schemaVersion?: number
 }

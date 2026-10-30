@@ -256,6 +256,7 @@ export interface Config {
   enablePortfolio?: boolean
   groups?: WatchGroup[]
   activeGroupId?: string | null
+  schemaVersion?: number
 }
 
 export interface AnomalyAlertConfig {

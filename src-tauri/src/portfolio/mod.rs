@@ -5,6 +5,7 @@ pub mod cancellation;
 pub mod engine;
 pub mod fee;
 pub mod matcher;
+pub mod migrate;
 pub mod rules;
 pub mod storage;
 pub mod summary;

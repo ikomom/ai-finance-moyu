@@ -207,6 +207,12 @@ fn default_strict_mode() -> bool {
     true
 }
 
+pub const PORTFOLIO_SCHEMA_VERSION: u32 = 1;
+
+fn default_portfolio_schema_version() -> u32 {
+    PORTFOLIO_SCHEMA_VERSION
+}
+
 /// Root persisted schema stored in `portfolio.json`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -219,6 +225,8 @@ pub struct PortfolioData {
     pub pending_orders: Vec<PendingOrder>,
     #[serde(default = "default_strict_mode")]
     pub strict_mode: bool,
+    #[serde(default = "default_portfolio_schema_version")]
+    pub schema_version: u32,
 }
 
 impl Default for PortfolioData {
@@ -230,6 +238,7 @@ impl Default for PortfolioData {
             trades: Vec::new(),
             pending_orders: Vec::new(),
             strict_mode: true,
+            schema_version: PORTFOLIO_SCHEMA_VERSION,
         }
     }
 }

@@ -8,6 +8,7 @@
 mod ai;
 mod groups;
 mod layout;
+pub mod migrate;
 mod prefs;
 mod store;
 mod types;

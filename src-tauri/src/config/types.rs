@@ -123,6 +123,15 @@ pub struct Config {
     /// Currently active foreground group ID (None or "all" means all).
     #[serde(default)]
     pub active_group_id: Option<String>,
+    /// Schema version for automated lossless data migrations.
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+}
+
+pub const CONFIG_SCHEMA_VERSION: u32 = 2;
+
+fn default_schema_version() -> u32 {
+    CONFIG_SCHEMA_VERSION
 }
 
 impl Default for Config {
@@ -156,6 +165,7 @@ impl Default for Config {
             enable_portfolio: false,
             groups: default_groups(),
             active_group_id: None,
+            schema_version: CONFIG_SCHEMA_VERSION,
         }
     }
 }
@@ -274,6 +284,10 @@ impl Config {
             if act != ALL_GROUP_ID && !self.groups.iter().any(|g| g.id == *act) {
                 self.active_group_id = None;
             }
+        }
+
+        if self.schema_version == 0 {
+            self.schema_version = CONFIG_SCHEMA_VERSION;
         }
     }
 

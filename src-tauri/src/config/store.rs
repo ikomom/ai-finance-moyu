@@ -33,13 +33,40 @@ pub fn load(app: &AppHandle) -> Config {
     let Ok(text) = std::fs::read_to_string(&path) else {
         return Config::default();
     };
-    match serde_json::from_str::<Config>(&text) {
-        Ok(mut cfg) => {
-            cfg.sanitize();
-            cfg
+
+    let raw_val: Result<serde_json::Value, _> = serde_json::from_str(&text);
+    match raw_val {
+        Ok(val) => {
+            let (migrated_val, was_migrated) = super::migrate::migrate_config_value(val);
+            if was_migrated {
+                let bak_name = format!("config.pre_v{}.bak.json", super::types::CONFIG_SCHEMA_VERSION);
+                let bak_path = path.with_file_name(bak_name);
+                let _ = std::fs::write(&bak_path, &text);
+                log::info!(
+                    target: "SYSTEM",
+                    "检测到旧版配置，已创建原文件安全快照 {:?} 并无损升级至 schema v{}",
+                    bak_path.file_name().unwrap_or_default(),
+                    super::types::CONFIG_SCHEMA_VERSION
+                );
+            }
+
+            match serde_json::from_value::<Config>(migrated_val) {
+                Ok(mut cfg) => {
+                    cfg.sanitize();
+                    if was_migrated {
+                        let _ = save(app, &cfg);
+                    }
+                    cfg
+                }
+                Err(e) => {
+                    log::error!(target: "SYSTEM", "config.json 结构反序列化失败({e})，已备份为 config.json.bak 并回退默认配置");
+                    let _ = std::fs::rename(&path, path.with_extension("json.bak"));
+                    Config::default()
+                }
+            }
         }
         Err(e) => {
-            log::error!(target: "SYSTEM", "config.json 解析失败({e})，已备份为 config.json.bak 并回退默认配置");
+            log::error!(target: "SYSTEM", "config.json 语法损坏({e})，已备份为 config.json.bak 并回退默认配置");
             let _ = std::fs::rename(&path, path.with_extension("json.bak"));
             Config::default()
         }
