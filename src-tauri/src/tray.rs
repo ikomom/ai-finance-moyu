@@ -172,15 +172,47 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
             let code = other.trim_start_matches("stock:remove:");
             let state = app.state::<crate::state::AppState>();
             let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+            let removed_name = cfg
+                .watchlist
+                .iter()
+                .find(|w| w.code == code)
+                .and_then(|w| w.name.clone())
+                .unwrap_or_else(|| code.to_string());
             cfg.watchlist.retain(|w| w.code != code);
             let _ = config::save(app, &cfg);
             drop(cfg);
             poller::emit_snapshot(app);
             log::info!(target: "USER", "右键移除股票 {code}");
+            let _ = app.emit(
+                "toast-message",
+                serde_json::json!({
+                    "message": format!("已将「{}」移出自选", removed_name)
+                }),
+            );
         }
         other if other.starts_with("stock:trade:") => {
             let code = other.trim_start_matches("stock:trade:");
-            let _ = app.emit("trigger-open-trade", serde_json::json!({ "code": code }));
+            let state = app.state::<crate::state::AppState>();
+            let enabled = state.config.lock().unwrap_or_else(|e| e.into_inner()).enable_portfolio;
+            if enabled && !crate::market::is_index(code) {
+                let _ = app.emit("trigger-open-trade", serde_json::json!({ "code": code }));
+            }
+        }
+        other if other == "stock:quick_add" || other.starts_with("stock:quick_add") => {
+            let _ = app.emit("open-quick-add-modal", serde_json::json!({}));
+        }
+        other if other.starts_with("stock:cost_alert:") => {
+            let code = other.trim_start_matches("stock:cost_alert:");
+            let _ = app.emit("open-cost-alert-modal", serde_json::json!({ "code": code }));
+        }
+        other if other.starts_with("stock:new_group:") => {
+            let code = other.trim_start_matches("stock:new_group:");
+            let _ = app.emit(
+                "open-new-group-modal",
+                serde_json::json!({
+                    "code": if code.is_empty() { None } else { Some(code) }
+                }),
+            );
         }
         other if other.starts_with("stock:settings:") => {
             let code = other.trim_start_matches("stock:settings:").to_string();

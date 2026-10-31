@@ -192,6 +192,11 @@ export async function initStore(): Promise<string | null> {
       navigateToStock(e.payload.code, e.payload.mode ?? 'trend')
     }
   })
+  await listen<{ message: string }>('toast-message', (e) => {
+    if (e.payload?.message) {
+      showToast(e.payload.message)
+    }
+  })
 
   return null
 }

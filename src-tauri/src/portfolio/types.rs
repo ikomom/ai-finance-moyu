@@ -227,7 +227,7 @@ pub struct PortfolioData {
     pub pending_orders: Vec<PendingOrder>,
     #[serde(default = "default_strict_mode")]
     pub strict_mode: bool,
-    #[serde(default = "default_portfolio_schema_version")]
+    #[serde(default = "default_portfolio_schema_version", alias = "schema_version")]
     pub schema_version: u32,
 }
 

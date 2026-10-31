@@ -4,8 +4,8 @@
 //! §11 colocation + 300-line budget). Every closure the body needs is passed in
 //! explicitly, so this component has no hidden dependency on layout state.
 
-import { createSignal, onCleanup, onMount, Show, type Accessor, type Setter } from 'solid-js'
-import { listen } from '@tauri-apps/api/event'
+import { Show, type Accessor, type Setter } from 'solid-js'
+import { emit } from '@tauri-apps/api/event'
 
 import { AuctionBadge } from '../components/AuctionBadge'
 import { Chart, type HoverExtra } from '../components/Chart'
@@ -14,7 +14,6 @@ import { IndexBadge } from '../components/IndexBadge'
 import { KLineBadge } from '../components/KLineBadge'
 import { KlineCanvas } from '../components/KlineCanvas'
 import { MiniOrderBook } from '../components/portfolio/MiniOrderBook'
-import { MiniTradeDrawer } from '../components/portfolio/MiniTradeDrawer'
 import { StatusLine } from '../components/StatusLine'
 import { StockHeader } from '../components/StockHeader'
 import { StockBadge } from '../components/StockBadge'
@@ -95,24 +94,6 @@ export function MiniBody(props: MiniBodyProps) {
   const setHoveredKBar = props.hover.setKbar
   const hoveredKExtra = props.hover.kbarExtra
   const setHoveredKExtra = props.hover.setKbarExtra
-  const [showTrade, setShowTrade] = createSignal(false)
-  const [chosenPrice, setChosenPrice] = createSignal<number | null>(null)
-
-  onMount(() => {
-    let unlisten: (() => void) | undefined
-    try {
-      listen<{ code?: string }>('trigger-open-trade', (evt) => {
-        if (evt.payload?.code === q().code) {
-          setShowTrade(true)
-        }
-      }).then((fn) => {
-        unlisten = fn
-      }).catch(() => {})
-    } catch {}
-    onCleanup(() => {
-      unlisten?.()
-    })
-  })
 
   const { cost, pnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra } =
     createMiniDerived({
@@ -200,7 +181,7 @@ export function MiniBody(props: MiniBodyProps) {
                 title="模拟投资 / 快速买卖"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setShowTrade(true)
+                  void emit('trigger-open-trade', { code: q().code })
                 }}
               >
                 买卖
@@ -258,8 +239,7 @@ export function MiniBody(props: MiniBodyProps) {
             currentPrice={q().price}
             pendingOrders={(s().pendingOrders ?? []).filter((o) => o.code === q().code)}
             onPickPrice={(p) => {
-              setChosenPrice(p)
-              setShowTrade(true)
+              void emit('trigger-open-trade', { code: q().code, price: p })
             }}
           />
         </Show>
@@ -278,22 +258,6 @@ export function MiniBody(props: MiniBodyProps) {
           onSelectPeriod={props.onSelectPeriod}
         />
       </div>
-
-      <Show when={showTrade()}>
-        <MiniTradeDrawer
-          code={q().code}
-          name={q().name}
-          currentPrice={q().price}
-          initialPrice={chosenPrice() ?? undefined}
-          bids={q().bids}
-          asks={q().asks}
-          preClose={q().preClose}
-          onClose={() => {
-            setShowTrade(false)
-            setChosenPrice(null)
-          }}
-        />
-      </Show>
     </>
   )
 }

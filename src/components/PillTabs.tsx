@@ -56,7 +56,7 @@ export function PillTabs(props: PillTabsProps) {
   return (
     <div class={`mini-tabs-bar ${props.class ?? ''}`} data-tauri-drag-region>
       <Show when={props.prefix}>
-        <div class="mini-tabs-prefix">{props.prefix}</div>
+        <div class="mini-tabs-prefix" data-tauri-drag-region="none">{props.prefix}</div>
       </Show>
       <div
         class="mini-tabs"

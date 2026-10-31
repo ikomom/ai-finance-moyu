@@ -23,9 +23,15 @@ pub fn add_group_inner(cfg: &mut Config, name: &str) -> Result<WatchGroup, Strin
 }
 
 pub fn rename_group_inner(cfg: &mut Config, id: &str, name: &str) -> Result<(), String> {
+    if id == DEFAULT_GROUP_ID || id == ALL_GROUP_ID {
+        return Err("系统默认分组不可修改名称".to_string());
+    }
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Err("分组名称不能为空".to_string());
+    }
+    if cfg.groups.iter().any(|g| g.id != id && g.name == trimmed) {
+        return Err(format!("已存在名为「{trimmed}」的分组"));
     }
     if let Some(group) = cfg.groups.iter_mut().find(|g| g.id == id) {
         group.name = trimmed.to_string();

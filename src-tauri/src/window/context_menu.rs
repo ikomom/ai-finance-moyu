@@ -49,11 +49,21 @@ pub fn show_context_menu(
 
     let menu = if let Some(item) = stock_item {
         let code = &item.code;
+        let is_index = crate::market::is_index(code);
+        let show_trade = cfg.enable_portfolio && !is_index;
+        let is_top = cfg.watchlist.first().map(|w| w.code == *code).unwrap_or(false);
+
         let title_label = format!("{} ({})", item.name.as_deref().unwrap_or(code), code);
         let title_item = MenuItemBuilder::with_id("stock:title", title_label)
             .enabled(false)
             .build(app)?;
-        let sep_title = tauri::menu::PredefinedMenuItem::separator(app)?;
+
+        let trade_item = if show_trade {
+            Some(MenuItemBuilder::with_id(format!("stock:trade:{code}"), "⚡ 快捷买卖…").build(app)?)
+        } else {
+            None
+        };
+        let cost_alert_item = MenuItemBuilder::with_id(format!("stock:cost_alert:{code}"), "⚙️ 持仓成本与预警…").build(app)?;
 
         // Submenu: 移动到分组
         let current_grp = item.group.as_deref().unwrap_or(crate::config::DEFAULT_GROUP_ID);
@@ -66,17 +76,22 @@ pub fn show_context_menu(
                 .build(app)?;
             group_sub_builder = group_sub_builder.item(&item_btn);
         }
-        let sep_new_grp = tauri::menu::PredefinedMenuItem::separator(app)?;
-        let new_grp_item = MenuItemBuilder::with_id(format!("stock:new_group:{code}"), "+ 新建分组…").build(app)?;
-        let group_sub = group_sub_builder.item(&sep_new_grp).item(&new_grp_item).build()?;
+        let new_grp_item = MenuItemBuilder::with_id(format!("stock:new_group:{code}"), "➕ 新建分组…").build(app)?;
+        let group_sub = group_sub_builder
+            .separator()
+            .item(&new_grp_item)
+            .build()?;
 
-        let pin_item = MenuItemBuilder::with_id(format!("stock:pin:{code}"), "设为置顶").build(app)?;
-        let remove_item = MenuItemBuilder::with_id(format!("stock:remove:{code}"), "从自选中移除").build(app)?;
-        let sep_actions = tauri::menu::PredefinedMenuItem::separator(app)?;
+        let pin_item = if is_top {
+            MenuItemBuilder::with_id("stock:pin:disabled", "📌 已在顶部")
+                .enabled(false)
+                .build(app)?
+        } else {
+            MenuItemBuilder::with_id(format!("stock:pin:{code}"), "📌 设为置顶").build(app)?
+        };
+        let remove_item = MenuItemBuilder::with_id(format!("stock:remove:{code}"), "🗑️ 从自选中移除").build(app)?;
 
-        let trade_item = MenuItemBuilder::with_id(format!("stock:trade:{code}"), "快捷买卖…").build(app)?;
-        let settings_item = MenuItemBuilder::with_id(format!("stock:settings:{code}"), "成本与预警设置…").build(app)?;
-        let sep_system = tauri::menu::PredefinedMenuItem::separator(app)?;
+        let add_stock_item = MenuItemBuilder::with_id("stock:quick_add", "🔍 添加自选…").build(app)?;
 
         // Nested Submenu: 系统菜单
         let sys_refresh = MenuItemBuilder::with_id("refresh", "立即刷新").build(app)?;
@@ -95,7 +110,7 @@ pub fn show_context_menu(
         let sys_global = CheckMenuItemBuilder::with_id("layout:global", "全球股指")
             .checked(current_layout == crate::config::Layout::Global)
             .build(app)?;
-        let sys_settings = MenuItemBuilder::with_id("settings", "设置…").build(app)?;
+        let sys_settings = MenuItemBuilder::with_id("settings", "设置中心…").build(app)?;
         let sys_quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
 
         let sys_sub = SubmenuBuilder::new(app, "系统设置与形态")
@@ -111,22 +126,31 @@ pub fn show_context_menu(
             .item(&sys_quit)
             .build()?;
 
-        MenuBuilder::new(app)
-            .items(&[
-                &title_item,
-                &sep_title,
-                &group_sub,
-                &pin_item,
-                &remove_item,
-                &sep_actions,
-                &trade_item,
-                &settings_item,
-                &sep_system,
-                &sys_sub,
-            ])
-            .build()?
+        let mut builder = MenuBuilder::new(app)
+            .item(&title_item)
+            .separator();
+
+        if let Some(ref t) = trade_item {
+            builder = builder.item(t);
+        }
+        builder = builder
+            .item(&cost_alert_item)
+            .separator()
+            .item(&group_sub)
+            .item(&pin_item)
+            .item(&remove_item)
+            .separator()
+            .item(&add_stock_item)
+            .separator()
+            .item(&sys_sub);
+
+        builder.build()?
     } else {
         // Standard blank-space context menu
+        let add_stock_item = MenuItemBuilder::with_id("stock:quick_add", "🔍 添加自选…").build(app)?;
+        let new_grp_item = MenuItemBuilder::with_id("stock:new_group:", "➕ 新建分组…").build(app)?;
+        let sep0 = tauri::menu::PredefinedMenuItem::separator(app)?;
+
         let refresh = MenuItemBuilder::with_id("refresh", "立即刷新").build(app)?;
         let sep1 = tauri::menu::PredefinedMenuItem::separator(app)?;
 
@@ -174,6 +198,7 @@ pub fn show_context_menu(
 
         MenuBuilder::new(app)
             .items(&[
+                &add_stock_item, &new_grp_item, &sep0,
                 &refresh, &sep1, &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode,
                 &opacity_sub, &sep_opacity, &settings, &sep_settings, &autostart, &sep3, &quit,
             ])

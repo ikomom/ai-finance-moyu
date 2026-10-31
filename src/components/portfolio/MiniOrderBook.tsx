@@ -114,12 +114,7 @@ export function MiniOrderBook(props: MiniOrderBookProps) {
         </For>
       </div>
 
-      <div class="ob-divider">
-        <span class="ob-div-label">盘口五档</span>
-        <Show when={props.currentPrice && props.currentPrice > 0}>
-          <span class="ob-div-price">{props.currentPrice!.toFixed(2)}</span>
-        </Show>
-      </div>
+      <div class="ob-divider" />
 
       <div class="ob-section bids">
         <For each={bidTiers()}>

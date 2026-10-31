@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 
 import { ContextMenu, closeMenu, isContextMenuOpen, setContextMenuOpen } from './components/ContextMenu'
+import { GlobalModals } from './components/modals/GlobalModals'
 import { Toast } from './components/Toast'
 import { Bar } from './layouts/Bar'
 import { Global } from './layouts/Global'
@@ -277,6 +278,7 @@ export function Widget() {
 
         <ContextMenu />
         <Toast />
+        <GlobalModals />
       </Show>
     </div>
   )

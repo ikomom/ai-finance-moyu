@@ -1,6 +1,7 @@
 /* Layout 2 — 迷你图 (Mini) */
 .layout-mini-card {
   gap: 4px;
+  overflow: visible;
 }
 
 /* Chart container in Mini */

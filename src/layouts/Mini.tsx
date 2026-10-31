@@ -164,6 +164,12 @@ export function Mini(props: { flash: boolean }) {
       classList={{ flash: props.flash }}
       data-tauri-drag-region
       onWheel={handleWheel}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const c = quote()?.code
+        void invoke('show_context_menu', c ? { code: c } : {})
+      }}
     >
       {/* Top stock pill tabs with GroupDropdown prefix */}
       <PillTabs

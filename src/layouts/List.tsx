@@ -59,7 +59,7 @@ export function List(props: { flash: boolean }) {
   return (
     <div class="card layout-list-card" classList={{ flash: props.flash }} data-tauri-drag-region>
       <div class="list-head" data-tauri-drag-region>
-        <div class="title-group">
+        <div class="title-group" data-tauri-drag-region="none">
           <span class="title">自选看板</span>
           <GroupDropdown />
           <span class="count">({filteredQuotes().length})</span>

@@ -130,23 +130,7 @@
 }
 
 .ob-divider {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-top: 1px dashed rgba(255, 255, 255, 0.1);
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
-  padding: 1px 2px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
   margin: 1px 0;
-  color: #64748b;
-  font-size: 8.5px;
-}
-
-.ob-div-label {
-  font-weight: 500;
-}
-
-.ob-div-price {
-  color: #e2e8f0;
-  font-family: ui-monospace, monospace;
-  font-weight: 600;
 }

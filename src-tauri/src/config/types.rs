@@ -124,7 +124,7 @@ pub struct Config {
     #[serde(default)]
     pub active_group_id: Option<String>,
     /// Schema version for automated lossless data migrations.
-    #[serde(default = "default_schema_version")]
+    #[serde(default = "default_schema_version", alias = "schema_version")]
     pub schema_version: u32,
 }
 

@@ -4,7 +4,9 @@
   align-items: center;
   gap: 4px;
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 50;
   margin-bottom: 2px;
   border-bottom: 1px solid var(--surface-border-divider);
 }

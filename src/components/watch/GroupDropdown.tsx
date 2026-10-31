@@ -38,7 +38,8 @@ export function GroupDropdown(props: GroupDropdownProps) {
 
   const handleToggle = (e: MouseEvent) => {
     e.stopPropagation()
-    setOpen(!open())
+    e.preventDefault()
+    setOpen((prev) => !prev)
   }
 
   const handleSelectGroup = async (gid: string) => {
@@ -99,11 +100,18 @@ export function GroupDropdown(props: GroupDropdownProps) {
   })
 
   return (
-    <div class={`group-dropdown-container ${props.class ?? ''}`} ref={containerRef}>
+    <div
+      class={`group-dropdown-container ${props.class ?? ''}`}
+      ref={containerRef}
+      data-tauri-drag-region="none"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <button
         type="button"
         class="group-dropdown-trigger"
         onClick={handleToggle}
+        onMouseDown={(e) => e.stopPropagation()}
+        data-tauri-drag-region="none"
         title="切换自选股票分组"
       >
         <span>{activeLabel()}</span>
@@ -113,7 +121,11 @@ export function GroupDropdown(props: GroupDropdownProps) {
       </button>
 
       <Show when={open()}>
-        <div class="group-dropdown-menu">
+        <div
+          class="group-dropdown-menu"
+          data-tauri-drag-region="none"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <div
             class="group-dropdown-item"
             classList={{ active: activeGroupId() === ALL_GROUP_ID || !activeGroupId() }}
