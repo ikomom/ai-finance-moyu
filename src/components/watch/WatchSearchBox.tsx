@@ -2,6 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import type { SearchResult, WatchGroup, WatchItem } from '../../types'
 import { DEFAULT_GROUP_ID } from '../../services/watchlistGroups'
+import { SelectMenu } from '../SelectMenu'
 
 export interface WatchSearchBoxProps {
   items: WatchItem[]
@@ -239,16 +240,15 @@ export function WatchSearchBox(props: WatchSearchBoxProps) {
             </p>
             <div style={{ 'margin-top': '6px', display: 'flex', 'flex-direction': 'column', gap: '4px' }}>
               <span style={{ 'font-size': '11px', color: '#94a3b8' }}>选择归属分组：</span>
-              <select
-                class="group-modal-input"
-                style={{ cursor: 'pointer' }}
+              <SelectMenu
                 value={targetGroupId()}
-                onChange={(e) => setTargetGroupId(e.currentTarget.value)}
-              >
-                <For each={props.groups ?? [{ id: DEFAULT_GROUP_ID, name: '默认自选' }]}>
-                  {(g) => <option value={g.id}>{g.name}</option>}
-                </For>
-              </select>
+                options={(props.groups ?? [{ id: DEFAULT_GROUP_ID, name: '默认自选' }]).map((g) => ({
+                  value: g.id,
+                  label: g.name,
+                }))}
+                onChange={setTargetGroupId}
+                title="选择归属分组"
+              />
             </div>
             <div class="group-modal-actions" style={{ 'margin-top': '10px' }}>
               <button

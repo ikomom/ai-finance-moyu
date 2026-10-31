@@ -2,6 +2,7 @@
 
 pub mod ai_decision;
 pub mod config;
+pub mod dragon_tiger;
 pub mod log;
 pub mod portfolio;
 pub mod quote;
@@ -11,6 +12,7 @@ pub mod window;
 
 pub use ai_decision::*;
 pub use config::*;
+pub use dragon_tiger::*;
 pub use log::*;
 pub use portfolio::*;
 pub use quote::*;

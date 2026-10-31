@@ -1,6 +1,7 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { listen } from '@tauri-apps/api/event'
 import { snapshot } from '../../store'
+import { DragonTigerDrawer } from '../dragon_tiger/DragonTigerDrawer'
 import { MiniTradeDrawer } from '../portfolio/MiniTradeDrawer'
 import { CostAlertModal } from './CostAlertModal'
 import { QuickAddModal } from './QuickAddModal'
@@ -10,6 +11,7 @@ export function GlobalModals() {
   const [tradePrice, setTradePrice] = createSignal<number | null>(null)
   const [costAlertCode, setCostAlertCode] = createSignal<string | null>(null)
   const [showQuickAdd, setShowQuickAdd] = createSignal(false)
+  const [dragonTigerCode, setDragonTigerCode] = createSignal<string | null>(null)
 
   const s = () => snapshot()
   const tradeQuote = () => {
@@ -37,6 +39,12 @@ export function GlobalModals() {
 
     listen('open-quick-add-modal', () => {
       setShowQuickAdd(true)
+    }).then((fn) => unlisteners.push(fn)).catch(() => {})
+
+    listen<{ code?: string }>('open-dragon-tiger-drawer', (evt) => {
+      if (evt.payload?.code) {
+        setDragonTigerCode(evt.payload.code)
+      }
     }).then((fn) => unlisteners.push(fn)).catch(() => {})
 
     onCleanup(() => {
@@ -79,6 +87,16 @@ export function GlobalModals() {
 
       <Show when={showQuickAdd()}>
         <QuickAddModal onClose={() => setShowQuickAdd(false)} />
+      </Show>
+
+      <Show when={dragonTigerCode()}>
+        {(code) => (
+          <DragonTigerDrawer
+            code={code()}
+            name={s()?.quotes.find((q) => q.code === code())?.name}
+            onClose={() => setDragonTigerCode(null)}
+          />
+        )}
       </Show>
     </>
   )

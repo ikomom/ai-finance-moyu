@@ -1,5 +1,6 @@
 import { For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
+import { emit } from '@tauri-apps/api/event'
 import './List.css'
 
 import { Grip } from '../components/Grip'
@@ -99,7 +100,22 @@ export function List(props: { flash: boolean }) {
         <div class="table-body" ref={tableBodyRef} onScroll={handleScroll}>
           <Show
             when={filteredQuotes().length > 0}
-            fallback={<div class="row empty-row">该分组暂无自选股 · 右键添加</div>}
+            fallback={
+              <div class="empty-state">
+                <span class="empty-state-title">这个分组还没有股票</span>
+                <span class="empty-state-hint">右键添加，或直接搜一只加进来</span>
+                <button
+                  type="button"
+                  class="empty-state-add"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void emit('open-quick-add-modal')
+                  }}
+                >
+                  ＋ 添加自选
+                </button>
+              </div>
+            }
           >
             <For each={filteredQuotes()}>
               {(q, i) => {

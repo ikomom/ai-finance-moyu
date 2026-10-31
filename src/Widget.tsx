@@ -11,6 +11,7 @@ import { List } from './layouts/List'
 import { Market } from './layouts/Market'
 import { Mini } from './layouts/Mini'
 import { checkAppUpdate } from './services/updater'
+import { installInputActivation } from './services/inputActivation'
 import {
   alertTick,
   initStore,
@@ -101,6 +102,7 @@ export function Widget() {
   }
 
   onMount(async () => {
+    installInputActivation()
     const err = await initStore()
     if (err) setError(err)
 

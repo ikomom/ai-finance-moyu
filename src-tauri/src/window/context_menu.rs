@@ -64,6 +64,7 @@ pub fn show_context_menu(
             None
         };
         let cost_alert_item = MenuItemBuilder::with_id(format!("stock:cost_alert:{code}"), "⚙️ 持仓成本与预警…").build(app)?;
+        let lhb_item = MenuItemBuilder::with_id(format!("stock:dragon_tiger:{code}"), "🐉 龙虎榜与舆情…").build(app)?;
 
         // Submenu: 移动到分组
         let current_grp = item.group.as_deref().unwrap_or(crate::config::DEFAULT_GROUP_ID);
@@ -135,6 +136,7 @@ pub fn show_context_menu(
         }
         builder = builder
             .item(&cost_alert_item)
+            .item(&lhb_item)
             .separator()
             .item(&group_sub)
             .item(&pin_item)

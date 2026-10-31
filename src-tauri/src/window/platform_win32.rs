@@ -83,3 +83,53 @@ pub fn hide_from_alt_tab(win: &tauri::WebviewWindow) {
 
 #[cfg(not(windows))]
 pub fn hide_from_alt_tab(_win: &tauri::WebviewWindow) {}
+
+/// Pull the window to the foreground even when another app currently owns it.
+///
+/// The widget runs with `WS_EX_NOACTIVATE` (config `focusable: false`) so moving
+/// the mouse over it never steals the keyboard from whatever the user is typing
+/// in. The side effect is that Windows does not treat a click on us as user
+/// input, so while that flag is on `SetForegroundWindow` is refused. Callers must
+/// drop the flag first; this then takes care of the foreground lock itself.
+#[cfg(windows)]
+pub fn force_foreground(win: &tauri::WebviewWindow) {
+    use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow, SetWindowPos,
+        SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+    };
+
+    let Some(raw) = win.raw_hwnd() else {
+        return;
+    };
+
+    unsafe {
+        // Re-apply the frame so the style change is visible to the window manager
+        // before we ask for the foreground.
+        SetWindowPos(
+            raw,
+            0 as _,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        );
+
+        let fg = GetForegroundWindow();
+        let cur = GetCurrentThreadId();
+        let fg_thread = GetWindowThreadProcessId(fg, std::ptr::null_mut());
+        if fg_thread != 0 && fg_thread != cur {
+            // Attaching to the foreground thread's input queue is what lifts the
+            // "only the active app may raise a window" restriction.
+            AttachThreadInput(cur, fg_thread, 1);
+            SetForegroundWindow(raw);
+            AttachThreadInput(cur, fg_thread, 0);
+        } else {
+            SetForegroundWindow(raw);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn force_foreground(_win: &tauri::WebviewWindow) {}

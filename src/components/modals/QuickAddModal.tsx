@@ -2,6 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { DEFAULT_GROUP_ID, ALL_GROUP_ID } from '../../services/watchlistGroups'
 import { showToast, snapshot } from '../../store'
+import { SelectMenu } from '../SelectMenu'
 import type { SearchResult, WatchItem } from '../../types'
 import './QuickAddModal.css'
 
@@ -147,16 +148,12 @@ export function QuickAddModal(props: QuickAddModalProps) {
               onKeyDown={handleKeyDown}
             />
           </div>
-          <select
-            class="quick-add-group-select"
+          <SelectMenu
             value={selectedGroupId()}
-            onChange={(e) => setSelectedGroupId(e.currentTarget.value)}
+            options={groups().map((g) => ({ value: g.id, label: g.name }))}
+            onChange={setSelectedGroupId}
             title="选择要加入的自选分组"
-          >
-            <For each={groups()}>
-              {(g) => <option value={g.id}>{g.name}</option>}
-            </For>
-          </select>
+          />
         </div>
 
         <div class="quick-add-results">

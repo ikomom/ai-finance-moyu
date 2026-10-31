@@ -1,0 +1,172 @@
+/* 分时下钻视图：占用整个弹层高度，图在上、操作条贴底 */
+
+.stock-trend-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.stv-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.stv-title {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stv-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stv-code {
+  font-size: 10px;
+  color: #64748b;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.stv-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+  flex-shrink: 0;
+}
+.stv-price.up { color: #f43f5e; }
+.stv-price.down { color: #10b981; }
+.stv-price-val { font-size: 14px; font-weight: 700; font-family: monospace; }
+.stv-price-pct { font-size: 10px; font-family: monospace; }
+
+.stv-chart {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.stv-chart > .chart-wrap {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.stv-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  color: #64748b;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+}
+
+.stv-hover-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 15px;
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+  padding-left: 44px;
+  flex-shrink: 0;
+}
+.stv-hover-data {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.stv-hover-idle { color: #475569; font-family: inherit; }
+.stv-hover-time { color: #cbd5e1; }
+.stv-hover-price.up { color: #f43f5e; }
+.stv-hover-price.down { color: #10b981; }
+.stv-hover-avg { color: #64748b; }
+
+.stv-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+/* 分组下拉吃掉剩余宽度，加入按钮保持原尺寸 */
+.stv-actions .select-menu {
+  flex: 1;
+  min-width: 0;
+}
+
+.stv-primary-btn {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.stv-primary-btn:hover {
+  background: rgba(245, 158, 11, 0.28);
+  color: #fde68a;
+}
+.stv-primary-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.stv-added-btn {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
+  transition: background 0.15s ease;
+}
+.stv-added-btn:hover { background: rgba(16, 185, 129, 0.2); }
+
+.stv-link-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 9.5px;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+.stv-link-btn:hover { color: #cbd5e1; text-decoration: underline; }

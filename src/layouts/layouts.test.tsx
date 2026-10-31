@@ -148,7 +148,20 @@ describe('Mini layout', () => {
     setSnapshot(snapshotWith({ quotes: [] }))
     const host = mount(() => Mini({ flash: false }))
 
-    expect(host.textContent).toContain('等待行情')
+    // 有自选但行情未到：提示等待，而不是"这个分组还没有股票"
+    expect(host.textContent).toContain('正在等待这只股票的行情')
+    expect(host.querySelector('.mini-empty')).toBeTruthy()
+    host.remove()
+  })
+
+  it('offers an add action when the group is empty', () => {
+    const snap = snapshotWith({ quotes: [] })
+    snap.config.watchlist = []
+    setSnapshot(snap)
+    const host = mount(() => Mini({ flash: false }))
+
+    expect(host.textContent).toContain('这个分组还没有股票')
+    expect(host.querySelector('.mini-empty-add')).toBeTruthy()
     host.remove()
   })
 })

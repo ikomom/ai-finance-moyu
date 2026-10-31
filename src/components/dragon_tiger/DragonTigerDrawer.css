@@ -1,0 +1,282 @@
+.lhb-drawer-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.lhb-drawer-container {
+  background: rgba(18, 22, 31, 0.98);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
+  padding: 10px 12px 12px;
+  /* 下钻弹层铺满整个挂件面板：席位名单和分时图都需要纵向空间 */
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 91;
+  color: #f1f5f9;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lhb-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+}
+
+.lhb-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lhb-title-name { font-size: 13px; font-weight: 700; color: #f8fafc; }
+.lhb-title-code { font-size: 11px; color: #64748b; font-family: monospace; }
+.lhb-badge-title-tag {
+  font-size: 9.5px;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.lhb-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.lhb-close-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+.lhb-drawer-content {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lhb-drawer-content::-webkit-scrollbar { width: 3px; }
+.lhb-drawer-content::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 2px; }
+
+/* 顶部概览大卡片：宽敞、无挤压感 */
+.lhb-summary-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lhb-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lhb-reason-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lhb-date-tag {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.lhb-stat-grid {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lhb-stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* basis: auto —— 按内容宽度分配，三列不再强行等分；
+     收盘价（价格+涨跌幅）天然比「-1959万」长，等分会把它挤断 */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lhb-stat-lbl {
+  font-size: 9.5px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.lhb-stat-val {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lhb-stat-val.up { color: #f43f5e; }
+.lhb-stat-val.down { color: #10b981; }
+.lhb-stat-val.flat { color: #94a3b8; }
+
+/* 涨跌幅跟在收盘价后面，降一档字号做次级信息，同时省出宽度 */
+.lhb-stat-pct {
+  margin-left: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.lhb-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.lhb-seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 席位行：自适应宽敞，营业部名字充分展开 */
+.lhb-seat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: default;
+  transition: background 0.12s ease;
+}
+.lhb-seat-row.is-clickable {
+  cursor: pointer;
+}
+.lhb-seat-row.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateX(1px);
+}
+
+.lhb-seat-arrow {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: 4px;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.lhb-seat-row:hover .lhb-seat-arrow {
+  color: #94a3b8;
+  transform: translateX(1px);
+}
+
+.lhb-seat-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+}
+
+.lhb-seat-rank {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #64748b;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.lhb-seat-branch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e2e8f0;
+  font-size: 11px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lhb-seat-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.lhb-seat-tag.trader { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
+.lhb-seat-tag.institution { background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.4); }
+.lhb-seat-tag.north { background: rgba(13, 148, 136, 0.2); color: #2dd4bf; border: 1px solid rgba(13, 148, 136, 0.4); }
+
+.lhb-seat-right {
+  font-family: monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 52px;
+}
+
+.lhb-empty-card {
+  padding: 20px;
+  text-align: center;
+  color: #64748b;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  /* 全屏之后内容再少也不会挤在顶部，空态在面板里居中 */
+  margin: auto 0;
+}

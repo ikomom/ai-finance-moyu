@@ -1,0 +1,100 @@
+/* 挂件窗口通用下拉（手写样式：挂件没有引入 Tailwind） */
+
+.select-menu {
+  position: relative;
+  min-width: 0;
+}
+
+.select-menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: #e2e8f0;
+  font-size: 10.5px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.select-menu-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.select-menu-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.select-menu-caret {
+  font-size: 8px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.select-menu-caret.open {
+  transform: rotate(180deg);
+}
+
+.select-menu-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  max-height: 148px;
+  overflow-y: auto;
+  background: #181b22;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 200;
+}
+.select-menu-panel.is-up {
+  bottom: calc(100% + 4px);
+}
+.select-menu-panel.is-down {
+  top: calc(100% + 4px);
+}
+.select-menu-panel::-webkit-scrollbar {
+  width: 3px;
+}
+.select-menu-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+}
+
+.select-menu-item {
+  width: 100%;
+  text-align: left;
+  padding: 3px 7px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 10.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.1s ease;
+}
+.select-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.select-menu-item.active {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  font-weight: 600;
+}

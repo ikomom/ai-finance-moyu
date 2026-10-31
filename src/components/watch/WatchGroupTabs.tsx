@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import type { WatchGroup } from '../../types'
-import { ALL_GROUP_ID, DEFAULT_GROUP_ID } from '../../services/watchlistGroups'
+import { ALL_GROUP_ID, DEFAULT_GROUP_ID, MAX_GROUP_NAME_LEN } from '../../services/watchlistGroups'
 import './WatchGroupTabs.css'
 
 export interface WatchGroupTabsProps {
@@ -133,6 +133,7 @@ export function WatchGroupTabs(props: WatchGroupTabsProps) {
             <input
               class="group-modal-input"
               placeholder="请输入分组名称..."
+              maxLength={MAX_GROUP_NAME_LEN}
               value={newGroupName()}
               onInput={(e) => setNewGroupName(e.currentTarget.value)}
               onKeyDown={(e) => {
@@ -168,6 +169,7 @@ export function WatchGroupTabs(props: WatchGroupTabsProps) {
             <div class="group-modal-title">重命名分组</div>
             <input
               class="group-modal-input"
+              maxLength={MAX_GROUP_NAME_LEN}
               value={renameValue()}
               onInput={(e) => setRenameValue(e.currentTarget.value)}
               onKeyDown={(e) => {

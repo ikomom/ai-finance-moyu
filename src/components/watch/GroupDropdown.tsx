@@ -6,6 +6,7 @@ import {
   computeGroupCounts,
   createWatchGroup,
   DEFAULT_GROUP_ID,
+  MAX_GROUP_NAME_LEN,
   moveWatchItem,
   setActiveWatchGroup,
 } from '../../services/watchlistGroups'
@@ -168,6 +169,7 @@ export function GroupDropdown(props: GroupDropdownProps) {
               ref={inputRef}
               class="group-modal-input"
               placeholder="请输入分组名称..."
+              maxLength={MAX_GROUP_NAME_LEN}
               value={newGroupName()}
               onInput={(e) => setNewGroupName(e.currentTarget.value)}
               onKeyDown={(e) => {

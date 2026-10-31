@@ -73,6 +73,12 @@
   align-items: center;
 }
 
+/* 分组下拉跟搜索框并排：固定宽度，不参与压缩 */
+.quick-add-controls .select-menu {
+  width: 92px;
+  flex-shrink: 0;
+}
+
 .quick-add-input-wrap {
   flex: 1;
   position: relative;
@@ -92,27 +98,6 @@
 
 .quick-add-input:focus {
   border-color: #38bdf8;
-}
-
-.quick-add-group-select {
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 4px;
-  color: #38bdf8;
-  font-size: 10.5px;
-  padding: 3px 6px;
-  outline: none;
-  cursor: pointer;
-  max-width: 90px;
-}
-
-.quick-add-group-select:focus {
-  border-color: #38bdf8;
-}
-
-.quick-add-group-select option {
-  background: #181b22;
-  color: #e2e8f0;
 }
 
 .quick-add-results {

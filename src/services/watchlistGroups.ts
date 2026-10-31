@@ -4,6 +4,9 @@ import type { Quote, WatchGroup, WatchItem } from '../types'
 export const DEFAULT_GROUP_ID = 'default'
 export const ALL_GROUP_ID = 'all'
 
+/** 与后端 `MAX_GROUP_NAME_CHARS` 保持一致：分组名最长 12 个字。 */
+export const MAX_GROUP_NAME_LEN = 12
+
 export async function createWatchGroup(name: string): Promise<WatchGroup> {
   return invoke<WatchGroup>('create_watch_group', { name })
 }

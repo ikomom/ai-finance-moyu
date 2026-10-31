@@ -205,6 +205,11 @@ pub fn handle_menu(app: &AppHandle, id: &str) {
             let code = other.trim_start_matches("stock:cost_alert:");
             let _ = app.emit("open-cost-alert-modal", serde_json::json!({ "code": code }));
         }
+        other if other.starts_with("stock:dragon_tiger:") => {
+            let code = other.trim_start_matches("stock:dragon_tiger:");
+            log::info!(target: "USER", "右键菜单查看个股龙虎榜与舆情: {code}");
+            let _ = app.emit("open-dragon-tiger-drawer", serde_json::json!({ "code": code }));
+        }
         other if other.starts_with("stock:new_group:") => {
             let code = other.trim_start_matches("stock:new_group:");
             let _ = app.emit(

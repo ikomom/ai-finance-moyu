@@ -82,3 +82,41 @@ pub async fn get_global_trend(app: AppHandle, code: String) -> Result<quote::Tre
     let state = app.state::<AppState>();
     state.fetcher.fetch_global_trend(&code).await.map_err(|e| e.to_string())
 }
+
+/// Intraday series for one A-share code, fetched on demand.
+///
+/// Serves the dragon-tiger drill-down, where the target is usually *not* in the
+/// watchlist and therefore has no polled quote or cached trend behind it.
+#[tauri::command]
+pub async fn get_stock_trend(app: AppHandle, code: String) -> Result<quote::Trend, String> {
+    let state = app.state::<AppState>();
+    let norm_code = market::normalize_code(&code)?;
+
+    // 两次加锁各自独立取值，不嵌套，避免与 poller 的锁序相冲。
+    let source = state.config.lock().unwrap_or_else(|e| e.into_inner()).data_source;
+    let cached_pre_close = state
+        .quotes
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&norm_code)
+        .map(|q| q.pre_close);
+
+    // 不在自选里的标的没有被轮询，缺昨收就没有基准线，单独补一次报价。
+    let pre_close = match cached_pre_close {
+        Some(p) if p > 0.0 => p,
+        _ => state
+            .fetcher
+            .fetch_quotes(source, std::slice::from_ref(&norm_code))
+            .await
+            .ok()
+            .and_then(|qs| qs.into_iter().find(|q| q.code == norm_code))
+            .map(|q| q.pre_close)
+            .unwrap_or(0.0),
+    };
+
+    state
+        .fetcher
+        .fetch_trend(source, &norm_code, pre_close)
+        .await
+        .map_err(|e| e.to_string())
+}

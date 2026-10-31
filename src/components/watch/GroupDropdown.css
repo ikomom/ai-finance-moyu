@@ -19,8 +19,14 @@
   padding: 1px 5px;
   cursor: pointer;
   white-space: nowrap;
+  /* 分组名再长也不能把顶栏撑破 */
+  max-width: 104px;
   transition: all var(--transition-fast, 0.15s);
   line-height: 1.35;
+}
+.group-dropdown-trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .group-dropdown-trigger:hover {
@@ -67,7 +73,12 @@
   color: var(--text-base, #e2e8f0);
   cursor: pointer;
   white-space: nowrap;
+  max-width: 168px;
   transition: background 0.1s ease;
+}
+.group-dropdown-item > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .group-dropdown-item:hover {

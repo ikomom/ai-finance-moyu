@@ -1,6 +1,8 @@
-import { For, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import './Market.css'
 
+import { DragonTigerDrawer } from '../components/dragon_tiger/DragonTigerDrawer'
+import { MarketDragonTigerTab } from '../components/dragon_tiger/MarketDragonTigerTab'
 import { Grip } from '../components/Grip'
 import { StatusLine } from '../components/StatusLine'
 import { snapshot } from '../store'
@@ -10,6 +12,10 @@ import { fmtPct, fmtPrice, fmtTurnover, trendClass } from '../types'
  * Layout 4 — 大盘全景看板 (A股市场温度与板块情绪).
  */
 export function Market(props: { flash: boolean }) {
+  const [tab, setTab] = createSignal<'overview' | 'lhb'>('overview')
+  const [drawerCode, setDrawerCode] = createSignal<string | null>(null)
+  const [drawerName, setDrawerName] = createSignal<string | undefined>()
+
   const s = () => snapshot()!
   const overview = () => s()?.marketOverview
 
@@ -32,9 +38,21 @@ export function Market(props: { flash: boolean }) {
     >
       {/* 顶部标题与更新指示 */}
       <div class="market-header" data-tauri-drag-region>
-        <div class="market-title">
-          <span class="icon">🧭</span>
-          <span class="title-text">大盘全景</span>
+        <div class="market-tab-switch" data-tauri-drag-region="none">
+          <button
+            type="button"
+            class={`market-tab-btn ${tab() === 'overview' ? 'active' : ''}`}
+            onClick={() => setTab('overview')}
+          >
+            🧭 市场温度
+          </button>
+          <button
+            type="button"
+            class={`market-tab-btn ${tab() === 'lhb' ? 'active' : ''}`}
+            onClick={() => setTab('lhb')}
+          >
+            🐉 龙虎游资
+          </button>
         </div>
         <div class="market-time">
           <Show when={overview()?.updatedAt}>
@@ -43,16 +61,17 @@ export function Market(props: { flash: boolean }) {
         </div>
       </div>
 
-      <Show
-        when={overview()}
-        fallback={
-          <div class="market-loading">
-            <span class="loading-spinner">⌛</span>
-            <span>正在拉取全市场数据…</span>
-          </div>
-        }
-      >
-        {(data) => (
+      <Show when={tab() === 'overview'}>
+        <Show
+          when={overview()}
+          fallback={
+            <div class="market-loading">
+              <span class="loading-spinner">⌛</span>
+              <span>正在拉取全市场数据…</span>
+            </div>
+          }
+        >
+          {(data) => (
           <div class="market-body">
             {/* 三大指数卡片 */}
             <div class="index-grid">
@@ -168,6 +187,27 @@ export function Market(props: { flash: boolean }) {
             </div>
           </div>
         )}
+      </Show>
+      </Show>
+
+      <Show when={tab() === 'lhb'}>
+        <MarketDragonTigerTab
+          onOpenDrawer={(code, name) => {
+            setDrawerCode(code)
+            setDrawerName(name)
+          }}
+        />
+      </Show>
+
+      <Show when={drawerCode()}>
+        <DragonTigerDrawer
+          code={drawerCode()!}
+          name={drawerName()}
+          onClose={() => {
+            setDrawerCode(null)
+            setDrawerName(undefined)
+          }}
+        />
       </Show>
 
       <StatusLine status={s().status} />

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { KlinePeriod, KLineData, Trend } from './types'
+import type { MarketDragonTigerOverview, SeatDetailInfo, StockDetailInfo } from './components/dragon_tiger/types'
 
 /**
  * Whether a Tauri runtime is present to talk to. False when the page is opened
@@ -61,6 +62,64 @@ export async function fetchGlobalTrend(code: string): Promise<Trend | null> {
     return await invoke<Trend>('get_global_trend', { code })
   } catch (e) {
     logToBackend(`fetchGlobalTrend failed for ${code}: ${e}`)
+    return null
+  }
+}
+
+/**
+ * Request intraday minute trend (分时走势) for a single A-share code on demand.
+ */
+export async function fetchStockTrend(code: string): Promise<Trend | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<Trend>('get_stock_trend', { code })
+  } catch (e) {
+    logToBackend(`fetchStockTrend failed for ${code}: ${e}`)
+    return null
+  }
+}
+
+/**
+ * Fetch Dragon & Tiger list for a stock (daily cached).
+ */
+export async function fetchStockDragonTiger(code: string): Promise<StockDetailInfo | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<StockDetailInfo>('get_stock_dragon_tiger', { code })
+  } catch (e) {
+    logToBackend(`fetchStockDragonTiger failed for ${code}: ${e}`)
+    return null
+  }
+}
+
+/**
+ * Fetch whole-market Dragon & Tiger overview.
+ */
+export async function fetchMarketDragonTiger(): Promise<MarketDragonTigerOverview | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<MarketDragonTigerOverview>('get_market_dragon_tiger')
+  } catch (e) {
+    logToBackend(`fetchMarketDragonTiger failed: ${e}`)
+    return null
+  }
+}
+
+/**
+ * Fetch operating department / seat drill-down detail.
+ */
+export async function fetchSeatDragonTiger(
+  branchName: string,
+  tradeDate?: string
+): Promise<SeatDetailInfo | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<SeatDetailInfo>('get_seat_dragon_tiger', {
+      branchName,
+      tradeDate,
+    })
+  } catch (e) {
+    logToBackend(`fetchSeatDragonTiger failed for ${branchName}: ${e}`)
     return null
   }
 }

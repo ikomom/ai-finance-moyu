@@ -130,6 +130,7 @@ pub struct AppState {
     pub auction_tracker: Mutex<crate::auction_engine::AuctionTracker>,
     pub hotkey_bindings: Mutex<HotkeyBindings>,
     pub portfolio: Mutex<crate::portfolio::PortfolioData>,
+    pub dragon_tiger_client: crate::dragon_tiger::DragonTigerClient,
 }
 
 impl AppState {
@@ -182,6 +183,7 @@ impl AppState {
             auction_tracker: Mutex::new(auction_tracker),
             hotkey_bindings: Mutex::new(HotkeyBindings::default()),
             portfolio: Mutex::new(portfolio),
+            dragon_tiger_client: crate::dragon_tiger::DragonTigerClient::new(),
         }
     }
 

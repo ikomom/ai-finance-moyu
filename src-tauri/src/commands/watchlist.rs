@@ -8,11 +8,26 @@ use crate::config::{self, Config, WatchGroup, ALL_GROUP_ID, DEFAULT_GROUP_ID};
 use crate::poller;
 use crate::state::AppState;
 
-pub fn add_group_inner(cfg: &mut Config, name: &str) -> Result<WatchGroup, String> {
+/// 分组名长度上限。顶栏切换器与右键菜单都是窄条，再长就会把布局撑破。
+/// 前端 `MAX_GROUP_NAME_LEN` 必须与此保持一致。
+pub const MAX_GROUP_NAME_CHARS: usize = 12;
+
+fn normalize_group_name(name: &str) -> Result<&str, String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Err("分组名称不能为空".to_string());
     }
+    let len = trimmed.chars().count();
+    if len > MAX_GROUP_NAME_CHARS {
+        return Err(format!(
+            "分组名称最多 {MAX_GROUP_NAME_CHARS} 个字，当前 {len} 个"
+        ));
+    }
+    Ok(trimmed)
+}
+
+pub fn add_group_inner(cfg: &mut Config, name: &str) -> Result<WatchGroup, String> {
+    let trimmed = normalize_group_name(name)?;
     if cfg.groups.iter().any(|g| g.name == trimmed) {
         return Err(format!("已存在名为「{trimmed}」的分组"));
     }
@@ -26,10 +41,7 @@ pub fn rename_group_inner(cfg: &mut Config, id: &str, name: &str) -> Result<(), 
     if id == DEFAULT_GROUP_ID || id == ALL_GROUP_ID {
         return Err("系统默认分组不可修改名称".to_string());
     }
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return Err("分组名称不能为空".to_string());
-    }
+    let trimmed = normalize_group_name(name)?;
     if cfg.groups.iter().any(|g| g.id != id && g.name == trimmed) {
         return Err(format!("已存在名为「{trimmed}」的分组"));
     }
@@ -227,8 +239,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_group_without_move_to_default_removes_stocks() {
-        let mut cfg = Config::default();
+    fn test_delete_group_without_move_to_default_removes_stocks() {        let mut cfg = Config::default();
         let g = add_group_inner(&mut cfg, "待删分组").unwrap();
         let code = "sz002428";
         let mut item = WatchItem::new(code);
@@ -238,5 +249,32 @@ mod tests {
         assert!(cfg.watchlist.iter().any(|w| w.code == code));
         delete_group_inner(&mut cfg, &g.id, false).unwrap();
         assert!(!cfg.watchlist.iter().any(|w| w.code == code));
+    }
+
+    #[test]
+    fn test_group_name_length_and_trim() {
+        let mut cfg = Config::default();
+
+        // 12 个字放行，13 个拒绝（按字符数，不是字节数）
+        let max = "一二三四五六七八九十一二";
+        assert_eq!(max.chars().count(), MAX_GROUP_NAME_CHARS);
+        assert!(add_group_inner(&mut cfg, max).is_ok());
+
+        assert!(add_group_inner(&mut cfg, "一二三四五六七八九十一二三").is_err());
+        assert!(add_group_inner(&mut cfg, "   ").is_err());
+
+        let g = add_group_inner(&mut cfg, "短线").unwrap();
+        // 前后空格先 trim 再算长度，不能因为空格把合法名字判超标
+        assert!(rename_group_inner(&mut cfg, &g.id, "  短线龙头  ").is_ok());
+        assert_eq!(
+            cfg.groups.iter().find(|x| x.id == g.id).unwrap().name,
+            "短线龙头"
+        );
+        assert!(rename_group_inner(&mut cfg, &g.id, "一二三四五六七八九十一二三").is_err());
+        // 失败后原名保持不变
+        assert_eq!(
+            cfg.groups.iter().find(|x| x.id == g.id).unwrap().name,
+            "短线龙头"
+        );
     }
 }

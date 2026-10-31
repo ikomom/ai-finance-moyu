@@ -9,6 +9,7 @@ import { emit } from '@tauri-apps/api/event'
 
 import { AuctionBadge } from '../components/AuctionBadge'
 import { Chart, type HoverExtra } from '../components/Chart'
+import { DragonTigerBadge } from '../components/dragon_tiger/DragonTigerBadge'
 import { FooterControls } from '../components/FooterControls'
 import { IndexBadge } from '../components/IndexBadge'
 import { KLineBadge } from '../components/KLineBadge'
@@ -153,6 +154,14 @@ export function MiniBody(props: MiniBodyProps) {
               }
             >
               <KLineBadge kline={kline()} quote={q()} snapshot={s()} />
+            </Show>
+            <Show when={!isIndex()}>
+              <DragonTigerBadge
+                code={q().code}
+                onClick={() => {
+                  void emit('open-dragon-tiger-drawer', { code: q().code })
+                }}
+              />
             </Show>
           </>
         }

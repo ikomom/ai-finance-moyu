@@ -2,6 +2,7 @@ pub mod auction_engine;
 pub mod commands;
 mod config;
 mod crossing;
+pub mod dragon_tiger;
 pub mod logger;
 mod market;
 pub mod market_overview;
@@ -156,12 +157,14 @@ pub fn run() {
             commands::data_sources,
             commands::set_dock_collapsed,
             commands::set_visibility_mode,
+            commands::set_widget_focusable,
             commands::show_context_menu,
             commands::search_securities,
             commands::set_trend_targets,
             commands::get_kline,
             commands::get_global_kline,
             commands::get_global_trend,
+            commands::get_stock_trend,
             commands::get_recent_logs,
             commands::open_log_dir,
             commands::open_url,
@@ -200,6 +203,9 @@ pub fn run() {
             commands::move_watch_item,
             commands::pin_watch_item,
             commands::remove_watch_item,
+            commands::get_stock_dragon_tiger,
+            commands::get_market_dragon_tiger,
+            commands::get_seat_dragon_tiger,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

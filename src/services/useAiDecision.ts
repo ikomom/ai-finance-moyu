@@ -61,23 +61,24 @@ export function useAiDecision(
     const code = q.code
     const cacheKey = modeType === 'kline' ? `${code}:kline` : code
 
+    const inFlight = IN_FLIGHT_REQUESTS.get(cacheKey)
+    if (inFlight) {
+      try {
+        const res = await inFlight
+        setResult(res)
+        setErrorMsg(null)
+      } catch (e) {
+        setErrorMsg(String(e))
+      }
+      return
+    }
+
     const now = Date.now()
     if (!force) {
       const cached = DECISION_CACHE.get(cacheKey)
       if (cached && now - cached.ts < CACHE_TTL_MS) {
         setResult(cached.result)
         setErrorMsg(null)
-        return
-      }
-      const inFlight = IN_FLIGHT_REQUESTS.get(cacheKey)
-      if (inFlight) {
-        try {
-          const res = await inFlight
-          setResult(res)
-          setErrorMsg(null)
-        } catch (e) {
-          setErrorMsg(String(e))
-        }
         return
       }
     }

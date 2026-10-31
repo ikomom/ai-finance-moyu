@@ -236,9 +236,46 @@
   display: block;
 }
 
-.empty-row {
-  padding: 16px 8px;
+/* 空分组：在表体里垂直居中，给说明和动作，而不是一行灰字 */
+.empty-state {
+  height: 100%;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px;
   text-align: center;
-  opacity: 0.5;
-  font-size: 11px;
+}
+
+.empty-state-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  line-height: 1.3;
+}
+
+.empty-state-hint {
+  font-size: 10px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.empty-state-add {
+  margin-top: 3px;
+  padding: 3px 11px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.empty-state-add:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.6);
 }
