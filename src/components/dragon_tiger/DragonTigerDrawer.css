@@ -206,6 +206,12 @@
   transform: translateX(1px);
 }
 
+.lhb-seat-row.is-highlighted-seat {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-left: 3px solid #f59e0b !important;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
 .lhb-seat-arrow {
   font-size: 11px;
   color: #64748b;

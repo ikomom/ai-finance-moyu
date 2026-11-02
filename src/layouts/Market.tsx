@@ -11,10 +11,21 @@ import { fmtPct, fmtPrice, fmtTurnover, trendClass } from '../types'
 /**
  * Layout 4 — 大盘全景看板 (A股市场温度与板块情绪).
  */
+// Module-level persistent state across dock collapse/expand & layout switches
+const [marketTab, setMarketTab] = createSignal<'overview' | 'lhb'>('overview')
+const [marketDrawerCode, setMarketDrawerCode] = createSignal<string | null>(null)
+const [marketDrawerName, setMarketDrawerName] = createSignal<string | undefined>()
+const [marketDrawerHighlight, setMarketDrawerHighlight] = createSignal<string | undefined>()
+
 export function Market(props: { flash: boolean }) {
-  const [tab, setTab] = createSignal<'overview' | 'lhb'>('overview')
-  const [drawerCode, setDrawerCode] = createSignal<string | null>(null)
-  const [drawerName, setDrawerName] = createSignal<string | undefined>()
+  const tab = marketTab
+  const setTab = setMarketTab
+  const drawerCode = marketDrawerCode
+  const setDrawerCode = setMarketDrawerCode
+  const drawerName = marketDrawerName
+  const setDrawerName = setMarketDrawerName
+  const drawerHighlight = marketDrawerHighlight
+  const setDrawerHighlight = setMarketDrawerHighlight
 
   const s = () => snapshot()!
   const overview = () => s()?.marketOverview
@@ -192,9 +203,10 @@ export function Market(props: { flash: boolean }) {
 
       <Show when={tab() === 'lhb'}>
         <MarketDragonTigerTab
-          onOpenDrawer={(code, name) => {
+          onOpenDrawer={(code, name, highlightBranch) => {
             setDrawerCode(code)
             setDrawerName(name)
+            setDrawerHighlight(highlightBranch)
           }}
         />
       </Show>
@@ -203,9 +215,11 @@ export function Market(props: { flash: boolean }) {
         <DragonTigerDrawer
           code={drawerCode()!}
           name={drawerName()}
+          highlightBranch={drawerHighlight()}
           onClose={() => {
             setDrawerCode(null)
             setDrawerName(undefined)
+            setDrawerHighlight(undefined)
           }}
         />
       </Show>

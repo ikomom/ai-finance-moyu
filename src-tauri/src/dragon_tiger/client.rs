@@ -26,6 +26,7 @@ pub struct DragonTigerClient {
     /// Per-stock daily cache: code -> (date_key, data).
     stock_cache: Mutex<HashMap<String, (String, StockDetailInfo)>>,
     pub seat_client: super::seat_client::SeatClient,
+    pub seat_radar_client: super::seat_radar::SeatRadarClient,
 }
 
 impl Default for DragonTigerClient {
@@ -49,7 +50,17 @@ impl DragonTigerClient {
             market_cache: Mutex::new(None),
             stock_cache: Mutex::new(HashMap::new()),
             seat_client: super::seat_client::SeatClient::new(),
+            seat_radar_client: super::seat_radar::SeatRadarClient::new(),
         }
+    }
+
+    /// Query seat radar filtered stocks for operating department seats.
+    pub async fn fetch_seat_radar(
+        &self,
+        branches: &[String],
+        trade_date: Option<&str>,
+    ) -> super::types::SeatRadarResult {
+        self.seat_radar_client.fetch_seat_radar(branches, trade_date).await
     }
 
     /// Fetch operating department / seat drill-down detail.

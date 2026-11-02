@@ -34,7 +34,9 @@ body {
 }
 
 .widget.is-collapsed .card,
+.widget.is-collapsed .widget-body,
 .widget.is-collapsed .layout-bar {
+  display: none !important;
   opacity: 0.12 !important;
   pointer-events: none;
   transition: opacity var(--transition-normal);

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { KlinePeriod, KLineData, Trend } from './types'
-import type { MarketDragonTigerOverview, SeatDetailInfo, StockDetailInfo } from './components/dragon_tiger/types'
+import type { MarketDragonTigerOverview, SeatDetailInfo, SeatRadarResult, StockDetailInfo } from './components/dragon_tiger/types'
 
 /**
  * Whether a Tauri runtime is present to talk to. False when the page is opened
@@ -120,6 +120,25 @@ export async function fetchSeatDragonTiger(
     })
   } catch (e) {
     logToBackend(`fetchSeatDragonTiger failed for ${branchName}: ${e}`)
+    return null
+  }
+}
+
+/**
+ * Query seat radar filtered stocks for operating department seats on a trade date.
+ */
+export async function fetchSeatRadar(
+  branches: string[],
+  tradeDate?: string
+): Promise<SeatRadarResult | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<SeatRadarResult>('get_seat_radar', {
+      branches,
+      tradeDate,
+    })
+  } catch (e) {
+    logToBackend(`fetchSeatRadar failed: ${e}`)
     return null
   }
 }

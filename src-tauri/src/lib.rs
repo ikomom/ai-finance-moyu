@@ -206,6 +206,7 @@ pub fn run() {
             commands::get_stock_dragon_tiger,
             commands::get_market_dragon_tiger,
             commands::get_seat_dragon_tiger,
+            commands::get_seat_radar,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -45,6 +45,21 @@ describe('shortenLhbReason', () => {
 })
 
 describe('DragonTigerBadge', () => {
+  it('does not render badge and skips fetch for market indices', async () => {
+    const { fetchStockDragonTiger } = await import('../../tauri')
+    const mockFn = fetchStockDragonTiger as ReturnType<typeof vi.fn>
+    mockFn.mockClear()
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+
+    render(() => <DragonTigerBadge code="sh000001" />, container)
+    await new Promise((r) => setTimeout(r, 50))
+
+    expect(container.querySelector('button')).toBeNull()
+    expect(mockFn).not.toHaveBeenCalled()
+  })
+
   it('does not render badge when no LHB data', async () => {
     const container = document.createElement('div')
     document.body.appendChild(container)

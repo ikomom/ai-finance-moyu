@@ -3,8 +3,40 @@
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  max-height: 290px;
+  flex: 1;
+  min-height: 0;
   padding-right: 2px;
+}
+
+.lhb-sub-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.lhb-sub-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 10px;
+  font-weight: 500;
+  color: #64748b;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lhb-sub-tab-btn:hover {
+  color: #cbd5e1;
+}
+
+.lhb-sub-tab-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font-weight: 600;
 }
 
 .market-lhb-wrap::-webkit-scrollbar {

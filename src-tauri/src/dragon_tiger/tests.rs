@@ -1,5 +1,5 @@
-use super::baseline::{get_market_baseline, get_seat_baseline, get_stock_baseline};
-use super::trader_dict::match_famous_trader;
+use super::baseline::{get_market_baseline, get_seat_baseline, get_seat_radar_baseline, get_stock_baseline};
+use super::trader_dict::{match_famous_trader, resolve_branch_pattern};
 use super::DragonTigerClient;
 
 #[test]
@@ -84,5 +84,24 @@ fn test_get_seat_baseline() {
         assert_eq!(op.trade_date, "2026-10-30");
         assert!(!op.code.is_empty());
         assert!(op.buy_amount > 0.0);
+    }
+}
+
+#[test]
+fn test_resolve_branch_pattern() {
+    assert_eq!(resolve_branch_pattern("六一路"), vec!["福州六一中路".to_string()]);
+    assert_eq!(resolve_branch_pattern("呼家楼"), vec!["北京东城分公司".to_string(), "北京呼家楼".to_string()]);
+    assert_eq!(resolve_branch_pattern("普通营业部"), vec!["普通营业部".to_string()]);
+}
+
+#[test]
+fn test_get_seat_radar_baseline() {
+    let res = get_seat_radar_baseline(&["六一路".into()], Some("2026-11-02"));
+    assert_eq!(res.query_date, "2026-11-02");
+    assert!(!res.items.is_empty());
+    for item in &res.items {
+        assert_eq!(item.trade_date, "2026-11-02");
+        assert!(!item.code.is_empty());
+        assert!(!item.name.is_empty());
     }
 }

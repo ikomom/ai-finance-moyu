@@ -3,9 +3,10 @@ import './MarketDragonTigerTab.css'
 import type { FamousTraderMove, MarketDragonTigerOverview, MarketLhbStockItem } from './types'
 import { fetchMarketDragonTiger } from '../../tauri'
 import { fmtPct, fmtPrice, trendClass } from '../../types'
+import { SeatRadarView } from './SeatRadarView'
 
 export interface MarketDragonTigerTabProps {
-  onOpenDrawer?: (code: string, name?: string) => void
+  onOpenDrawer?: (code: string, name?: string, highlightBranch?: string) => void
 }
 
 function fmtAmount(amt: number): string {
@@ -20,7 +21,12 @@ function fmtAmount(amt: number): string {
   return `${sign}${abs.toFixed(0)}`
 }
 
+// Module-level persistent state across dock collapse/expand & layout switches
+const [persistedSubTab, setPersistedSubTab] = createSignal<'overview' | 'radar'>('overview')
+
 export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
+  const subTab = persistedSubTab
+  const setSubTab = setPersistedSubTab
   const [data, setData] = createSignal<MarketDragonTigerOverview | null>(null)
   const [loading, setLoading] = createSignal(true)
 
@@ -35,22 +41,45 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
 
   return (
     <div class="market-lhb-wrap">
-      {/* 披露日期栏 */}
-      <div class="market-lhb-date-bar">
-        <span>交易所盘后公开披露数据</span>
-        <Show when={data()?.trade_date}>
-          {(d) => <span class="market-lhb-date-badge">披露日 {d()}</span>}
-        </Show>
+      {/* 二级切换：🔥 游资动向 vs 🎯 席位雷达 */}
+      <div class="lhb-sub-tabs">
+        <button
+          type="button"
+          class={`lhb-sub-tab-btn ${subTab() === 'overview' ? 'active' : ''}`}
+          onClick={() => setSubTab('overview')}
+        >
+          🔥 游资动向
+        </button>
+        <button
+          type="button"
+          class={`lhb-sub-tab-btn ${subTab() === 'radar' ? 'active' : ''}`}
+          onClick={() => setSubTab('radar')}
+        >
+          🎯 席位雷达
+        </button>
       </div>
 
-      <Show
-        when={!loading() && data()}
-        fallback={
-          <div style={{ padding: "20px", "text-align": "center", color: "#64748b", "font-size": "11px" }}>
-            ⌛ 正在拉取龙虎榜机构与游资动向…
-          </div>
-        }
-      >
+      <Show when={subTab() === 'radar'}>
+        <SeatRadarView onOpenDrawer={props.onOpenDrawer} />
+      </Show>
+
+      <Show when={subTab() === 'overview'}>
+        {/* 披露日期栏 */}
+        <div class="market-lhb-date-bar">
+          <span>交易所盘后公开披露数据</span>
+          <Show when={data()?.trade_date}>
+            {(d) => <span class="market-lhb-date-badge">披露日 {d()}</span>}
+          </Show>
+        </div>
+
+        <Show
+          when={!loading() && data()}
+          fallback={
+            <div style={{ padding: "20px", "text-align": "center", color: "#64748b", "font-size": "11px" }}>
+              ⌛ 正在拉取龙虎榜机构与游资动向…
+            </div>
+          }
+        >
         {/* 机构净买入 Top 5 */}
         <div class="market-lhb-section">
           <div class="market-lhb-sec-title">
@@ -124,6 +153,7 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
             </For>
           </div>
         </div>
+      </Show>
       </Show>
     </div>
   )

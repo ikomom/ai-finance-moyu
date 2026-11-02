@@ -11,6 +11,7 @@ import { fetchStockTrend } from '../../tauri'
 import { showToast, snapshot } from '../../store'
 import { DEFAULT_GROUP_ID, ALL_GROUP_ID } from '../../services/watchlistGroups'
 import type { Trend, TrendPoint, WatchItem } from '../../types'
+import { isIndexCode } from '../../types'
 
 export interface StockTrendViewProps {
   code: string
@@ -179,7 +180,7 @@ export function StockTrendView(props: StockTrendViewProps) {
                 )}
               </Show>
             </div>
-            <Show when={props.onOpenDragonTiger}>
+            <Show when={props.onOpenDragonTiger && !isIndexCode(props.code)}>
               <button type="button" class="stv-link-btn" onClick={() => props.onOpenDragonTiger?.()}>
                 🐉 该股龙虎榜 ›
               </button>

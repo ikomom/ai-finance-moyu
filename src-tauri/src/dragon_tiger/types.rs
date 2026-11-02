@@ -80,3 +80,25 @@ pub struct SeatDetailInfo {
     pub same_day_operations: Vec<SeatOperationItem>,
     pub historical_operations: Vec<SeatOperationItem>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeatRadarItem {
+    pub code: String,
+    pub name: String,
+    pub trade_date: String,
+    pub branch_name: String,
+    pub trader_label: Option<String>,
+    pub is_buy: bool,
+    pub buy_amount: f64,
+    pub sell_amount: f64,
+    pub net_amount: f64,
+    pub close_price: f64,
+    pub change_pct: f64,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeatRadarResult {
+    pub query_date: String,
+    pub items: Vec<SeatRadarItem>,
+}

@@ -1,6 +1,7 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import './DragonTigerBadge.css'
 import { fetchStockDragonTiger } from '../../tauri'
+import { isIndexCode } from '../../types'
 
 export interface DragonTigerBadgeProps {
   code: string
@@ -24,7 +25,10 @@ export function DragonTigerBadge(props: DragonTigerBadgeProps) {
 
   createEffect(() => {
     const code = props.code
-    if (!code || code === lastFetchedCode) return
+    if (!code || isIndexCode(code) || code === lastFetchedCode) {
+      setHasLhb(false)
+      return
+    }
     lastFetchedCode = code
     void fetchStockDragonTiger(code).then((detail) => {
       const dt = detail?.dragon_tiger

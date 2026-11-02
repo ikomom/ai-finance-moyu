@@ -62,3 +62,25 @@ pub fn match_famous_trader(branch_name: &str) -> Option<&'static str> {
 
     None
 }
+
+/// Expand a trader pseudonym or branch alias into search keywords/branch fragments.
+pub fn resolve_branch_pattern(input: &str) -> Vec<String> {
+    let clean = input.trim();
+    if clean.is_empty() {
+        return vec![];
+    }
+    match clean {
+        "方新侠" => vec!["西安朱雀大街".into()],
+        "章盟主" => vec!["上海江苏路".into(), "杭州延安路".into()],
+        "呼家楼" => vec!["北京东城分公司".into(), "北京呼家楼".into()],
+        "赵老哥" => vec!["绍兴".into()],
+        "作手新一" => vec!["南京太平南路".into()],
+        "陈小群" => vec!["大连黄河路".into()],
+        "六一路" => vec!["福州六一中路".into()],
+        "炒股养家" => vec!["上海宛平南路".into(), "上海茅台路".into()],
+        "上塘路" => vec!["杭州上塘路".into()],
+        "机构专用" => vec!["机构专用".into()],
+        "北向外资" => vec!["深股通".into(), "沪股通".into()],
+        other => vec![other.to_string()],
+    }
+}

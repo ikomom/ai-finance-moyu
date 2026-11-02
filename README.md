@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Framework-Tauri%20v2-24C8D8?style=flat-square&logo=tauri" alt="Tauri" />
   <img src="https://img.shields.io/badge/Backend-Rust%201.93.1-DEA584?style=flat-square&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/Frontend-SolidJS%20%2B%20TypeScript-2C4F7C?style=flat-square&logo=solid" alt="SolidJS" />
-  <img src="https://img.shields.io/badge/Tests-279%20Passed-brightgreen?style=flat-square" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-285%20Passed-brightgreen?style=flat-square" alt="Tests" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
 </p>
 
@@ -65,6 +65,14 @@
 - **上榜原因智能精简**：把交易所长达数十字的官方通告（如「非S证券连续三个交易日内收盘价格跌幅偏离值累计达到20%的证券」）提炼为标准交易员术语 `⚡ 3日跌幅偏离达20%`，鼠标悬停即可查阅完整原句；
 - **席位战绩深度下钻**：点击任意席位平滑滑入其专属战绩页 —— 同日该席位抱团买入的联动标的、近期 10 笔龙虎榜活跃记录；点其中任意股票就地展开当日分时，底部可直接归入指定分组或切回挂件主图；
 - **大盘全景游资榜**：大盘全景顶栏提供 `[ 🧭 市场温度 | 🐉 龙虎游资 ]` 胶囊切换，呈现「机构大额净买入 Top 5」与「知名游资动向追踪」，点击一键探查标的详情；
+- **🎯 席位雷达与逆向漏斗筛选 (Seat Radar)**：
+  - **关注席位池自由定制**：内置六一路、呼家楼、章盟主、方新侠、陈小群、机构专用等主流游资/机构预设，支持多选胶囊快速启停与一键删除；
+  - **营业部实时智能模糊搜索**：输入营业部别名或关键词（如“六一”、“呼家”、“拉萨”、“中信”等）实时联想下拉匹配，一键将目标营业部加入关注池；
+  - **全市场龙虎榜一键逆向过滤**：买入/卖出方向极速筛选当天上榜股票，支持历史日期回溯复盘；
+  - **命中股票金光高亮联动**：点击命中股票就地展开个股龙虎榜抽屉，并在买卖前五中以金色微光精准锁定匹配营业部；
+- **纯净指数过滤与 DOM Keep-Alive 状态持久记忆**：
+  - 自选列表右键菜单与全链路接口对大盘指数自动隐藏龙虎榜，杜绝误点开空抽屉与无效请求；
+  - 贴边折叠收起改用 CSS 隐藏常驻挂载，展开 0ms 秒开无白屏，完美记忆当前所选 Tab、子 Tab 与展开的抽屉；
 - **自然日长效缓存**：盘后首次拉取后全天命中本地缓存，避免盘中与周末无谓的高频重复请求。
 
 ---
@@ -261,10 +269,10 @@ ai-finance-moyu/
 本项目拥有完善的前后端自动化测试门禁与 CI 覆盖：
 
 ```bash
-# 运行后端全量单元测试（包含 162 项核心算法、交易撮合、数据迁移与跨日持久化测试）
+# 运行后端全量单元测试（包含 164 项核心算法、交易撮合、数据迁移与跨日持久化测试）
 cargo test --manifest-path src-tauri/Cargo.toml
 
-# 运行前端 Vitest 单元测试（包含 117 项技术指标、龙虎榜下钻、模拟记账、分组管理、布局滚动与格式化测试）
+# 运行前端 Vitest 单元测试（包含 121 项技术指标、龙虎榜下钻、模拟记账、分组管理、布局滚动与格式化测试）
 npm test
 
 # 运行 TypeScript 严格类型检查与 Vite 生产打包验证

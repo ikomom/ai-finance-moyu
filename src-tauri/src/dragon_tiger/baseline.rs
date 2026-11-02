@@ -5,7 +5,7 @@
 use super::trader_dict::match_famous_trader;
 use super::types::{
     DragonTigerSeat, FamousTraderMove, MarketDragonTigerOverview, MarketLhbStockItem,
-    SeatDetailInfo, SeatOperationItem, StockDetailInfo, StockDragonTiger,
+    SeatDetailInfo, SeatOperationItem, SeatRadarItem, SeatRadarResult, StockDetailInfo, StockDragonTiger,
 };
 use crate::market::beijing_now;
 
@@ -263,4 +263,94 @@ pub fn get_seat_baseline(branch_name: &str, trade_date: Option<&str>) -> SeatDet
         same_day_operations,
         historical_operations,
     }
+}
+
+/// Baseline fallback for operating department / seat radar filtered list.
+pub fn get_seat_radar_baseline(branches: &[String], trade_date: Option<&str>) -> SeatRadarResult {
+    let today = beijing_now().format("%Y-%m-%d").to_string();
+    let query_date = trade_date.unwrap_or(&today).to_string();
+
+    let all_candidates = vec![
+        SeatRadarItem {
+            code: "sh603019".into(),
+            name: "中科曙光".into(),
+            trade_date: query_date.clone(),
+            branch_name: "中信证券股份有限公司西安朱雀大街证券营业部".into(),
+            trader_label: Some("方新侠".into()),
+            is_buy: true,
+            buy_amount: 128_000_000.0,
+            sell_amount: 0.0,
+            net_amount: 128_000_000.0,
+            close_price: 78.50,
+            change_pct: 10.00,
+            reason: "日涨幅偏离达7%".into(),
+        },
+        SeatRadarItem {
+            code: "sh601138".into(),
+            name: "工业富联".into(),
+            trade_date: query_date.clone(),
+            branch_name: "中信建投证券股份有限公司北京东城分公司".into(),
+            trader_label: Some("呼家楼".into()),
+            is_buy: true,
+            buy_amount: 95_000_000.0,
+            sell_amount: 0.0,
+            net_amount: 95_000_000.0,
+            close_price: 24.60,
+            change_pct: 6.82,
+            reason: "3日涨幅偏离达20%".into(),
+        },
+        SeatRadarItem {
+            code: "sz000977".into(),
+            name: "浪潮信息".into(),
+            trade_date: query_date.clone(),
+            branch_name: "华泰证券股份有限公司福州六一中路证券营业部".into(),
+            trader_label: Some("六一路".into()),
+            is_buy: true,
+            buy_amount: 72_000_000.0,
+            sell_amount: 0.0,
+            net_amount: 72_000_000.0,
+            close_price: 46.80,
+            change_pct: 9.98,
+            reason: "日换手率达20%".into(),
+        },
+        SeatRadarItem {
+            code: "sz002049".into(),
+            name: "紫光国微".into(),
+            trade_date: query_date.clone(),
+            branch_name: "国泰君安证券股份有限公司上海江苏路证券营业部".into(),
+            trader_label: Some("章盟主".into()),
+            is_buy: false,
+            buy_amount: 5_000_000.0,
+            sell_amount: 65_000_000.0,
+            net_amount: -60_000_000.0,
+            close_price: 72.30,
+            change_pct: 5.16,
+            reason: "日涨幅偏离达7%".into(),
+        },
+    ];
+
+    if branches.is_empty() {
+        return SeatRadarResult {
+            query_date,
+            items: all_candidates,
+        };
+    }
+
+    let items: Vec<SeatRadarItem> = all_candidates
+        .into_iter()
+        .filter(|item| {
+            branches.iter().any(|b| {
+                let clean = b.trim();
+                !clean.is_empty()
+                    && (item.branch_name.contains(clean)
+                        || item
+                            .trader_label
+                            .as_ref()
+                            .map(|l| l.contains(clean))
+                            .unwrap_or(false))
+            })
+        })
+        .collect();
+
+    SeatRadarResult { query_date, items }
 }

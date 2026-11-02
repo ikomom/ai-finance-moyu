@@ -234,7 +234,7 @@ export function Widget() {
         />
       </Show>
 
-      <Show when={!isCollapsed()}>
+      <div class="widget-body" style={{ display: isCollapsed() ? "none" : "contents" }}>
         <Show
           when={error()}
           fallback={
@@ -281,7 +281,7 @@ export function Widget() {
         <ContextMenu />
         <Toast />
         <GlobalModals />
-      </Show>
+      </div>
     </div>
   )
 }

@@ -1,0 +1,364 @@
+/* SeatRadarView.css - 龙虎榜席位雷达样式 */
+
+.seat-radar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  font-size: 11px;
+  user-select: none;
+}
+
+/* 顶部配置与过滤条 */
+.seat-radar-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.seat-radar-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.seat-radar-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.seat-capsules-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.seat-capsule-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.seat-capsule-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.seat-capsule-btn.active {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #f59e0b;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+.seat-capsule-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 1;
+  color: #94a3b8;
+  margin-left: 2px;
+  transition: all 0.12s ease;
+}
+
+.seat-capsule-del:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
+/* 输入框与添加 (相对定位支持联想浮层) */
+.seat-input-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.seat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.seat-custom-input {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #f1f5f9;
+  font-size: 10px;
+  padding: 3px 6px;
+  outline: none;
+}
+
+.seat-custom-input:focus {
+  border-color: #38bdf8;
+}
+
+/* 联想搜索下拉菜单浮层 */
+.seat-suggest-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #0f172a;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.seat-suggest-menu::-webkit-scrollbar {
+  width: 3px;
+}
+.seat-suggest-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.seat-suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.12s;
+}
+
+.seat-suggest-item:hover {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.seat-suggest-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.seat-suggest-tag {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 3px;
+  font-size: 9px;
+  padding: 0 3px;
+  white-space: nowrap;
+}
+
+.seat-suggest-name {
+  font-size: 10px;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seat-suggest-btn {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: #0284c7;
+  color: #fff;
+  border: none;
+}
+
+.seat-suggest-btn.added {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.seat-action-btn {
+  background: #3b82f6;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 10px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.seat-action-btn:hover {
+  opacity: 0.9;
+}
+
+/* 过滤控制器 (日期 + 方向 + 按钮) */
+.seat-filter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.seat-date-input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 10px;
+  padding: 2px 4px;
+  width: 90px;
+}
+
+.seat-dir-tabs {
+  display: flex;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 4px;
+  padding: 1px;
+}
+
+.seat-dir-btn {
+  background: none;
+  border: none;
+  font-size: 9px;
+  padding: 2px 6px;
+  color: #64748b;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.seat-dir-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  font-weight: 500;
+}
+
+/* 结果列表与卡片 */
+.seat-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 6px;
+}
+
+.seat-result-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.seat-result-card:hover {
+  background: rgba(51, 65, 85, 0.6);
+  border-color: rgba(245, 158, 11, 0.35);
+  transform: translateY(-1px);
+}
+
+.seat-res-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.seat-res-stock {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.seat-res-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.seat-res-code {
+  font-size: 9px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.seat-res-quote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+
+.seat-res-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.seat-hit-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: #94a3b8;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seat-trader-tag {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-size: 9px;
+}
+
+.seat-action-val {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.seat-action-val.buy {
+  color: #ef4444;
+}
+
+.seat-action-val.sell {
+  color: #22c55e;
+}
+
+.seat-empty-hint {
+  text-align: center;
+  padding: 16px;
+  color: #64748b;
+  font-size: 10px;
+}

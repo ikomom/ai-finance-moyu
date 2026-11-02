@@ -8,6 +8,7 @@ import { SeatDetailView } from './SeatDetailView'
 export interface DragonTigerDrawerProps {
   code: string
   name?: string
+  highlightBranch?: string
   onClose: () => void
 }
 
@@ -216,48 +217,16 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                     </div>
                     <div class="lhb-seat-list">
                       <For each={l().top_buyers}>
-                        {(seat: DragonTigerSeat, idx) => (
-                          <div
-                            class="lhb-seat-row is-clickable"
-                            onClick={() =>
-                              setSelectedSeat({
-                                branchName: seat.branch_name,
-                                tradeDate: l().trade_date,
-                              })
-                            }
-                            title="点击下钻查看该席位操盘战绩与买卖标的"
-                          >
-                            <div class="lhb-seat-left">
-                              <span class="lhb-seat-rank">{idx() + 1}</span>
-                              <span class="lhb-seat-branch">
-                                {cleanBranchName(seat.branch_name)}
-                              </span>
-                              <Show when={seat.trader_label}>
-                                {(tag) => (
-                                  <span class={`lhb-seat-tag ${getSeatTagClass(tag())}`}>
-                                    {tag()}
-                                  </span>
-                                )}
-                              </Show>
-                            </div>
-                            <div class={`lhb-seat-right ${seat.net_amount >= 0 ? 'up' : 'down'}`}>
-                              {fmtMoney(seat.net_amount)}
-                              <span class="lhb-seat-arrow">›</span>
-                            </div>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-
-                    <Show when={l().top_sellers.length > 0}>
-                      <div class="lhb-section-header" style={{ "margin-top": "8px" }}>
-                        <span>🔴 卖出前五席位</span>
-                      </div>
-                      <div class="lhb-seat-list">
-                        <For each={l().top_sellers}>
-                          {(seat: DragonTigerSeat, idx) => (
+                        {(seat: DragonTigerSeat, idx) => {
+                          const isHighlighted = () => {
+                            const h = props.highlightBranch?.trim()
+                            if (!h) return false
+                            return seat.branch_name.includes(h) || (seat.trader_label && h.includes(seat.trader_label))
+                          }
+                          return (
                             <div
                               class="lhb-seat-row is-clickable"
+                              classList={{ 'is-highlighted-seat': Boolean(isHighlighted()) }}
                               onClick={() =>
                                 setSelectedSeat({
                                   branchName: seat.branch_name,
@@ -279,12 +248,60 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                                   )}
                                 </Show>
                               </div>
-                              <div class="lhb-seat-right down">
+                              <div class={`lhb-seat-right ${seat.net_amount >= 0 ? 'up' : 'down'}`}>
                                 {fmtMoney(seat.net_amount)}
                                 <span class="lhb-seat-arrow">›</span>
                               </div>
                             </div>
-                          )}
+                          )
+                        }}
+                      </For>
+                    </div>
+
+                    <Show when={l().top_sellers.length > 0}>
+                      <div class="lhb-section-header" style={{ "margin-top": "8px" }}>
+                        <span>🔴 卖出前五席位</span>
+                      </div>
+                      <div class="lhb-seat-list">
+                        <For each={l().top_sellers}>
+                          {(seat: DragonTigerSeat, idx) => {
+                            const isHighlighted = () => {
+                              const h = props.highlightBranch?.trim()
+                              if (!h) return false
+                              return seat.branch_name.includes(h) || (seat.trader_label && h.includes(seat.trader_label))
+                            }
+                            return (
+                              <div
+                                class="lhb-seat-row is-clickable"
+                                classList={{ 'is-highlighted-seat': Boolean(isHighlighted()) }}
+                                onClick={() =>
+                                  setSelectedSeat({
+                                    branchName: seat.branch_name,
+                                    tradeDate: l().trade_date,
+                                  })
+                                }
+                                title="点击下钻查看该席位操盘战绩与买卖标的"
+                              >
+                                <div class="lhb-seat-left">
+                                  <span class="lhb-seat-rank">{idx() + 1}</span>
+                                  <span class="lhb-seat-branch">
+                                    {cleanBranchName(seat.branch_name)}
+                                  </span>
+                                  <Show when={seat.trader_label}>
+                                    {(tag) => (
+                                      <span class={`lhb-seat-tag ${getSeatTagClass(tag())}`}>
+                                        {tag()}
+                                      </span>
+                                    )}
+                                  </Show>
+                                </div>
+                                <div class="lhb-seat-right down">
+                                  {fmtMoney(seat.net_amount)}
+                                  <span class="lhb-seat-arrow">›</span>
+                                </div>
+                              </div>
+                            )
+                          }}
                         </For>
                       </div>
                     </Show>

@@ -67,3 +67,23 @@ export interface SeatDetailInfo {
   same_day_operations: SeatOperationItem[]
   historical_operations: SeatOperationItem[]
 }
+
+export interface SeatRadarItem {
+  code: string
+  name: string
+  trade_date: string
+  branch_name: string
+  trader_label: string | null
+  is_buy: boolean
+  buy_amount: number
+  sell_amount: number
+  net_amount: number
+  close_price: number
+  change_pct: number
+  reason: string
+}
+
+export interface SeatRadarResult {
+  query_date: string
+  items: SeatRadarItem[]
+}

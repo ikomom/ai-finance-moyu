@@ -16,6 +16,12 @@ pub async fn get_stock_dragon_tiger(
     code: String,
 ) -> Result<StockDetailInfo, String> {
     let norm_code = crate::market::normalize_code(&code).unwrap_or(code);
+    if crate::market::is_index(&norm_code) {
+        return Ok(StockDetailInfo {
+            code: norm_code,
+            dragon_tiger: None,
+        });
+    }
     let stock_name = {
         let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
         quotes.get(&norm_code).map(|q| q.name.clone())
@@ -72,5 +78,23 @@ pub async fn get_seat_dragon_tiger(
     Ok(state
         .dragon_tiger_client
         .fetch_seat_detail(&branch_name, trade_date.as_deref())
+        .await)
+}
+
+#[tauri::command]
+pub async fn get_seat_radar(
+    state: State<'_, AppState>,
+    branches: Vec<String>,
+    trade_date: Option<String>,
+) -> Result<crate::dragon_tiger::SeatRadarResult, String> {
+    log::info!(
+        target: "USER",
+        "龙虎榜席位雷达筛选, 营业部数量: {}, 指定日期: {:?}",
+        branches.len(),
+        trade_date
+    );
+    Ok(state
+        .dragon_tiger_client
+        .fetch_seat_radar(&branches, trade_date.as_deref())
         .await)
 }
