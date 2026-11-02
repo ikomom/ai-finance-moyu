@@ -98,3 +98,97 @@
 .group-tab-modal-checkbox input {
   cursor: pointer;
 }
+
+/* Modal backdrop & card (Portal-rendered) */
+.group-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.group-modal {
+  background: #181c24;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 16px 18px;
+  width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.group-modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+}
+
+.group-modal-name-tag {
+  color: #38bdf8;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.group-modal-input {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.group-modal-input:focus {
+  border-color: #38bdf8;
+}
+
+.group-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.group-modal-btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.group-modal-btn.cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.group-modal-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #f1f5f9;
+}
+
+.group-modal-btn.confirm {
+  background: #0284c7;
+  color: #fff;
+}
+
+.group-modal-btn.confirm:hover {
+  filter: brightness(1.1);
+}

@@ -1,4 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
+import { Portal } from 'solid-js/web'
 import type { WatchGroup } from '../../types'
 import { ALL_GROUP_ID, DEFAULT_GROUP_ID, MAX_GROUP_NAME_LEN } from '../../services/watchlistGroups'
 import './WatchGroupTabs.css'
@@ -127,112 +128,120 @@ export function WatchGroupTabs(props: WatchGroupTabsProps) {
 
       {/* 新建分组弹窗 */}
       <Show when={showAddModal()}>
-        <div class="group-modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div class="group-modal" onClick={(e) => e.stopPropagation()}>
-            <div class="group-modal-title">新建自选分组</div>
-            <input
-              class="group-modal-input"
-              placeholder="请输入分组名称..."
-              maxLength={MAX_GROUP_NAME_LEN}
-              value={newGroupName()}
-              onInput={(e) => setNewGroupName(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleConfirmAdd()
-                if (e.key === 'Escape') setShowAddModal(false)
-              }}
-              autofocus
-            />
-            <div class="group-modal-actions">
-              <button
-                type="button"
-                class="group-modal-btn cancel"
-                onClick={() => setShowAddModal(false)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                class="group-modal-btn confirm"
-                onClick={handleConfirmAdd}
-              >
-                确定
-              </button>
+        <Portal>
+          <div class="group-modal-backdrop" onClick={() => setShowAddModal(false)}>
+            <div class="group-modal" onClick={(e) => e.stopPropagation()}>
+              <div class="group-modal-title">新建自选分组</div>
+              <input
+                class="group-modal-input"
+                placeholder="请输入分组名称..."
+                maxLength={MAX_GROUP_NAME_LEN}
+                value={newGroupName()}
+                onInput={(e) => setNewGroupName(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleConfirmAdd()
+                  if (e.key === 'Escape') setShowAddModal(false)
+                }}
+                autofocus
+              />
+              <div class="group-modal-actions">
+                <button
+                  type="button"
+                  class="group-modal-btn cancel"
+                  onClick={() => setShowAddModal(false)}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  class="group-modal-btn confirm"
+                  onClick={handleConfirmAdd}
+                >
+                  确定
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       </Show>
 
       {/* 重命名分组弹窗 */}
       <Show when={renameGroupTarget()}>
-        <div class="group-modal-backdrop" onClick={() => setRenameGroupTarget(null)}>
-          <div class="group-modal" onClick={(e) => e.stopPropagation()}>
-            <div class="group-modal-title">重命名分组</div>
-            <input
-              class="group-modal-input"
-              maxLength={MAX_GROUP_NAME_LEN}
-              value={renameValue()}
-              onInput={(e) => setRenameValue(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleConfirmRename()
-                if (e.key === 'Escape') setRenameGroupTarget(null)
-              }}
-              autofocus
-            />
-            <div class="group-modal-actions">
-              <button
-                type="button"
-                class="group-modal-btn cancel"
-                onClick={() => setRenameGroupTarget(null)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                class="group-modal-btn confirm"
-                onClick={handleConfirmRename}
-              >
-                保存
-              </button>
+        <Portal>
+          <div class="group-modal-backdrop" onClick={() => setRenameGroupTarget(null)}>
+            <div class="group-modal" onClick={(e) => e.stopPropagation()}>
+              <div class="group-modal-title">重命名分组</div>
+              <input
+                class="group-modal-input"
+                maxLength={MAX_GROUP_NAME_LEN}
+                value={renameValue()}
+                onInput={(e) => setRenameValue(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleConfirmRename()
+                  if (e.key === 'Escape') setRenameGroupTarget(null)
+                }}
+                autofocus
+              />
+              <div class="group-modal-actions">
+                <button
+                  type="button"
+                  class="group-modal-btn cancel"
+                  onClick={() => setRenameGroupTarget(null)}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  class="group-modal-btn confirm"
+                  onClick={handleConfirmRename}
+                >
+                  保存
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       </Show>
 
       {/* 删除分组确认弹窗 (带保留到默认分组选项) */}
       <Show when={deleteGroupTarget()}>
-        <div class="group-modal-backdrop" onClick={() => setDeleteGroupTarget(null)}>
-          <div class="group-modal" onClick={(e) => e.stopPropagation()}>
-            <div class="group-modal-title">删除分组【{deleteGroupTarget()?.name}】</div>
-            <p class="opt-desc" style={{ 'font-size': '11px', margin: '4px 0' }}>
-              删除后该分组将不再显示。请选择组内已有股票的处理方式：
-            </p>
-            <label class="group-tab-modal-checkbox">
-              <input
-                type="checkbox"
-                checked={moveToDefaultChecked()}
-                onChange={(e) => setMoveToDefaultChecked(e.currentTarget.checked)}
-              />
-              <span>将组内股票保留并移入默认分组</span>
-            </label>
-            <div class="group-modal-actions">
-              <button
-                type="button"
-                class="group-modal-btn cancel"
-                onClick={() => setDeleteGroupTarget(null)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                class="group-modal-btn confirm"
-                style={{ background: '#e11d48' }}
-                onClick={handleConfirmDelete}
-              >
-                确定删除
-              </button>
+        <Portal>
+          <div class="group-modal-backdrop" onClick={() => setDeleteGroupTarget(null)}>
+            <div class="group-modal" onClick={(e) => e.stopPropagation()}>
+              <div class="group-modal-title">
+                删除分组 <span class="group-modal-name-tag">【{deleteGroupTarget()?.name}】</span>
+              </div>
+              <p class="opt-desc" style={{ 'font-size': '11px', margin: '4px 0' }}>
+                删除后该分组将不再显示。请选择组内已有股票的处理方式：
+              </p>
+              <label class="group-tab-modal-checkbox">
+                <input
+                  type="checkbox"
+                  checked={moveToDefaultChecked()}
+                  onChange={(e) => setMoveToDefaultChecked(e.currentTarget.checked)}
+                />
+                <span>将组内股票保留并移入默认分组</span>
+              </label>
+              <div class="group-modal-actions">
+                <button
+                  type="button"
+                  class="group-modal-btn cancel"
+                  onClick={() => setDeleteGroupTarget(null)}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  class="group-modal-btn confirm"
+                  style={{ background: '#e11d48' }}
+                  onClick={handleConfirmDelete}
+                >
+                  确定删除
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       </Show>
     </div>
   )

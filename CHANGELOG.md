@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **修复北交所（920/83/43代码段）股票代码前缀与名称解析**：
   - 彻底修复此前将北交所上榜股票（如 920201 艾能聚）误判为深市 `sz` 前缀导致腾讯行情查不到名称、展示空白且个股无法下钻的问题；
   - 统一收口至 `canonical_stock_code`，准确映射北交所 `bj` 前缀，并为前端卡片名称提供优雅兜底。
+- **设置中心分组弹窗定位脱离与长字符防溢出**：
+  - 新建、重命名、删除分组及添加自选弹窗引入 `<Portal>` 挂载至顶层 DOM，彻底解决父级卡片 `backdrop-filter` 导致的定位参照陷阱，避免长页面滚动时弹窗偏移沉底被截断；
+  - 弹窗标题与分组名引入 `word-break: break-all; overflow-wrap: break-word`，杜绝连续无空格超长字符撑爆弹窗边框。
 - **DOM 常驻隐藏（Keep-Alive）与状态持久记忆**：
   - 贴边折叠收起改用 CSS `display: none` 常驻挂载，不再物理销毁组件，展开 0ms 秒开无白屏；
   - 模块级持久记忆当前视图打开的龙虎榜抽屉、大盘全景 Tab 与二级子 Tab，贴边展开后完美保持原操作现场。
