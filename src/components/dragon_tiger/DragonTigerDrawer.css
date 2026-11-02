@@ -128,6 +128,15 @@
   flex-shrink: 0;
 }
 
+.lhb-date-tag.is-stale {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-weight: 600;
+}
+
 .lhb-period-badge {
   font-size: 9px;
   font-weight: 700;

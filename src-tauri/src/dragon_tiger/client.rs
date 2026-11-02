@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use super::baseline::get_market_baseline;
 use super::trader_dict::match_famous_trader;
 use super::types::{
-    DragonTigerSeat, MarketDragonTigerOverview, MarketLhbStockItem,
+    DragonTigerSeat, FamousTraderMove, MarketDragonTigerOverview, MarketLhbStockItem,
     StockDetailInfo, StockDragonTiger,
 };
 use crate::market::beijing_now;
@@ -147,15 +147,28 @@ impl DragonTigerClient {
         }
 
         let baseline = get_market_baseline();
-        if famous_trader_moves.is_empty() {
-            famous_trader_moves = baseline.famous_trader_moves;
+        let trade_date = if trade_date.is_empty() { baseline.trade_date } else { trade_date };
+
+        let core_traders = ["呼家楼", "六一路", "章盟主", "方新侠", "陈小群", "炒股养家"].map(String::from);
+        if !trade_date.is_empty() {
+            let radar_res = self.seat_radar_client.fetch_seat_radar(&core_traders, Some(&trade_date)).await;
+            for item in radar_res.items.into_iter().take(6) {
+                let trader_name = item.trader_label.unwrap_or_else(|| item.branch_name.chars().take(4).collect());
+                famous_trader_moves.push(FamousTraderMove {
+                    trader_name,
+                    stock_code: item.code,
+                    stock_name: item.name,
+                    action: if item.is_buy { "买入".into() } else { "卖出".into() },
+                    net_amount: item.net_amount,
+                });
+            }
         }
 
-        let trade_date = if trade_date.is_empty() { baseline.trade_date } else { trade_date };
         log::info!(
             target: "NET",
-            "全市场龙虎榜拉取成功, 披露日: {trade_date}, 包含 {} 只标的",
-            top_institution_stocks.len()
+            "全市场龙虎榜拉取成功, 披露日: {trade_date}, 包含 {} 只标的, 知名游资动向: {} 条",
+            top_institution_stocks.len(),
+            famous_trader_moves.len()
         );
 
         Ok(MarketDragonTigerOverview { trade_date, top_institution_stocks, famous_trader_moves })
@@ -189,71 +202,39 @@ impl DragonTigerClient {
         detail
     }
 
-    async fn do_fetch_stock_detail(
-        &self,
-        code: &str,
-        stock_name: Option<&str>,
-    ) -> Result<StockDetailInfo, String> {
+    async fn do_fetch_stock_detail(&self, code: &str, stock_name: Option<&str>) -> Result<StockDetailInfo, String> {
         let bare_code = code.trim_start_matches(|c: char| c.is_alphabetic());
         let buy_url = format!(
-            "https://datacenter-web.eastmoney.com/api/data/v1/get?\
-             reportName=RPT_BILLBOARD_DAILYDETAILSBUY&\
-             columns=ALL&\
-             filter=(SECURITY_CODE%3D%22{bare_code}%22)&\
-             pageNumber=1&pageSize=5&\
-             sortTypes=-1&sortColumns=TRADE_DATE"
+            "https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_BILLBOARD_DAILYDETAILSBUY&columns=ALL&filter=(SECURITY_CODE%3D%22{bare_code}%22)&pageNumber=1&pageSize=5&sortTypes=-1&sortColumns=TRADE_DATE"
         );
-
-        let resp = self.client.get(&buy_url).send().await
-            .map_err(|e| format!("请求失败: {e}"))?;
-
+        let resp = self.client.get(&buy_url).send().await.map_err(|e| format!("请求失败: {e}"))?;
         if !resp.status().is_success() {
             return Err(format!("HTTP 状态码异常: {}", resp.status()));
         }
 
-        let json: serde_json::Value = resp.json().await
-            .map_err(|e| format!("JSON解析: {e}"))?;
+        let json: serde_json::Value = resp.json().await.map_err(|e| format!("JSON解析: {e}"))?;
         let data_arr = match json["result"]["data"].as_array() {
             Some(arr) if !arr.is_empty() => arr,
-            _ => {
-                log::info!(target: "NET", "个股龙虎榜无上榜记录: {code}");
-                return Ok(StockDetailInfo { code: code.to_string(), dragon_tiger: None });
-            }
+            _ => return Ok(StockDetailInfo { code: code.to_string(), dragon_tiger: None }),
         };
 
         let mut top_buyers = Vec::new();
-        let mut trade_date = String::new();
-        let mut reason = String::new();
-        let mut close_price = 0.0;
-        let mut change_pct = 0.0;
+        let (mut trade_date, mut reason, mut close_price, mut change_pct) = (String::new(), String::new(), 0.0, 0.0);
 
         for item in data_arr.iter().take(5) {
             if trade_date.is_empty() {
-                if let Some(td) = item["TRADE_DATE"].as_str() {
-                    trade_date = td.chars().take(10).collect();
-                }
+                if let Some(td) = item["TRADE_DATE"].as_str() { trade_date = td.chars().take(10).collect(); }
             }
             if reason.is_empty() {
-                if let Some(r) = item["EXPLANATION"].as_str() {
-                    reason = r.to_string();
-                }
+                if let Some(r) = item["EXPLANATION"].as_str() { reason = r.to_string(); }
             }
-            if close_price == 0.0 {
-                close_price = item["CLOSE_PRICE"].as_f64().unwrap_or(0.0);
-            }
-            if change_pct == 0.0 {
-                change_pct = item["CHANGE_RATE"].as_f64().unwrap_or(0.0);
-            }
+            if close_price == 0.0 { close_price = item["CLOSE_PRICE"].as_f64().unwrap_or(0.0); }
+            if change_pct == 0.0 { change_pct = item["CHANGE_RATE"].as_f64().unwrap_or(0.0); }
             top_buyers.push(parse_seat(item));
         }
 
         let sell_url = format!(
-            "https://datacenter-web.eastmoney.com/api/data/v1/get?\
-             reportName=RPT_BILLBOARD_DAILYDETAILSSELL&\
-             columns=ALL&\
-             filter=(SECURITY_CODE%3D%22{bare_code}%22)&\
-             pageNumber=1&pageSize=5&\
-             sortTypes=-1&sortColumns=TRADE_DATE"
+            "https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_BILLBOARD_DAILYDETAILSSELL&columns=ALL&filter=(SECURITY_CODE%3D%22{bare_code}%22)&pageNumber=1&pageSize=5&sortTypes=-1&sortColumns=TRADE_DATE"
         );
         let mut top_sellers = Vec::new();
         if let Ok(s_resp) = self.client.get(&sell_url).send().await {
@@ -266,18 +247,10 @@ impl DragonTigerClient {
             }
         }
 
-        let inst_buy: f64 = top_buyers.iter()
-            .filter(|s| s.branch_name.contains("机构")).map(|s| s.buy_amount).sum();
-        let inst_sell: f64 = top_sellers.iter()
-            .filter(|s| s.branch_name.contains("机构")).map(|s| s.sell_amount).sum();
+        let inst_buy: f64 = top_buyers.iter().filter(|s| s.branch_name.contains("机构")).map(|s| s.buy_amount).sum();
+        let inst_sell: f64 = top_sellers.iter().filter(|s| s.branch_name.contains("机构")).map(|s| s.sell_amount).sum();
         let net_total = top_buyers.iter().map(|s| s.net_amount).sum::<f64>()
             + top_sellers.iter().map(|s| s.net_amount).sum::<f64>();
-
-        log::info!(
-            target: "NET",
-            "个股龙虎榜拉取完成: {code}, 上榜日: {trade_date}, 席位: 买{} 卖{}",
-            top_buyers.len(), top_sellers.len()
-        );
 
         let dragon_tiger = Some(StockDragonTiger {
             code: code.to_string(),
@@ -299,6 +272,5 @@ fn parse_seat(item: &serde_json::Value) -> DragonTigerSeat {
     let buy = item["BUY"].as_f64().unwrap_or(0.0);
     let sell = item["SELL"].as_f64().unwrap_or(0.0);
     let net = item["NET"].as_f64().unwrap_or(buy - sell);
-    let trader_label = match_famous_trader(&branch).map(|s| s.to_string());
-    DragonTigerSeat { branch_name: branch, trader_label, buy_amount: buy, sell_amount: sell, net_amount: net }
+    DragonTigerSeat { branch_name: branch.clone(), trader_label: match_famous_trader(&branch).map(|s| s.to_string()), buy_amount: buy, sell_amount: sell, net_amount: net }
 }

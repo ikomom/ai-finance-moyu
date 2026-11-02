@@ -149,7 +149,21 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
             <span>⚡ 知名游资动向追踪</span>
           </div>
           <div class="trader-moves-grid">
-            <For each={data()!.famous_trader_moves}>
+            <For
+              each={data()!.famous_trader_moves}
+              fallback={
+                <div class="trader-moves-empty">
+                  <span>🏛️ 今日官方披露榜单中暂无预设顶流游资上榜</span>
+                  <button
+                    type="button"
+                    class="trader-moves-goto-radar"
+                    onClick={() => setSubTab('radar')}
+                  >
+                    🎯 切换至席位雷达自定义回溯 ›
+                  </button>
+                </div>
+              }
+            >
               {(move: FamousTraderMove) => {
                 const isBuy = move.action.includes('买') || move.net_amount >= 0
                 return (

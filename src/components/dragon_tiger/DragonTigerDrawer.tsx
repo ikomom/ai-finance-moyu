@@ -40,6 +40,15 @@ export function getLhbPeriodType(reason: string): '3day' | '1day' {
   return reason.includes('连续三个交易日') || reason.includes('3日') ? '3day' : '1day'
 }
 
+/** Calculate days elapsed since trade_date (to flag stale historical records). */
+export function getDaysDiff(tradeDate: string): number {
+  if (!tradeDate) return 0
+  const d = new Date(tradeDate + 'T00:00:00')
+  const now = new Date()
+  const diffTime = now.getTime() - d.getTime()
+  return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)))
+}
+
 /** Shorten verbose official exchange explanation strings to concise trader terminology. */
 export function shortenLhbReason(reason: string): string {
   if (!reason) return '龙虎榜披露'
@@ -197,7 +206,17 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                             ⚡ {shortenLhbReason(l().reason)}
                           </span>
                         </div>
-                        <span class="lhb-date-tag">上榜日 {l().trade_date}</span>
+                        <Show
+                          when={getDaysDiff(l().trade_date) > 5}
+                          fallback={<span class="lhb-date-tag">上榜日 {l().trade_date}</span>}
+                        >
+                          <span
+                            class="lhb-date-tag is-stale"
+                            title={`该标的近期未触发异动披露，此为历史最后一次上榜记录（距今已超 ${getDaysDiff(l().trade_date)} 天）`}
+                          >
+                            ⚠️ 历史复盘 {l().trade_date}
+                          </span>
+                        </Show>
                       </div>
 
                       <div class="lhb-stat-grid">

@@ -232,3 +232,34 @@
 
 .trader-target-amt.up { color: #f43f5e; }
 .trader-target-amt.down { color: #10b981; }
+
+.trader-moves-empty {
+  grid-column: span 2;
+  padding: 14px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.trader-moves-goto-radar {
+  background: rgba(2, 132, 199, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(2, 132, 199, 0.3);
+  border-radius: 4px;
+  font-size: 10.5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.trader-moves-goto-radar:hover {
+  background: rgba(2, 132, 199, 0.25);
+  color: #7dd3fc;
+}

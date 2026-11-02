@@ -4,6 +4,8 @@ import type { CustomSeatMapping, SeatCategory } from '../dragon_tiger/types'
 import { fetchCustomSeats, saveCustomSeats } from '../../tauri'
 import { useSettings } from './SettingsContext'
 
+const RADAR_STORAGE_KEY = 'moyu_seat_radar_pool_v2'
+
 const CATEGORIES: { id: SeatCategory; label: string }[] = [
   { id: 'trader', label: '游资' },
   { id: 'institution', label: '机构' },
@@ -12,9 +14,12 @@ const CATEGORIES: { id: SeatCategory; label: string }[] = [
   { id: 'custom', label: '自定义' },
 ]
 
+import { POPULAR_TRADERS, type PopularTraderPreset } from './popularTraders'
+
 export function SeatsTab() {
   const { say } = useSettings()
   const [seats, setSeats] = createSignal<CustomSeatMapping[]>([])
+  const [showAdvanced, setShowAdvanced] = createSignal(false)
   const [search, setSearch] = createSignal('')
   const [keyword, setKeyword] = createSignal('')
   const [label, setLabel] = createSignal('')
@@ -36,10 +41,56 @@ export function SeatsTab() {
     setSeats(next)
     try {
       await saveCustomSeats(next)
-      say('席位标记已保存并全链路生效')
+      say('游资追踪与席位配置已更新生效')
     } catch {
-      say('保存席位标记失败，请重试')
+      say('保存席位配置失败，请重试')
     }
+  }
+
+  const isTraderActive = (trader: PopularTraderPreset) => {
+    const list = seats()
+    return trader.branchKeywords.some((kw) => {
+      const match = list.find((s) => s.branch_keyword.includes(kw) || kw.includes(s.branch_keyword))
+      return match ? match.enabled : true
+    })
+  }
+
+  const toggleTrader = async (trader: PopularTraderPreset) => {
+    const active = isTraderActive(trader)
+    const nextState = !active
+    const list = seats()
+    let updated = [...list]
+
+    for (const kw of trader.branchKeywords) {
+      const idx = updated.findIndex((s) => s.branch_keyword.includes(kw) || kw.includes(s.branch_keyword))
+      if (idx >= 0) {
+        updated[idx] = { ...updated[idx], enabled: nextState }
+      } else if (nextState) {
+        updated.unshift({
+          id: `preset-${Date.now()}-${kw}`,
+          branch_keyword: kw,
+          label: trader.name,
+          category: trader.category,
+          enabled: true,
+        })
+      }
+    }
+
+    try {
+      const saved = localStorage.getItem(RADAR_STORAGE_KEY)
+      const radarPool: Array<{ name: string; label?: string; active: boolean }> = saved ? JSON.parse(saved) : []
+      const existing = radarPool.find((item) => item.name === trader.name)
+      if (existing) {
+        existing.active = nextState
+      } else {
+        radarPool.push({ name: trader.name, label: trader.name, active: nextState })
+      }
+      localStorage.setItem(RADAR_STORAGE_KEY, JSON.stringify(radarPool))
+    } catch {
+      // Ignore localstorage errors in restricted webview
+    }
+
+    await persist(updated)
   }
 
   const handleAdd = async () => {
@@ -75,7 +126,7 @@ export function SeatsTab() {
   }
 
   const handleResetDefaults = async () => {
-    if (!confirm('确定恢复官方推荐的知名游资与机构席位标记预设吗？')) return
+    if (!confirm('确定恢复官方推荐的知名游资与主力席位预设吗？')) return
     const defSeats: CustomSeatMapping[] = [
       { id: 'preset-hjl-1', branch_keyword: '北京东城分公司', label: '呼家楼', category: 'trader', enabled: true },
       { id: 'preset-hjl-2', branch_keyword: '北京呼家楼', label: '呼家楼', category: 'trader', enabled: true },
@@ -108,113 +159,140 @@ export function SeatsTab() {
 
   return (
     <div class="seats-tab-container">
-      {/* 顶部新增卡片 */}
+      {/* 1. 核心游资雷达关注池 */}
       <div class="seats-add-card">
-        <div style={{ 'font-size': '13px', 'font-weight': '600', color: '#e2e8f0' }}>
-          ✨ 标记自定义游资或机构席位
-        </div>
-        <div style={{ 'font-size': '11px', color: '#94a3b8' }}>
-          设置后将在龙虎榜买卖前五席位、席位雷达及战绩下钻中全链路自动识别并着色显示。
-        </div>
-
-        <div class="seats-form-row">
-          <input
-            type="text"
-            class="seats-input"
-            placeholder="营业部关键词/全称 (如：中信建投北京东城分公司、拉萨东环路)"
-            value={keyword()}
-            onInput={(e) => setKeyword(e.currentTarget.value)}
-          />
-          <input
-            type="text"
-            class="seats-input"
-            style={{ 'max-width': '130px' }}
-            placeholder="自定义标签名 (如：呼家楼)"
-            value={label()}
-            onInput={(e) => setLabel(e.currentTarget.value)}
-          />
-        </div>
-
-        <div class="seats-form-row" style={{ 'justify-content': 'space-between' }}>
-          <div class="seats-cat-picker">
-            <For each={CATEGORIES}>
-              {(cat) => (
-                <button
-                  type="button"
-                  class={`seats-cat-btn ${cat.id} ${category() === cat.id ? 'active' : ''}`}
-                  onClick={() => setCategory(cat.id)}
-                >
-                  {cat.label}
-                </button>
-              )}
-            </For>
+        <div style={{ display: 'flex', 'justify-content': 'space-between', 'align-items': 'center' }}>
+          <div>
+            <div style={{ 'font-size': '13px', 'font-weight': '600', color: '#e2e8f0' }}>
+              🎯 核心知名游资与主力关注池
+            </div>
+            <div style={{ 'font-size': '11px', color: '#94a3b8', 'margin-top': '2px' }}>
+              勾选关注的主力席位，前台「席位雷达」与「大盘游资动向」将自动进行全市场实时扫描与高亮。
+            </div>
           </div>
-          <button type="button" class="seats-add-btn" onClick={handleAdd}>
-            ＋ 添加席位标记
+          <button type="button" class="seats-btn-reset" onClick={handleResetDefaults} title="恢复官方推荐的预设游资配置">
+            ↺ 恢复推荐预设
           </button>
         </div>
-      </div>
 
-      {/* 列表管理工具栏 */}
-      <div class="seats-header-toolbar">
-        <div style={{ display: 'flex', 'align-items': 'center', gap: '8px' }}>
-          <input
-            type="text"
-            class="seats-input"
-            style={{ width: '180px', padding: '3px 8px', 'font-size': '11px' }}
-            placeholder="🔍 搜索已标记规则…"
-            value={search()}
-            onInput={(e) => setSearch(e.currentTarget.value)}
-          />
-          <span>
-            共 {seats().length} 条（已启用 {seats().filter((s) => s.enabled).length} 条）
-          </span>
-        </div>
-        <button type="button" class="seats-btn-reset" onClick={handleResetDefaults}>
-          ↺ 恢复推荐预设
-        </button>
-      </div>
-
-      {/* 席位规则列表 */}
-      <Show when={!loading()} fallback={<div style={{ color: '#64748b', 'font-size': '12px' }}>载入中…</div>}>
-        <div class="seats-list">
-          <For
-            each={filteredSeats()}
-            fallback={
-              <div style={{ color: '#64748b', 'font-size': '12px', 'text-align': 'center', padding: '20px 0' }}>
-                暂无匹配的席位标记规则
-              </div>
-            }
-          >
-            {(item) => (
-              <div class="seats-item-row" style={{ opacity: item.enabled ? '1' : '0.45' }}>
-                <div class="seats-item-left">
-                  <span class={`seat-badge-pill ${item.category}`}>{item.label}</span>
-                  <span class="seat-keyword-text" title={item.branch_keyword}>
-                    {item.branch_keyword}
-                  </span>
+        <div class="popular-traders-grid">
+          <For each={POPULAR_TRADERS}>
+            {(trader) => {
+              const active = () => isTraderActive(trader)
+              return (
+                <div
+                  class={`popular-trader-card ${active() ? 'active' : ''}`}
+                  onClick={() => toggleTrader(trader)}
+                  title={`点击${active() ? '取消关注' : '加入关注'} ${trader.name}`}
+                >
+                  <div class="popular-trader-top">
+                    <span class="popular-trader-name">{trader.name}</span>
+                    <span class={`seat-badge-pill ${trader.category}`} style={{ 'font-size': '10px' }}>
+                      {active() ? '已关注' : '未开启'}
+                    </span>
+                  </div>
+                  <span class="popular-trader-desc">{trader.desc}</span>
                 </div>
-                <div class="seats-item-right">
-                  <button
-                    type="button"
-                    class="seats-toggle-btn"
-                    onClick={() => handleToggle(item.id)}
-                    title={item.enabled ? '点击禁用该规则' : '点击启用该规则'}
-                  >
-                    {item.enabled ? '🟢' : '⚪'}
-                  </button>
-                  <button
-                    type="button"
-                    class="seats-del-btn"
-                    onClick={() => handleDelete(item.id)}
-                    title="删除该规则"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            )}
+              )
+            }}
           </For>
+        </div>
+      </div>
+
+      {/* 2. 高级：自定义营业部标签映射（默认折叠） */}
+      <div class="seats-adv-toggle" onClick={() => setShowAdvanced(!showAdvanced())}>
+        <span>{showAdvanced() ? '▼' : '▶'}</span>
+        <span>高级设置：自定义营业部标签与马甲映射 ({seats().length} 条规则)</span>
+      </div>
+
+      <Show when={showAdvanced()}>
+        <div class="seats-add-card" style={{ 'border-style': 'dashed' }}>
+          <div style={{ 'font-size': '12px', 'font-weight': '600', color: '#cbd5e1' }}>
+            ➕ 新增营业部识别规则
+          </div>
+          <div class="seats-form-row">
+            <input
+              type="text"
+              class="seats-input"
+              placeholder="营业部关键词/全称 (如：中信证券北京东城分公司)"
+              value={keyword()}
+              onInput={(e) => setKeyword(e.currentTarget.value)}
+            />
+            <input
+              type="text"
+              class="seats-input"
+              style={{ 'max-width': '130px' }}
+              placeholder="标签名 (如：呼家楼)"
+              value={label()}
+              onInput={(e) => setLabel(e.currentTarget.value)}
+            />
+          </div>
+
+          <div class="seats-form-row" style={{ 'justify-content': 'space-between' }}>
+            <div class="seats-cat-picker">
+              <For each={CATEGORIES}>
+                {(cat) => (
+                  <button
+                    type="button"
+                    class={`seats-cat-btn ${cat.id} ${category() === cat.id ? 'active' : ''}`}
+                    onClick={() => setCategory(cat.id)}
+                  >
+                    {cat.label}
+                  </button>
+                )}
+              </For>
+            </div>
+            <button type="button" class="seats-add-btn" onClick={handleAdd}>
+              ＋ 添加规则
+            </button>
+          </div>
+
+          {/* 列表搜索与表格 */}
+          <div class="seats-header-toolbar" style={{ 'margin-top': '8px' }}>
+            <input
+              type="text"
+              class="seats-input"
+              style={{ width: '180px', padding: '3px 8px', 'font-size': '11px' }}
+              placeholder="🔍 搜索规则…"
+              value={search()}
+              onInput={(e) => setSearch(e.currentTarget.value)}
+            />
+          </div>
+
+          <Show when={!loading()} fallback={<div style={{ color: '#64748b', 'font-size': '11px', padding: '10px' }}>加载席位规则中…</div>}>
+            <div class="seats-list" style={{ 'max-height': '240px' }}>
+              <For each={filteredSeats()}>
+                {(item) => (
+                  <div class="seats-item-row" style={{ opacity: item.enabled ? '1' : '0.45' }}>
+                    <div class="seats-item-left">
+                      <span class={`seat-badge-pill ${item.category}`}>{item.label}</span>
+                      <span class="seat-keyword-text" title={item.branch_keyword}>
+                        {item.branch_keyword}
+                      </span>
+                    </div>
+                    <div class="seats-item-right">
+                      <button
+                        type="button"
+                        class="seats-toggle-btn"
+                        onClick={() => handleToggle(item.id)}
+                        title={item.enabled ? '点击禁用该规则' : '点击启用该规则'}
+                      >
+                        {item.enabled ? '🟢' : '⚪'}
+                      </button>
+                      <button
+                        type="button"
+                        class="seats-del-btn"
+                        onClick={() => handleDelete(item.id)}
+                        title="删除该规则"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
       </Show>
     </div>
