@@ -128,6 +128,22 @@
   flex-shrink: 0;
 }
 
+.lhb-period-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  white-space: nowrap;
+}
+.lhb-period-badge.cumulative {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
 .lhb-stat-grid {
   display: flex;
   justify-content: space-between;
@@ -178,6 +194,12 @@
   align-items: center;
   gap: 4px;
   margin-top: 4px;
+}
+.lhb-section-header.buy {
+  color: #fb7185;
+}
+.lhb-section-header.sell {
+  color: #34d399;
 }
 
 .lhb-seat-list {
@@ -261,8 +283,8 @@
 }
 .lhb-seat-tag.trader { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
 .lhb-seat-tag.institution { background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.4); }
-.lhb-seat-tag.north { background: rgba(13, 148, 136, 0.2); color: #2dd4bf; border: 1px solid rgba(13, 148, 136, 0.4); }
-.lhb-seat-tag.quant { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4); }
+.lhb-seat-tag.north { background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); }
+.lhb-seat-tag.quant { background: rgba(13, 148, 136, 0.2); color: #2dd4bf; border: 1px solid rgba(13, 148, 136, 0.4); }
 .lhb-seat-tag.custom { background: rgba(148, 163, 184, 0.2); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.4); }
 
 .lhb-seat-right {

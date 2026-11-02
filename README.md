@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Framework-Tauri%20v2-24C8D8?style=flat-square&logo=tauri" alt="Tauri" />
   <img src="https://img.shields.io/badge/Backend-Rust%201.93.1-DEA584?style=flat-square&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/Frontend-SolidJS%20%2B%20TypeScript-2C4F7C?style=flat-square&logo=solid" alt="SolidJS" />
-  <img src="https://img.shields.io/badge/Tests-289%20Passed-brightgreen?style=flat-square" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-290%20Passed-brightgreen?style=flat-square" alt="Tests" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
 </p>
 

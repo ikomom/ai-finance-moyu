@@ -70,64 +70,107 @@ impl SeatClient {
         trade_date: Option<&str>,
     ) -> Result<SeatDetailInfo, String> {
         let filter_str = format!(r#"(OPERATEDEPT_NAME="{}")"#, branch_name);
-        let resp = self
-            .client
-            .get("https://datacenter-web.eastmoney.com/api/data/v1/get")
-            .query(&[
-                ("reportName", "RPT_BILLBOARD_DAILYDETAILSBUY"),
-                ("columns", "ALL"),
-                ("filter", &filter_str),
-                ("pageNumber", "1"),
-                ("pageSize", "20"),
-                ("sortTypes", "-1"),
-                ("sortColumns", "TRADE_DATE"),
-            ])
-            .send()
-            .await
-            .map_err(|e| format!("请求失败: {e}"))?;
+        let (buy_resp, sell_resp) = tokio::join!(
+            self.client
+                .get("https://datacenter-web.eastmoney.com/api/data/v1/get")
+                .query(&[
+                    ("reportName", "RPT_BILLBOARD_DAILYDETAILSBUY"),
+                    ("columns", "ALL"),
+                    ("filter", &filter_str),
+                    ("pageNumber", "1"),
+                    ("pageSize", "15"),
+                    ("sortTypes", "-1"),
+                    ("sortColumns", "TRADE_DATE"),
+                ])
+                .send(),
+            self.client
+                .get("https://datacenter-web.eastmoney.com/api/data/v1/get")
+                .query(&[
+                    ("reportName", "RPT_BILLBOARD_DAILYDETAILSSELL"),
+                    ("columns", "ALL"),
+                    ("filter", &filter_str),
+                    ("pageNumber", "1"),
+                    ("pageSize", "15"),
+                    ("sortTypes", "-1"),
+                    ("sortColumns", "TRADE_DATE"),
+                ])
+                .send()
+        );
 
-        if !resp.status().is_success() {
+        let mut raw_items = Vec::new();
+        if let Ok(resp) = buy_resp {
+            if resp.status().is_success() {
+                if let Ok(json) = resp.json::<serde_json::Value>().await {
+                    if let Some(arr) = json["result"]["data"].as_array() {
+                        for item in arr {
+                            raw_items.push((true, item.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        if let Ok(resp) = sell_resp {
+            if resp.status().is_success() {
+                if let Ok(json) = resp.json::<serde_json::Value>().await {
+                    if let Some(arr) = json["result"]["data"].as_array() {
+                        for item in arr {
+                            raw_items.push((false, item.clone()));
+                        }
+                    }
+                }
+            }
+        }
+
+        if raw_items.is_empty() {
             return Ok(get_seat_baseline(branch_name, trade_date));
         }
 
-        let json: serde_json::Value = resp.json().await
-            .map_err(|e| format!("JSON解析: {e}"))?;
-        let data_arr = match json["result"]["data"].as_array() {
-            Some(arr) if !arr.is_empty() => arr,
-            _ => return Ok(get_seat_baseline(branch_name, trade_date)),
-        };
-
-        let mut all_ops: Vec<(bool, SeatOperationItem)> = Vec::new();
+        // Merge items by (trade_date, bare_code) to combine buy & sell into real net
+        let mut merged_map: HashMap<(String, String), SeatOperationItem> = HashMap::new();
         let target_date = trade_date.unwrap_or("");
 
-        for item in data_arr {
-            let bare_code = item["SECURITY_CODE"].as_str().unwrap_or_default();
+        for (is_buy_record, item) in raw_items {
+            let bare_code = item["SECURITY_CODE"].as_str().unwrap_or_default().to_string();
             let name = item["SECURITY_NAME_ABBR"].as_str().unwrap_or_default().to_string();
             let td = item["TRADE_DATE"].as_str().map(|s| s.chars().take(10).collect::<String>()).unwrap_or_default();
             let buy = item["BUY"].as_f64().unwrap_or(0.0);
             let sell = item["SELL"].as_f64().unwrap_or(0.0);
-            let net = item["NET"].as_f64().unwrap_or(buy - sell);
             let price = item["CLOSE_PRICE"].as_f64().unwrap_or(0.0);
             let change = item["CHANGE_RATE"].as_f64().unwrap_or(0.0);
             let reason = item["EXPLANATION"].as_str().unwrap_or("龙虎榜公开信息").to_string();
 
-            let code = super::canonical_stock_code(bare_code);
+            let code = super::canonical_stock_code(&bare_code);
+            let key = (td.clone(), bare_code);
 
-            let is_same_day = !target_date.is_empty() && td == target_date;
-            all_ops.push((
-                is_same_day,
-                SeatOperationItem {
-                    code,
-                    name,
-                    trade_date: td,
-                    buy_amount: buy,
-                    sell_amount: sell,
-                    net_amount: net,
-                    close_price: price,
-                    change_pct: change,
-                    reason,
-                },
-            ));
+            let entry = merged_map.entry(key).or_insert_with(|| SeatOperationItem {
+                code,
+                name,
+                trade_date: td,
+                buy_amount: 0.0,
+                sell_amount: 0.0,
+                net_amount: 0.0,
+                close_price: price,
+                change_pct: change,
+                reason,
+            });
+
+            if is_buy_record {
+                if buy > 0.0 {
+                    entry.buy_amount = buy;
+                }
+            } else if sell > 0.0 {
+                entry.sell_amount = sell;
+            }
+            entry.net_amount = entry.buy_amount - entry.sell_amount;
+        }
+
+        let mut sorted_ops: Vec<SeatOperationItem> = merged_map.into_values().collect();
+        sorted_ops.sort_by(|a, b| b.trade_date.cmp(&a.trade_date));
+
+        let mut all_ops: Vec<(bool, SeatOperationItem)> = Vec::new();
+        for op in sorted_ops {
+            let is_same_day = !target_date.is_empty() && op.trade_date == target_date;
+            all_ops.push((is_same_day, op));
         }
 
         // 该报表只有 SECURITY_CODE，没有名称列，name 恒为空。

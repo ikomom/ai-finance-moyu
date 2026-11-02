@@ -99,12 +99,8 @@ pub fn get_stock_baseline(code: &str, stock_name: Option<&str>) -> StockDetailIn
     let today = beijing_now().format("%Y-%m-%d").to_string();
     let name = stock_name.unwrap_or(code).to_string();
 
-    // Deterministic pseudo-random seed based on code digits
-    let seed: u64 = code.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-
-    // Only a subset of stocks have baseline LHB data
-    let has_lhb = seed.is_multiple_of(3)
-        || code.contains("603019")
+    // Deterministic baseline for mock/demo purposes only on specific demo codes
+    let has_lhb = code.contains("603019")
         || code.contains("000977")
         || code.contains("601138");
     let dragon_tiger = if has_lhb {

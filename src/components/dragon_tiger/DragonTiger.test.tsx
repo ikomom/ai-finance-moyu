@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'solid-js/web'
 import { DragonTigerBadge } from './DragonTigerBadge'
-import { cleanBranchName, shortenLhbReason } from './DragonTigerDrawer'
+import { cleanBranchName, shortenLhbReason, getLhbPeriodType } from './DragonTigerDrawer'
 
 // Mock fetchStockDragonTiger to avoid IPC calls in tests
 vi.mock('../../tauri', () => ({
@@ -10,16 +10,26 @@ vi.mock('../../tauri', () => ({
 }))
 
 describe('cleanBranchName', () => {
-  it('cleans up verbose suffixes', () => {
+  it('cleans up verbose suffixes to maximize space for road names', () => {
     expect(
       cleanBranchName('中泰证券股份有限公司上海金沙江路证券营业部')
-    ).toBe('中泰证券上海金沙江路营业部')
+    ).toBe('中泰证券上海金沙江路')
     expect(
       cleanBranchName('东方财富证券股份有限公司拉萨东环路第二证券营业部')
-    ).toBe('东方财富证券拉萨东环路第二营业部')
+    ).toBe('东财拉萨东环路第二')
     expect(
       cleanBranchName('国信证券股份有限公司浙江互联网分公司')
     ).toBe('国信证券浙江互联网分公司')
+    expect(
+      cleanBranchName('机构专用')
+    ).toBe('机构专用')
+  })
+})
+
+describe('getLhbPeriodType', () => {
+  it('distinguishes 3-day accumulated from 1-day lists', () => {
+    expect(getLhbPeriodType('连续三个交易日内收盘价格涨幅偏离值累计达到20%')).toBe('3day')
+    expect(getLhbPeriodType('日收盘价涨幅偏离值达到7%')).toBe('1day')
   })
 })
 

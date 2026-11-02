@@ -256,6 +256,13 @@ export interface Config {
   enablePortfolio?: boolean
   groups?: WatchGroup[]
   activeGroupId?: string | null
+  customSeats?: Array<{
+    branchPattern: string
+    traderName: string
+    category: string
+    remark?: string
+    enabled: boolean
+  }>
   schemaVersion?: number
 }
 

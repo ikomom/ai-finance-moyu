@@ -24,10 +24,20 @@ function fmtMoney(amt: number): string {
 /** Clean up verbose corporate entity suffixes to maximize space for branch city and road name. */
 export function cleanBranchName(name: string): string {
   if (!name) return '--'
+  if (name === '机构专用' || name === '深股通专用' || name === '沪股通专用') return name
   return name
-    .replace(/股份有限公司/g, '')
-    .replace(/有限责任公司/g, '')
-    .replace(/证券营业部/g, '营业部')
+    .replace(/^中国/, '')
+    .replace(/股份有限公司|有限责任公司/g, '')
+    .replace(/证券营业部|营业部/g, '')
+    .replace(/^东方财富证券/, '东财')
+    .replace(/证券(分公司|路|街|桥|道|门|支)/g, '$1')
+    .trim()
+}
+
+/** Determine whether this report is a 3-day cumulative or 1-day list. */
+export function getLhbPeriodType(reason: string): '3day' | '1day' {
+  if (!reason) return '1day'
+  return reason.includes('连续三个交易日') || reason.includes('3日') ? '3day' : '1day'
 }
 
 /** Shorten verbose official exchange explanation strings to concise trader terminology. */
@@ -104,7 +114,13 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
     <div
       class="lhb-drawer-overlay"
       onClick={(e) => {
-        if (e.target === e.currentTarget) props.onClose()
+        if (e.target === e.currentTarget) {
+          if (selectedSeat()) {
+            setSelectedSeat(null)
+          } else {
+            props.onClose()
+          }
+        }
       }}
     >
       <div class="lhb-drawer-container">
@@ -171,15 +187,24 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                   <>
                     <div class="lhb-summary-card">
                       <div class="lhb-summary-header">
-                        <span class="lhb-reason-tag" title={l().reason}>
-                          ⚡ {shortenLhbReason(l().reason)}
-                        </span>
+                        <div style={{ display: "flex", "align-items": "center", gap: "4px", "max-width": "68%" }}>
+                          <span
+                            class={`lhb-period-badge ${getLhbPeriodType(l().reason) === '3day' ? 'cumulative' : ''}`}
+                          >
+                            {getLhbPeriodType(l().reason) === '3day' ? '3日累计' : '单日榜'}
+                          </span>
+                          <span class="lhb-reason-tag" title={l().reason}>
+                            ⚡ {shortenLhbReason(l().reason)}
+                          </span>
+                        </div>
                         <span class="lhb-date-tag">上榜日 {l().trade_date}</span>
                       </div>
 
                       <div class="lhb-stat-grid">
                         <div class="lhb-stat-box">
-                          <span class="lhb-stat-lbl">龙虎总净买</span>
+                          <span class="lhb-stat-lbl">
+                            {getLhbPeriodType(l().reason) === '3day' ? '3日总净买' : '单日总净买'}
+                          </span>
                           <span class={`lhb-stat-val ${l().net_total >= 0 ? 'up' : 'down'}`}>
                             {fmtMoney(l().net_total)}
                           </span>
@@ -209,8 +234,8 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                       </div>
                     </div>
 
-                    <div class="lhb-section-header">
-                      <span>🟢 买入前五席位</span>
+                    <div class="lhb-section-header buy">
+                      <span>🔺 买入前五席位</span>
                     </div>
                     <div class="lhb-seat-list">
                       <For each={l().top_buyers}>
@@ -262,8 +287,8 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                     </div>
 
                     <Show when={l().top_sellers.length > 0}>
-                      <div class="lhb-section-header" style={{ "margin-top": "8px" }}>
-                        <span>🔴 卖出前五席位</span>
+                      <div class="lhb-section-header sell" style={{ "margin-top": "8px" }}>
+                        <span>🔻 卖出前五席位</span>
                       </div>
                       <div class="lhb-seat-list">
                         <For each={l().top_sellers}>

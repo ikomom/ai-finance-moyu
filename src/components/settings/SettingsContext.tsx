@@ -59,6 +59,7 @@ export function SettingsProvider(props: { children: JSX.Element }) {
       macd: [12, 26, 9],
     },
     groups: [{ id: 'default', name: '默认自选' }],
+    customSeats: [],
     window: { x: 0, y: 0, width: 320, height: 170 },
   })
 

@@ -13,6 +13,7 @@ struct PreviousConfig {
     iwencai_api_key: Option<String>,
     layout_sizes: crate::config::LayoutSizes,
     ai_decision_online_api_key: Option<String>,
+    custom_seats: Vec<crate::dragon_tiger::CustomSeatMapping>,
 }
 
 /// Hand the renderer a consistent view of everything it displays.
@@ -53,8 +54,19 @@ pub fn save_config(app: AppHandle, mut cfg: Config) -> Result<(), String> {
             iwencai_api_key: guard.iwencai_api_key.clone(),
             layout_sizes: guard.layout_sizes.clone(),
             ai_decision_online_api_key: guard.ai_decision.online_api_key.clone(),
+            custom_seats: guard.custom_seats.clone(),
         }
     };
+
+    // Protect custom_seats: if client omitted field or sent empty / default while
+    // previous has customized mappings, retain user's previous customizations.
+    let default_seats = crate::dragon_tiger::default_custom_seats();
+    if (cfg.custom_seats.is_empty() || cfg.custom_seats == default_seats)
+        && !previous.custom_seats.is_empty()
+        && previous.custom_seats != default_seats
+    {
+        cfg.custom_seats = previous.custom_seats;
+    }
 
     if let Some(ref key) = cfg.ai_decision.online_api_key {
         if key.trim().is_empty() {

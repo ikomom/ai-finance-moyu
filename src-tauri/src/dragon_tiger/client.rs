@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use super::baseline::{get_market_baseline, get_stock_baseline};
+use super::baseline::get_market_baseline;
 use super::trader_dict::match_famous_trader;
 use super::types::{
     DragonTigerSeat, MarketDragonTigerOverview, MarketLhbStockItem,
@@ -131,10 +131,14 @@ impl DragonTigerClient {
             }
 
             let code = super::canonical_stock_code(bare_code);
+            let institution_net = item["INSTITUTION_NET_AMT"]
+                .as_f64()
+                .or_else(|| item["ORGAN_NET_AMT"].as_f64())
+                .unwrap_or(net_total);
 
             top_institution_stocks.push(MarketLhbStockItem {
                 code, name: name.to_string(), price, change_pct,
-                institution_net: net_total * 0.7, net_total,
+                institution_net, net_total,
             });
         }
 
@@ -175,7 +179,10 @@ impl DragonTigerClient {
         }
 
         let detail = self.do_fetch_stock_detail(&norm_code, stock_name).await
-            .unwrap_or_else(|_| get_stock_baseline(&norm_code, stock_name));
+            .unwrap_or_else(|e| {
+                log::info!(target: "NET", "个股龙虎榜拉取未命中或异常({norm_code}): {e}");
+                StockDetailInfo { code: norm_code.clone(), dragon_tiger: None }
+            });
 
         let mut guard = self.stock_cache.lock().unwrap_or_else(|e| e.into_inner());
         guard.insert(norm_code, (today, detail.clone()));
@@ -201,7 +208,7 @@ impl DragonTigerClient {
             .map_err(|e| format!("请求失败: {e}"))?;
 
         if !resp.status().is_success() {
-            return Ok(get_stock_baseline(code, stock_name));
+            return Err(format!("HTTP 状态码异常: {}", resp.status()));
         }
 
         let json: serde_json::Value = resp.json().await

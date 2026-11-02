@@ -34,12 +34,24 @@ function fmtAmount(amt: number): string {
   return `${sign}${abs.toFixed(0)}`
 }
 
+function alignToTradeDay(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const day = d.getDay()
+  if (day === 0) d.setDate(d.getDate() - 2)
+  else if (day === 6) d.setDate(d.getDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 function cleanShortName(name: string, label?: string): string {
   if (label) return label
+  if (name === '机构专用' || name === '深股通专用' || name === '沪股通专用') return name
   return name
-    .replace(/股份有限公司/g, '')
-    .replace(/有限责任公司/g, '')
-    .replace(/证券营业部/g, '')
+    .replace(/^中国/, '')
+    .replace(/股份有限公司|有限责任公司/g, '')
+    .replace(/证券营业部|营业部/g, '')
+    .replace(/^东方财富证券/, '东财')
+    .replace(/证券(分公司|路|街|桥|道|门|支)/g, '$1')
     .trim() || name
 }
 
@@ -308,11 +320,26 @@ export function SeatRadarView(props: SeatRadarViewProps) {
               class="seat-date-input"
               value={tradeDate()}
               onChange={(e) => {
-                setTradeDate(e.currentTarget.value)
+                const aligned = alignToTradeDay(e.currentTarget.value)
+                setTradeDate(aligned)
                 void doQuery()
               }}
-              title="留空则自动查询最新披露日"
+              title="选择日期（周末自动对齐最近交易日，留空则自动查询最新）"
             />
+            <Show when={tradeDate()}>
+              <button
+                type="button"
+                class="seat-dir-btn"
+                style={{ padding: '2px 5px', 'font-size': '9.5px', height: '20px' }}
+                onClick={() => {
+                  setTradeDate('')
+                  void doQuery()
+                }}
+                title="切回最新披露交易日"
+              >
+                最新
+              </button>
+            </Show>
           </div>
 
           <div class="seat-dir-tabs">

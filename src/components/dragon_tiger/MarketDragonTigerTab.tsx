@@ -21,6 +21,30 @@ function fmtAmount(amt: number): string {
   return `${sign}${abs.toFixed(0)}`
 }
 
+function getSessionNotice(tradeDate?: string): { text: string; badge: string } {
+  const now = new Date()
+  const hours = now.getHours()
+  const minutes = now.getMinutes()
+  const timeNum = hours * 100 + minutes
+
+  if (timeNum >= 915 && timeNum < 1500) {
+    return {
+      text: '盘中竞价 · 数据为上一个交易日盘后披露',
+      badge: tradeDate ? `参考日 ${tradeDate}` : '盘前参考 (T-1)',
+    }
+  }
+  if (timeNum >= 1500 && timeNum < 1700) {
+    return {
+      text: '盘后结算 · 今日龙虎榜披露中 (通常16:30~17:30)',
+      badge: '披露中',
+    }
+  }
+  return {
+    text: '交易所盘后官方公开披露数据',
+    badge: tradeDate ? `披露日 ${tradeDate}` : '已披露',
+  }
+}
+
 // Module-level persistent state across dock collapse/expand & layout switches
 const [persistedSubTab, setPersistedSubTab] = createSignal<'overview' | 'radar'>('overview')
 
@@ -64,12 +88,12 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
       </Show>
 
       <Show when={subTab() === 'overview'}>
-        {/* 披露日期栏 */}
+        {/* 披露日期与时序感知栏 */}
         <div class="market-lhb-date-bar">
-          <span>交易所盘后公开披露数据</span>
-          <Show when={data()?.trade_date}>
-            {(d) => <span class="market-lhb-date-badge">披露日 {d()}</span>}
-          </Show>
+          <span>{getSessionNotice(data()?.trade_date).text}</span>
+          <span class="market-lhb-date-badge">
+            {getSessionNotice(data()?.trade_date).badge}
+          </span>
         </div>
 
         <Show
@@ -80,10 +104,10 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
             </div>
           }
         >
-        {/* 机构净买入 Top 5 */}
+        {/* 龙虎榜大额净买入 Top 5 */}
         <div class="market-lhb-section">
           <div class="market-lhb-sec-title">
-            <span>🏛️ 机构大额净买入 Top 5</span>
+            <span>🏆 龙虎榜大额净买入 Top 5</span>
           </div>
           <div class="market-lhb-stock-list">
             <For each={data()!.top_institution_stocks}>
@@ -108,9 +132,9 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
                   </div>
 
                   <div class="market-lhb-stock-net">
-                    <span class="market-lhb-net-label">机构净买</span>
-                    <span class={`market-lhb-net-val ${stock.institution_net >= 0 ? 'up' : 'down'}`}>
-                      {fmtAmount(stock.institution_net)}
+                    <span class="market-lhb-net-label">榜单净买</span>
+                    <span class={`market-lhb-net-val ${stock.net_total >= 0 ? 'up' : 'down'}`}>
+                      {fmtAmount(stock.net_total)}
                     </span>
                   </div>
                 </div>
