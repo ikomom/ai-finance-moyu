@@ -111,11 +111,7 @@ impl SeatClient {
             let change = item["CHANGE_RATE"].as_f64().unwrap_or(0.0);
             let reason = item["EXPLANATION"].as_str().unwrap_or("龙虎榜公开信息").to_string();
 
-            let code = if bare_code.starts_with('6') {
-                format!("sh{bare_code}")
-            } else {
-                format!("sz{bare_code}")
-            };
+            let code = super::canonical_stock_code(bare_code);
 
             let is_same_day = !target_date.is_empty() && td == target_date;
             all_ops.push((

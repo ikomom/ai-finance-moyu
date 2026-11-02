@@ -89,8 +89,10 @@ fn test_get_seat_baseline() {
 
 #[test]
 fn test_resolve_branch_pattern() {
-    assert_eq!(resolve_branch_pattern("六一路"), vec!["福州六一中路".to_string()]);
-    assert_eq!(resolve_branch_pattern("呼家楼"), vec!["北京东城分公司".to_string(), "北京呼家楼".to_string()]);
+    let lyl = resolve_branch_pattern("六一路");
+    assert!(lyl.iter().any(|s| s.contains("福州六一中路")));
+    let hjl = resolve_branch_pattern("呼家楼");
+    assert!(hjl.iter().any(|s| s.contains("北京东城分公司")));
     assert_eq!(resolve_branch_pattern("普通营业部"), vec!["普通营业部".to_string()]);
 }
 
@@ -104,4 +106,16 @@ fn test_get_seat_radar_baseline() {
         assert!(!item.code.is_empty());
         assert!(!item.name.is_empty());
     }
+}
+
+#[test]
+fn test_canonical_stock_code() {
+    use super::canonical_stock_code;
+    assert_eq!(canonical_stock_code("600000"), "sh600000");
+    assert_eq!(canonical_stock_code("688019"), "sh688019");
+    assert_eq!(canonical_stock_code("000001"), "sz000001");
+    assert_eq!(canonical_stock_code("300750"), "sz300750");
+    assert_eq!(canonical_stock_code("920201"), "bj920201");
+    assert_eq!(canonical_stock_code("830799"), "bj830799");
+    assert_eq!(canonical_stock_code("430047"), "bj430047");
 }

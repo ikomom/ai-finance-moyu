@@ -31,48 +31,29 @@ impl SeatRadarClient {
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
-
-        Self {
-            client,
-            cache: Mutex::new(HashMap::new()),
-        }
+        Self { client, cache: Mutex::new(HashMap::new()) }
     }
 
     /// Query seat radar filtered stocks across designated branches on a trade date.
-    pub async fn fetch_seat_radar(
-        &self,
-        branches: &[String],
-        trade_date: Option<&str>,
-    ) -> SeatRadarResult {
-        let valid_branches: Vec<String> = branches
-            .iter()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
+    pub async fn fetch_seat_radar(&self, branches: &[String], trade_date: Option<&str>) -> SeatRadarResult {
+        let valid_branches: Vec<String> = branches.iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
         if valid_branches.is_empty() {
-            return get_seat_radar_baseline(&[], trade_date);
+            return SeatRadarResult { query_date: trade_date.unwrap_or("").to_string(), items: Vec::new() };
         }
 
         let today = beijing_now().format("%Y-%m-%d").to_string();
-        let cache_key = format!(
-            "{}:{}",
-            valid_branches.join("|"),
-            trade_date.unwrap_or("")
-        );
+        let cache_key = format!("{}:{}", valid_branches.join("|"), trade_date.unwrap_or(""));
 
         {
             let guard = self.cache.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((ref key, ref res)) = guard.get(&cache_key) {
-                if *key == today {
-                    return res.clone();
-                }
+                if *key == today { return res.clone(); }
             }
         }
 
         let result = match self.do_fetch_radar(&valid_branches, trade_date).await {
-            Ok(res) if !res.items.is_empty() => res,
-            _ => get_seat_radar_baseline(&valid_branches, trade_date),
+            Ok(res) => res,
+            Err(_) => get_seat_radar_baseline(&valid_branches, trade_date),
         };
 
         let mut guard = self.cache.lock().unwrap_or_else(|e| e.into_inner());
@@ -80,11 +61,7 @@ impl SeatRadarClient {
         result
     }
 
-    async fn do_fetch_radar(
-        &self,
-        branches: &[String],
-        trade_date: Option<&str>,
-    ) -> Result<SeatRadarResult, String> {
+    async fn do_fetch_radar(&self, branches: &[String], trade_date: Option<&str>) -> Result<SeatRadarResult, String> {
         let mut all_patterns: Vec<String> = Vec::new();
         for b in branches {
             let expanded = resolve_branch_pattern(b);
@@ -92,73 +69,46 @@ impl SeatRadarClient {
                 all_patterns.push(b.clone());
             } else {
                 for p in expanded {
-                    if !all_patterns.contains(&p) {
-                        all_patterns.push(p);
-                    }
+                    if !all_patterns.contains(&p) { all_patterns.push(p); }
                 }
             }
         }
 
         let mut raw_items: Vec<SeatRadarItem> = Vec::new();
-        let mut determined_date = trade_date.unwrap_or("").to_string();
-
         for pattern in &all_patterns {
-            let buy_items = self
-                .fetch_report_items(pattern, true, trade_date)
-                .await
-                .unwrap_or_default();
-            let sell_items = self
-                .fetch_report_items(pattern, false, trade_date)
-                .await
-                .unwrap_or_default();
+            let buy_items = self.fetch_report_items(pattern, true, trade_date).await.unwrap_or_default();
+            let sell_items = self.fetch_report_items(pattern, false, trade_date).await.unwrap_or_default();
+            for item in buy_items.into_iter().chain(sell_items) { raw_items.push(item); }
+        }
 
-            for item in buy_items.into_iter().chain(sell_items) {
-                if determined_date.is_empty() && !item.trade_date.is_empty() {
-                    determined_date = item.trade_date.clone();
-                }
-                raw_items.push(item);
+        // Deduplicate across patterns
+        let mut seen = std::collections::HashSet::new();
+        raw_items.retain(|it| seen.insert((it.code.clone(), it.branch_name.clone(), it.trade_date.clone(), it.is_buy)));
+
+        let determined_date = if let Some(td) = trade_date {
+            if !td.is_empty() { td.to_string() } else {
+                raw_items.iter().map(|it| it.trade_date.as_str()).filter(|d| !d.is_empty()).max().unwrap_or("").to_string()
             }
-        }
+        } else {
+            raw_items.iter().map(|it| it.trade_date.as_str()).filter(|d| !d.is_empty()).max().unwrap_or("").to_string()
+        };
 
-        if determined_date.is_empty() {
-            determined_date = beijing_now().format("%Y-%m-%d").to_string();
-        }
-
-        // Filter by the target date (either user specified or auto-detected latest trade date)
-        let mut filtered: Vec<SeatRadarItem> = raw_items
-            .into_iter()
-            .filter(|item| item.trade_date == determined_date)
-            .collect();
+        let final_date = if determined_date.is_empty() { beijing_now().format("%Y-%m-%d").to_string() } else { determined_date };
+        let mut filtered: Vec<SeatRadarItem> = raw_items.into_iter().filter(|item| item.trade_date == final_date).collect();
 
         // Batch resolve stock names if empty
-        let empty_name_codes: Vec<String> = filtered
-            .iter()
-            .filter(|it| it.name.trim().is_empty())
-            .map(|it| it.code.clone())
-            .collect();
-
+        let empty_name_codes: Vec<String> = filtered.iter().filter(|it| it.name.trim().is_empty()).map(|it| it.code.clone()).collect();
         if !empty_name_codes.is_empty() {
             let name_map = self.resolve_names(&empty_name_codes).await;
             for it in &mut filtered {
                 if it.name.trim().is_empty() {
-                    if let Some(n) = name_map.get(&it.code) {
-                        it.name = n.clone();
-                    }
+                    if let Some(n) = name_map.get(&it.code) { it.name = n.clone(); }
                 }
             }
         }
 
-        log::info!(
-            target: "NET",
-            "席位雷达筛选完成, 披露日: {}, 命中条数: {}",
-            determined_date,
-            filtered.len()
-        );
-
-        Ok(SeatRadarResult {
-            query_date: determined_date,
-            items: filtered,
-        })
+        log::info!(target: "NET", "席位雷达筛选完成, 披露日: {}, 命中条数: {}", final_date, filtered.len());
+        Ok(SeatRadarResult { query_date: final_date, items: filtered })
     }
 
     async fn fetch_report_items(
@@ -237,11 +187,7 @@ impl SeatRadarClient {
                 .unwrap_or("龙虎榜披露")
                 .to_string();
 
-            let code = if bare_code.starts_with('6') {
-                format!("sh{bare_code}")
-            } else {
-                format!("sz{bare_code}")
-            };
+            let code = super::canonical_stock_code(bare_code);
 
             if crate::market::is_index(&code) {
                 continue;

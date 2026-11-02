@@ -1,9 +1,80 @@
 //! Comprehensive brokerage branch & famous trader seat dictionary for search & suggestions.
 
+import type { CustomSeatMapping, SeatCategory } from './types'
+import { fetchCustomSeats } from '../../tauri'
+
 export interface BranchDictItem {
   branchName: string
   traderLabel?: string
   keywords: string[]
+}
+
+// In-memory synced custom seat mappings for reactive fast lookup
+let cachedCustomSeats: CustomSeatMapping[] = []
+
+export async function syncCustomSeats(): Promise<CustomSeatMapping[]> {
+  try {
+    const list = await fetchCustomSeats()
+    if (list && list.length > 0) {
+      cachedCustomSeats = list
+    }
+  } catch {}
+  return cachedCustomSeats
+}
+
+// Auto-sync on import
+void syncCustomSeats()
+
+export function getCachedCustomSeats(): CustomSeatMapping[] {
+  return cachedCustomSeats
+}
+
+/**
+ * Resolve display label and visual category for a branch name.
+ * Custom seat mappings take precedence over backend labels.
+ */
+export function resolveSeatLabel(
+  branchName: string,
+  backendLabel?: string | null
+): { label: string; category: SeatCategory } | null {
+  const clean = branchName.trim()
+  if (!clean) return null
+
+  // 1. Try matching enabled custom seat rules first
+  for (const item of cachedCustomSeats) {
+    if (!item.enabled) continue
+    const kw = item.branch_keyword.trim()
+    if (kw && (clean.includes(kw) || kw.includes(clean))) {
+      return { label: item.label, category: item.category }
+    }
+  }
+
+  // 2. Fall back to backend trader label if provided
+  if (backendLabel && backendLabel.trim()) {
+    const b = backendLabel.trim()
+    const cat: SeatCategory =
+      b === '机构专用' ? 'institution' : b === '北向外资' ? 'north' : 'trader'
+    return { label: b, category: cat }
+  }
+
+  // 3. Fall back to default dictionary
+  for (const item of FAMOUS_BRANCH_LIST) {
+    if (clean.includes(item.branchName) || item.branchName.includes(clean)) {
+      if (item.traderLabel) {
+        const cat: SeatCategory =
+          item.traderLabel === '机构专用'
+            ? 'institution'
+            : item.traderLabel === '北向外资'
+            ? 'north'
+            : item.traderLabel.includes('量化')
+            ? 'quant'
+            : 'trader'
+        return { label: item.traderLabel, category: cat }
+      }
+    }
+  }
+
+  return null
 }
 
 export const FAMOUS_BRANCH_LIST: BranchDictItem[] = [
@@ -144,9 +215,27 @@ export function searchBranchDictionary(query: string): BranchDictItem[] {
   const clean = query.trim().toLowerCase()
   if (!clean) return []
 
-  return FAMOUS_BRANCH_LIST.filter((item) => {
-    if (item.branchName.toLowerCase().includes(clean)) return true
-    if (item.traderLabel && item.traderLabel.toLowerCase().includes(clean)) return true
-    return item.keywords.some((k) => k.toLowerCase().includes(clean))
+  const customItems: BranchDictItem[] = cachedCustomSeats
+    .filter((s) => s.enabled)
+    .map((s) => ({
+      branchName: s.branch_keyword,
+      traderLabel: s.label,
+      keywords: [s.branch_keyword, s.label],
+    }))
+
+  const combined = [...customItems, ...FAMOUS_BRANCH_LIST]
+  const seen = new Set<string>()
+
+  return combined.filter((item) => {
+    if (seen.has(item.branchName)) return false
+    const match =
+      item.branchName.toLowerCase().includes(clean) ||
+      (item.traderLabel && item.traderLabel.toLowerCase().includes(clean)) ||
+      item.keywords.some((k) => k.toLowerCase().includes(clean))
+    if (match) {
+      seen.add(item.branchName)
+      return true
+    }
+    return false
   })
 }

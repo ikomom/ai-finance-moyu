@@ -130,11 +130,7 @@ impl DragonTigerClient {
                 }
             }
 
-            let code = if bare_code.starts_with('6') {
-                format!("sh{bare_code}")
-            } else {
-                format!("sz{bare_code}")
-            };
+            let code = super::canonical_stock_code(bare_code);
 
             top_institution_stocks.push(MarketLhbStockItem {
                 code, name: name.to_string(), price, change_pct,

@@ -131,8 +131,8 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
                 return (
                   <div
                     class="trader-move-card"
-                    onClick={() => props.onOpenDrawer?.(move.stock_code, move.stock_name)}
-                    title={`点击查看 ${move.stock_name} 龙虎榜详情`}
+                    onClick={() => props.onOpenDrawer?.(move.stock_code, move.stock_name, move.trader_name)}
+                    title={`点击查看 ${move.stock_name} 龙虎榜详情（高亮 ${move.trader_name} 席位）`}
                     style={{ cursor: "pointer" }}
                   >
                     <div class="trader-move-top">

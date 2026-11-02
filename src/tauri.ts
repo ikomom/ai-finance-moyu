@@ -1,6 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { KlinePeriod, KLineData, Trend } from './types'
-import type { MarketDragonTigerOverview, SeatDetailInfo, SeatRadarResult, StockDetailInfo } from './components/dragon_tiger/types'
+import type {
+  CustomSeatMapping,
+  MarketDragonTigerOverview,
+  SeatDetailInfo,
+  SeatRadarResult,
+  StockDetailInfo,
+} from './components/dragon_tiger/types'
 
 /**
  * Whether a Tauri runtime is present to talk to. False when the page is opened
@@ -140,5 +146,31 @@ export async function fetchSeatRadar(
   } catch (e) {
     logToBackend(`fetchSeatRadar failed: ${e}`)
     return null
+  }
+}
+
+/**
+ * Fetch custom seat mappings from backend config.
+ */
+export async function fetchCustomSeats(): Promise<CustomSeatMapping[]> {
+  if (!inTauri()) return []
+  try {
+    return await invoke<CustomSeatMapping[]>('get_custom_seats')
+  } catch (e) {
+    logToBackend(`fetchCustomSeats failed: ${e}`)
+    return []
+  }
+}
+
+/**
+ * Save custom seat mappings to backend config.
+ */
+export async function saveCustomSeats(seats: CustomSeatMapping[]): Promise<void> {
+  if (!inTauri()) return
+  try {
+    await invoke('save_custom_seats', { seats })
+  } catch (e) {
+    logToBackend(`saveCustomSeats failed: ${e}`)
+    throw e
   }
 }

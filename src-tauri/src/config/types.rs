@@ -123,6 +123,9 @@ pub struct Config {
     /// Currently active foreground group ID (None or "all" means all).
     #[serde(default)]
     pub active_group_id: Option<String>,
+    /// Custom dragon & tiger seat markings and trader labels.
+    #[serde(default = "default_custom_seats_cfg")]
+    pub custom_seats: Vec<crate::dragon_tiger::CustomSeatMapping>,
     /// Schema version for automated lossless data migrations.
     #[serde(default = "default_schema_version", alias = "schema_version")]
     pub schema_version: u32,
@@ -134,15 +137,16 @@ fn default_schema_version() -> u32 {
     CONFIG_SCHEMA_VERSION
 }
 
+fn default_custom_seats_cfg() -> Vec<crate::dragon_tiger::CustomSeatMapping> {
+    crate::dragon_tiger::default_custom_seats()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             watchlist: vec![
-                WatchItem::new("sh000001"),
-                WatchItem::new("sz399001"),
-                WatchItem::new("sz399006"),
-                WatchItem::new("sh600000"),
-                WatchItem::new("sz300750"),
+                WatchItem::new("sh000001"), WatchItem::new("sz399001"), WatchItem::new("sz399006"),
+                WatchItem::new("sh600000"), WatchItem::new("sz300750"),
             ],
             layout: Layout::default(),
             opacity: 0.92,
@@ -165,6 +169,7 @@ impl Default for Config {
             enable_portfolio: false,
             groups: default_groups(),
             active_group_id: None,
+            custom_seats: default_custom_seats_cfg(),
             schema_version: CONFIG_SCHEMA_VERSION,
         }
     }
@@ -182,10 +187,7 @@ impl Config {
             }
         }
 
-        if !matches!(
-            self.theme.as_str(),
-            "dark" | "light" | "transparent" | "ocean" | "cyberpunk"
-        ) {
+        if !matches!(self.theme.as_str(), "dark" | "light" | "transparent" | "ocean" | "cyberpunk") {
             self.theme = "dark".into();
         }
 

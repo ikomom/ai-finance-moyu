@@ -87,3 +87,13 @@ export interface SeatRadarResult {
   query_date: string
   items: SeatRadarItem[]
 }
+
+export type SeatCategory = 'trader' | 'institution' | 'north' | 'quant' | 'custom'
+
+export interface CustomSeatMapping {
+  id: string
+  branch_keyword: string
+  label: string
+  category: SeatCategory
+  enabled: boolean
+}

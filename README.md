@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Framework-Tauri%20v2-24C8D8?style=flat-square&logo=tauri" alt="Tauri" />
   <img src="https://img.shields.io/badge/Backend-Rust%201.93.1-DEA584?style=flat-square&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/Frontend-SolidJS%20%2B%20TypeScript-2C4F7C?style=flat-square&logo=solid" alt="SolidJS" />
-  <img src="https://img.shields.io/badge/Tests-285%20Passed-brightgreen?style=flat-square" alt="Tests" />
+  <img src="https://img.shields.io/badge/Tests-289%20Passed-brightgreen?style=flat-square" alt="Tests" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
 </p>
 
@@ -70,6 +70,9 @@
   - **营业部实时智能模糊搜索**：输入营业部别名或关键词（如“六一”、“呼家”、“拉萨”、“中信”等）实时联想下拉匹配，一键将目标营业部加入关注池；
   - **全市场龙虎榜一键逆向过滤**：买入/卖出方向极速筛选当天上榜股票，支持历史日期回溯复盘；
   - **命中股票金光高亮联动**：点击命中股票就地展开个股龙虎榜抽屉，并在买卖前五中以金色微光精准锁定匹配营业部；
+- **⚙️ 设置中心「🐉 龙虎席位」自定义标记引擎**：
+  - 支持在设置中心为任意营业部关键词绑定自定义游资/机构标签名与类别（游资、机构、外资、量化、自定义）；
+  - 全链路打通个股龙虎榜买卖前五徽标、席位雷达与战绩下钻，支持一键开关与恢复推荐预设，配置原子持久化；
 - **纯净指数过滤与 DOM Keep-Alive 状态持久记忆**：
   - 自选列表右键菜单与全链路接口对大盘指数自动隐藏龙虎榜，杜绝误点开空抽屉与无效请求；
   - 贴边折叠收起改用 CSS 隐藏常驻挂载，展开 0ms 秒开无白屏，完美记忆当前所选 Tab、子 Tab 与展开的抽屉；
@@ -269,10 +272,10 @@ ai-finance-moyu/
 本项目拥有完善的前后端自动化测试门禁与 CI 覆盖：
 
 ```bash
-# 运行后端全量单元测试（包含 164 项核心算法、交易撮合、数据迁移与跨日持久化测试）
+# 运行后端全量单元测试（包含 166 项核心算法、交易撮合、数据迁移与跨日持久化测试）
 cargo test --manifest-path src-tauri/Cargo.toml
 
-# 运行前端 Vitest 单元测试（包含 121 项技术指标、龙虎榜下钻、模拟记账、分组管理、布局滚动与格式化测试）
+# 运行前端 Vitest 单元测试（包含 123 项技术指标、龙虎榜下钻、模拟记账、分组管理、布局滚动与格式化测试）
 npm test
 
 # 运行 TypeScript 严格类型检查与 Vite 生产打包验证

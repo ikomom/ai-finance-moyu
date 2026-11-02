@@ -4,6 +4,7 @@ import type { DragonTigerSeat, StockDetailInfo } from './types'
 import { fetchStockDragonTiger } from '../../tauri'
 import { navigateToStock } from '../../store'
 import { SeatDetailView } from './SeatDetailView'
+import { resolveSeatLabel } from './seatDict'
 
 export interface DragonTigerDrawerProps {
   code: string
@@ -18,10 +19,6 @@ function fmtMoney(amt: number): string {
   if (abs >= 1e8) return `${sign}${(abs / 1e8).toFixed(2)}亿`
   if (abs >= 1e4) return `${sign}${(abs / 1e4).toFixed(0)}万`
   return `${sign}${abs.toFixed(0)}`
-}
-
-function getSeatTagClass(label: string): string {
-  return label === '机构专用' ? 'institution' : label === '北向外资' ? 'north' : 'trader'
 }
 
 /** Clean up verbose corporate entity suffixes to maximize space for branch city and road name. */
@@ -218,10 +215,16 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                     <div class="lhb-seat-list">
                       <For each={l().top_buyers}>
                         {(seat: DragonTigerSeat, idx) => {
+                          const seatTag = () => resolveSeatLabel(seat.branch_name, seat.trader_label)
                           const isHighlighted = () => {
                             const h = props.highlightBranch?.trim()
                             if (!h) return false
-                            return seat.branch_name.includes(h) || (seat.trader_label && h.includes(seat.trader_label))
+                            const st = seatTag()
+                            return (
+                              seat.branch_name.includes(h) ||
+                              h.includes(seat.branch_name) ||
+                              Boolean(st && (h.includes(st.label) || st.label.includes(h)))
+                            )
                           }
                           return (
                             <div
@@ -240,10 +243,10 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                                 <span class="lhb-seat-branch">
                                   {cleanBranchName(seat.branch_name)}
                                 </span>
-                                <Show when={seat.trader_label}>
+                                <Show when={seatTag()}>
                                   {(tag) => (
-                                    <span class={`lhb-seat-tag ${getSeatTagClass(tag())}`}>
-                                      {tag()}
+                                    <span class={`lhb-seat-tag ${tag().category}`}>
+                                      {tag().label}
                                     </span>
                                   )}
                                 </Show>
@@ -265,10 +268,16 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                       <div class="lhb-seat-list">
                         <For each={l().top_sellers}>
                           {(seat: DragonTigerSeat, idx) => {
+                            const seatTag = () => resolveSeatLabel(seat.branch_name, seat.trader_label)
                             const isHighlighted = () => {
                               const h = props.highlightBranch?.trim()
                               if (!h) return false
-                              return seat.branch_name.includes(h) || (seat.trader_label && h.includes(seat.trader_label))
+                              const st = seatTag()
+                              return (
+                                seat.branch_name.includes(h) ||
+                                h.includes(seat.branch_name) ||
+                                Boolean(st && (h.includes(st.label) || st.label.includes(h)))
+                              )
                             }
                             return (
                               <div
@@ -287,10 +296,10 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                                   <span class="lhb-seat-branch">
                                     {cleanBranchName(seat.branch_name)}
                                   </span>
-                                  <Show when={seat.trader_label}>
+                                  <Show when={seatTag()}>
                                     {(tag) => (
-                                      <span class={`lhb-seat-tag ${getSeatTagClass(tag())}`}>
-                                        {tag()}
+                                      <span class={`lhb-seat-tag ${tag().category}`}>
+                                        {tag().label}
                                       </span>
                                     )}
                                   </Show>

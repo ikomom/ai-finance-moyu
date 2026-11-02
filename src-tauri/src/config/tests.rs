@@ -249,3 +249,13 @@
         c.sanitize();
         assert_eq!(c.theme, "dark");
     }
+
+
+    #[test]
+    fn test_custom_seats_defaults_when_absent() {
+        let minimal_json = r#"{"watchlist":[],"layout":"mini"}"#;
+        let c: Config = serde_json::from_str(minimal_json).unwrap();
+        assert!(!c.custom_seats.is_empty());
+        assert!(c.custom_seats.iter().any(|s| s.label == "呼家楼"));
+        assert!(c.custom_seats.iter().any(|s| s.label == "六一路"));
+    }

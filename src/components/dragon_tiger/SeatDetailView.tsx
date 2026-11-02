@@ -8,6 +8,7 @@ import type { SeatDetailInfo, SeatOperationItem } from './types'
 import { fetchSeatDragonTiger } from '../../tauri'
 import { cleanBranchName, shortenLhbReason } from './DragonTigerDrawer'
 import { StockTrendView } from './StockTrendView'
+import { resolveSeatLabel } from './seatDict'
 
 export interface SeatDetailViewProps {
   branchName: string
@@ -28,12 +29,6 @@ function fmtMoney(amt: number): string {
     return `${sign}${(abs / 1e4).toFixed(0)}万`
   }
   return `${sign}${abs.toFixed(0)}`
-}
-
-function getSeatTagClass(label: string): string {
-  if (label === '机构专用') return 'institution'
-  if (label === '北向外资') return 'north'
-  return 'trader'
 }
 
 export function SeatDetailView(props: SeatDetailViewProps) {
@@ -98,9 +93,9 @@ export function SeatDetailView(props: SeatDetailViewProps) {
             </button>
             <div class="seat-head-title" title={props.branchName}>
               <span class="seat-head-branch">{cleanBranchName(props.branchName)}</span>
-              <Show when={data()?.trader_label}>
+              <Show when={resolveSeatLabel(props.branchName, data()?.trader_label)}>
                 {(tag) => (
-                  <span class={`lhb-seat-tag ${getSeatTagClass(tag())}`}>{tag()}</span>
+                  <span class={`lhb-seat-tag ${tag().category}`}>{tag().label}</span>
                 )}
               </Show>
             </div>

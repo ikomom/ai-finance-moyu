@@ -98,3 +98,23 @@ pub async fn get_seat_radar(
         .fetch_seat_radar(&branches, trade_date.as_deref())
         .await)
 }
+
+#[tauri::command]
+pub fn get_custom_seats(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::dragon_tiger::CustomSeatMapping>, String> {
+    let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+    Ok(cfg.custom_seats.clone())
+}
+
+#[tauri::command]
+pub fn save_custom_seats(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    seats: Vec<crate::dragon_tiger::CustomSeatMapping>,
+) -> Result<(), String> {
+    log::info!(target: "USER", "保存自定义龙虎席位映射, 数量: {}", seats.len());
+    let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+    cfg.custom_seats = seats;
+    crate::config::save(&app, &cfg).map_err(|e| format!("保存配置失败: {e}"))
+}

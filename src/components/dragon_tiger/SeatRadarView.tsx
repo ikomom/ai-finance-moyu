@@ -3,7 +3,7 @@ import './SeatRadarView.css'
 import type { SeatRadarItem } from './types'
 import { fetchSeatRadar } from '../../tauri'
 import { fmtPct, fmtPrice, trendClass } from '../../types'
-import { searchBranchDictionary, type BranchDictItem } from './seatDict'
+import { searchBranchDictionary, resolveSeatLabel, type BranchDictItem } from './seatDict'
 
 export interface SeatRadarViewProps {
   onOpenDrawer?: (code: string, name?: string, highlightBranch?: string) => void
@@ -379,13 +379,13 @@ export function SeatRadarView(props: SeatRadarViewProps) {
               <div
                 class="seat-result-card"
                 onClick={() =>
-                  props.onOpenDrawer?.(item.code, item.name, item.branch_name)
+                  props.onOpenDrawer?.(item.code, item.name || item.code, item.branch_name)
                 }
-                title={`点击查看 ${item.name} 龙虎榜席位详情（高亮该营业部）`}
+                title={`点击查看 ${item.name || item.code} 龙虎榜席位详情（高亮该营业部）`}
               >
                 <div class="seat-res-top">
                   <div class="seat-res-stock">
-                    <span class="seat-res-name">{item.name}</span>
+                    <span class="seat-res-name">{item.name || item.code}</span>
                     <span class="seat-res-code">{item.code}</span>
                   </div>
                   <div class="seat-res-quote">
@@ -400,8 +400,8 @@ export function SeatRadarView(props: SeatRadarViewProps) {
 
                 <div class="seat-res-bottom">
                   <div class="seat-hit-badge" title={item.branch_name}>
-                    <Show when={item.trader_label}>
-                      {(tag) => <span class="seat-trader-tag">{tag()}</span>}
+                    <Show when={resolveSeatLabel(item.branch_name, item.trader_label)}>
+                      {(tag) => <span class="seat-trader-tag">{tag().label}</span>}
                     </Show>
                     <span>{cleanShortName(item.branch_name)}</span>
                   </div>
