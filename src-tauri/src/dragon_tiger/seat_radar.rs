@@ -74,14 +74,39 @@ impl SeatRadarClient {
             }
         }
 
+        // 高性能优化：全市场龙虎榜批量并发拉取 (买榜 + 卖榜并行, 仅需 1 次网络往返)
+        let (buy_res, sell_res) = tokio::join!(
+            self.fetch_market_report(true, trade_date),
+            self.fetch_market_report(false, trade_date)
+        );
+
+        let mut all_market_items = Vec::new();
+        if let Ok(items) = buy_res { all_market_items.extend(items); }
+        if let Ok(items) = sell_res { all_market_items.extend(items); }
+
         let mut raw_items: Vec<SeatRadarItem> = Vec::new();
-        for pattern in &all_patterns {
-            let buy_items = self.fetch_report_items(pattern, true, trade_date).await.unwrap_or_default();
-            let sell_items = self.fetch_report_items(pattern, false, trade_date).await.unwrap_or_default();
-            for item in buy_items.into_iter().chain(sell_items) { raw_items.push(item); }
+        if !all_market_items.is_empty() {
+            // 在内存中纳秒级匹配关注的席位模式
+            for item in all_market_items {
+                if all_patterns.iter().any(|p| item.branch_name.contains(p) || p.contains(&item.branch_name)) {
+                    raw_items.push(item);
+                }
+            }
         }
 
-        // Deduplicate across patterns
+        // 若全市场批量拉取未命中（如历史冷门日期），再回退按具体 pattern 串联拉取兜底
+        if raw_items.is_empty() {
+            for pattern in &all_patterns {
+                let (buy_items, sell_items) = tokio::join!(
+                    self.fetch_report_items(pattern, true, trade_date),
+                    self.fetch_report_items(pattern, false, trade_date)
+                );
+                raw_items.extend(buy_items.unwrap_or_default());
+                raw_items.extend(sell_items.unwrap_or_default());
+            }
+        }
+
+        // 去重
         let mut seen = std::collections::HashSet::new();
         raw_items.retain(|it| seen.insert((it.code.clone(), it.branch_name.clone(), it.trade_date.clone(), it.is_buy)));
 
@@ -96,7 +121,7 @@ impl SeatRadarClient {
         let final_date = if determined_date.is_empty() { beijing_now().format("%Y-%m-%d").to_string() } else { determined_date };
         let mut filtered: Vec<SeatRadarItem> = raw_items.into_iter().filter(|item| item.trade_date == final_date).collect();
 
-        // Batch resolve stock names if empty
+        // 补全股票名称
         let empty_name_codes: Vec<String> = filtered.iter().filter(|it| it.name.trim().is_empty()).map(|it| it.code.clone()).collect();
         if !empty_name_codes.is_empty() {
             let name_map = self.resolve_names(&empty_name_codes).await;
@@ -107,35 +132,69 @@ impl SeatRadarClient {
             }
         }
 
-        log::info!(target: "NET", "席位雷达筛选完成, 披露日: {}, 命中条数: {}", final_date, filtered.len());
+        // AGENTS.md §7: 规范高价值审计留痕，不再输出无意义干瘪日志
+        log::info!(
+            target: "ALERT",
+            "【席位雷达】筛选完成: 披露日 {}, 监控 {} 个主力席位, 命中标的 {} 只",
+            final_date,
+            branches.len(),
+            filtered.len()
+        );
+        for it in filtered.iter().take(5) {
+            let trader = it.trader_label.as_deref().unwrap_or("主力席位");
+            let action = if it.is_buy { "买入" } else { "卖出" };
+            log::info!(
+                target: "ALERT",
+                " ↳ 动向命中: [{}] 在 [{}] {} {}({}) {:+.2}万 (涨跌: {:+.2}%)",
+                trader,
+                it.branch_name,
+                action,
+                it.name,
+                it.code,
+                it.net_amount / 10000.0,
+                it.change_pct
+            );
+        }
+
         Ok(SeatRadarResult { query_date: final_date, items: filtered })
     }
 
-    async fn fetch_report_items(
-        &self,
-        pattern: &str,
-        is_buy: bool,
-        trade_date: Option<&str>,
-    ) -> Result<Vec<SeatRadarItem>, String> {
-        let report_name = if is_buy {
-            "RPT_BILLBOARD_DAILYDETAILSBUY"
-        } else {
-            "RPT_BILLBOARD_DAILYDETAILSSELL"
-        };
-
-        let filter_str = if let Some(td) = trade_date {
+    /// 全市场龙虎榜批量拉取（单次并发可获取当日全部营业部明细）
+    async fn fetch_market_report(&self, is_buy: bool, trade_date: Option<&str>) -> Result<Vec<SeatRadarItem>, String> {
+        let report_name = if is_buy { "RPT_BILLBOARD_DAILYDETAILSBUY" } else { "RPT_BILLBOARD_DAILYDETAILSSELL" };
+        let mut req = self.client.get("https://datacenter-web.eastmoney.com/api/data/v1/get")
+            .query(&[
+                ("reportName", report_name),
+                ("columns", "ALL"),
+                ("pageNumber", "1"),
+                ("pageSize", "300"),
+                ("sortTypes", "-1"),
+                ("sortColumns", "TRADE_DATE"),
+            ]);
+        if let Some(td) = trade_date {
             if !td.is_empty() {
-                format!(r#"(OPERATEDEPT_NAME="{}")(TRADE_DATE='{}')"#, pattern, td)
-            } else {
-                format!(r#"(OPERATEDEPT_NAME="{}")"#, pattern)
+                let filter_str = format!(r#"(TRADE_DATE='{}')"#, td);
+                req = req.query(&[("filter", &filter_str)]);
             }
-        } else {
-            format!(r#"(OPERATEDEPT_NAME="{}")"#, pattern)
+        }
+        let resp = req.send().await.map_err(|e| format!("全量榜单请求失败: {e}"))?;
+        if !resp.status().is_success() { return Err(format!("HTTP {}", resp.status())); }
+        let json: serde_json::Value = resp.json().await.map_err(|e| format!("JSON: {e}"))?;
+        let data_arr = match json["result"]["data"].as_array() {
+            Some(arr) => arr,
+            None => return Ok(Vec::new()),
         };
+        Ok(parse_report_items(data_arr, is_buy, ""))
+    }
 
-        let resp = self
-            .client
-            .get("https://datacenter-web.eastmoney.com/api/data/v1/get")
+    async fn fetch_report_items(&self, pattern: &str, is_buy: bool, trade_date: Option<&str>) -> Result<Vec<SeatRadarItem>, String> {
+        let report_name = if is_buy { "RPT_BILLBOARD_DAILYDETAILSBUY" } else { "RPT_BILLBOARD_DAILYDETAILSSELL" };
+        let filter_str = if let Some(td) = trade_date {
+            if !td.is_empty() { format!(r#"(OPERATEDEPT_NAME="{}")(TRADE_DATE='{}')"#, pattern, td) }
+            else { format!(r#"(OPERATEDEPT_NAME="{}")"#, pattern) }
+        } else { format!(r#"(OPERATEDEPT_NAME="{}")"#, pattern) };
+
+        let resp = self.client.get("https://datacenter-web.eastmoney.com/api/data/v1/get")
             .query(&[
                 ("reportName", report_name),
                 ("columns", "ALL"),
@@ -145,87 +204,23 @@ impl SeatRadarClient {
                 ("sortTypes", "-1"),
                 ("sortColumns", "TRADE_DATE"),
             ])
-            .send()
-            .await
-            .map_err(|e| format!("请求失败: {e}"))?;
+            .send().await.map_err(|e| format!("请求失败: {e}"))?;
 
-        if !resp.status().is_success() {
-            return Err(format!("HTTP {}", resp.status()));
-        }
-
+        if !resp.status().is_success() { return Err(format!("HTTP {}", resp.status())); }
         let json: serde_json::Value = resp.json().await.map_err(|e| format!("JSON: {e}"))?;
         let data_arr = match json["result"]["data"].as_array() {
             Some(arr) => arr,
             None => return Ok(Vec::new()),
         };
-
-        let mut items = Vec::new();
-        for item in data_arr {
-            let bare_code = item["SECURITY_CODE"].as_str().unwrap_or_default();
-            if bare_code.is_empty() {
-                continue;
-            }
-            let name = item["SECURITY_NAME_ABBR"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-            let branch = item["OPERATEDEPT_NAME"]
-                .as_str()
-                .unwrap_or(pattern)
-                .to_string();
-            let td = item["TRADE_DATE"]
-                .as_str()
-                .map(|s| s.chars().take(10).collect::<String>())
-                .unwrap_or_default();
-            let buy = item["BUY"].as_f64().unwrap_or(0.0);
-            let sell = item["SELL"].as_f64().unwrap_or(0.0);
-            let net = item["NET"].as_f64().unwrap_or(buy - sell);
-            let price = item["CLOSE_PRICE"].as_f64().unwrap_or(0.0);
-            let change = item["CHANGE_RATE"].as_f64().unwrap_or(0.0);
-            let reason = item["EXPLANATION"]
-                .as_str()
-                .unwrap_or("龙虎榜披露")
-                .to_string();
-
-            let code = super::canonical_stock_code(bare_code);
-
-            if crate::market::is_index(&code) {
-                continue;
-            }
-
-            let trader_label = match_famous_trader(&branch).map(|s| s.to_string());
-
-            items.push(SeatRadarItem {
-                code,
-                name,
-                trade_date: td,
-                branch_name: branch,
-                trader_label,
-                is_buy,
-                buy_amount: buy,
-                sell_amount: sell,
-                net_amount: net,
-                close_price: price,
-                change_pct: change,
-                reason,
-            });
-        }
-
-        Ok(items)
+        Ok(parse_report_items(data_arr, is_buy, pattern))
     }
 
     async fn resolve_names(&self, codes: &[String]) -> HashMap<String, String> {
         let unique: Vec<String> = {
             let mut seen = std::collections::HashSet::new();
-            codes
-                .iter()
-                .filter(|c| seen.insert((*c).clone()))
-                .cloned()
-                .collect()
+            codes.iter().filter(|c| seen.insert((*c).clone())).cloned().collect()
         };
-        if unique.is_empty() {
-            return HashMap::new();
-        }
+        if unique.is_empty() { return HashMap::new(); }
         let resp = match self.client.get(tencent::quote_url(&unique)).send().await {
             Ok(r) if r.status().is_success() => r,
             _ => return HashMap::new(),
@@ -234,11 +229,36 @@ impl SeatRadarClient {
             Ok(b) => b,
             Err(_) => return HashMap::new(),
         };
-
         tencent::parse_quotes(&decode_gb18030(&bytes))
             .into_iter()
             .filter(|q| !q.name.trim().is_empty())
             .map(|q| (q.code, q.name))
             .collect()
     }
+}
+
+fn parse_report_items(data_arr: &[serde_json::Value], is_buy: bool, default_pattern: &str) -> Vec<SeatRadarItem> {
+    let mut items = Vec::new();
+    for item in data_arr {
+        let bare_code = item["SECURITY_CODE"].as_str().unwrap_or_default();
+        if bare_code.is_empty() { continue; }
+        let name = item["SECURITY_NAME_ABBR"].as_str().unwrap_or_default().to_string();
+        let branch = item["OPERATEDEPT_NAME"].as_str().unwrap_or(default_pattern).to_string();
+        let td = item["TRADE_DATE"].as_str().map(|s| s.chars().take(10).collect::<String>()).unwrap_or_default();
+        let buy = item["BUY"].as_f64().unwrap_or(0.0);
+        let sell = item["SELL"].as_f64().unwrap_or(0.0);
+        let net = item["NET"].as_f64().unwrap_or(buy - sell);
+        let price = item["CLOSE_PRICE"].as_f64().unwrap_or(0.0);
+        let change = item["CHANGE_RATE"].as_f64().unwrap_or(0.0);
+        let reason = item["EXPLANATION"].as_str().unwrap_or("龙虎榜披露").to_string();
+        let code = super::canonical_stock_code(bare_code);
+        if crate::market::is_index(&code) { continue; }
+        let trader_label = match_famous_trader(&branch).map(|s| s.to_string());
+        items.push(SeatRadarItem {
+            code, name, trade_date: td, branch_name: branch, trader_label,
+            is_buy, buy_amount: buy, sell_amount: sell, net_amount: net,
+            close_price: price, change_pct: change, reason,
+        });
+    }
+    items
 }

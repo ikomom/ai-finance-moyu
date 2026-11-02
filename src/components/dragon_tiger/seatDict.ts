@@ -66,6 +66,8 @@ export function resolveSeatLabel(
             ? 'institution'
             : item.traderLabel === '北向外资'
             ? 'north'
+            : item.traderLabel === '拉萨天团'
+            ? 'retail'
             : item.traderLabel.includes('量化')
             ? 'quant'
             : 'trader'

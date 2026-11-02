@@ -88,7 +88,7 @@ export interface SeatRadarResult {
   items: SeatRadarItem[]
 }
 
-export type SeatCategory = 'trader' | 'institution' | 'north' | 'quant' | 'custom'
+export type SeatCategory = 'trader' | 'institution' | 'north' | 'quant' | 'retail' | 'custom'
 
 export interface CustomSeatMapping {
   id: string

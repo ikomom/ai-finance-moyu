@@ -212,14 +212,14 @@ pub fn default_custom_seats() -> Vec<CustomSeatMapping> {
             id: "preset-lasa-1".into(),
             branch_keyword: "拉萨团结路".into(),
             label: "拉萨天团".into(),
-            category: "trader".into(),
+            category: "retail".into(),
             enabled: true,
         },
         CustomSeatMapping {
             id: "preset-lasa-2".into(),
             branch_keyword: "拉萨东环路".into(),
             label: "拉萨天团".into(),
-            category: "trader".into(),
+            category: "retail".into(),
             enabled: true,
         },
     ]
