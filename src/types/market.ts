@@ -3,7 +3,7 @@
 //! Split from `types.ts` to stay inside the 300-line budget (AGENTS.md §11).
 
 import type { Config, DockState, MarketOverview, TrendSignal } from './config'
-import type { PendingOrder } from './portfolio'
+import type { PendingOrder, PortfolioPosition, TradeRecord } from './portfolio'
 
 
 export interface Quote {
@@ -137,6 +137,8 @@ export interface Snapshot {
    */
   hasIwenCaiKey?: boolean
   pendingOrders?: PendingOrder[]
+  trades?: TradeRecord[]
+  positions?: PortfolioPosition[]
 }
 /** A structured row from the backend ring buffer (`logger::LogEntry`). */
 export interface LogEntry {

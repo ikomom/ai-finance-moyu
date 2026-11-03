@@ -71,4 +71,24 @@ describe('computeTotalStats', () => {
     expect(computeTotalStats([], watchlist)).toBeNull()
     expect(computeTotalStats(quotes, [])).toBeNull()
   })
+
+  it('uses portfolio positions when enablePortfolio is true and ignores cleared positions', () => {
+    const positions = [
+      {
+        brokerId: 'b1',
+        code: 'sh600000',
+        name: '浦发银行',
+        shares: 2000,
+        costPrice: 9.0,
+        updatedAt: '2026-11-03',
+      },
+    ]
+    // sh600000: today (10.2 - 10.0) * 2000 = +400, floating (10.2 - 9.0) * 2000 = +2400, cost = 18000
+    // sz000001: not in portfolio positions -> ignored even though watchlist has costPrice
+    const stats = computeTotalStats(quotes, watchlist, positions, true)
+    expect(stats).not.toBeNull()
+    expect(stats!.totalToday).toBeCloseTo(400, 1)
+    expect(stats!.totalFloating).toBeCloseTo(2400, 1)
+    expect(stats!.floatingPct).toBeCloseTo((2400 / 18000) * 100, 2)
+  })
 })

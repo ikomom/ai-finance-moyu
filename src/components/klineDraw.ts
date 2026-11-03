@@ -13,7 +13,7 @@ import {
 import { paintBarsAndOverlay } from './klineBarsOverlay'
 import { paintSubchart } from './klineSubchart'
 import type { KlinePaint } from './klinePaintTypes'
-import { fmtPrice, fmtVol, type KLineBar, type PriceLine, type Quote } from '../types'
+import { fmtPrice, fmtVol, type KLineBar, type PriceLine, type Quote, type TradeRecord } from '../types'
 
 export interface KlineDrawProps {
   compact?: boolean
@@ -22,6 +22,7 @@ export interface KlineDrawProps {
   maPeriods?: [number, number, number]
   costPrice?: number | null
   priceLines?: PriceLine[]
+  trades?: TradeRecord[]
 }
 
 export interface KlineHoverExtra {
@@ -82,13 +83,12 @@ export function drawKline(ctxIn: KlineDrawContext): void {
     const plotW = Math.max(10, w - padL - padR)
 
     const contentH = Math.max(20, h - legendH - bottomAxisH)
-    const priceH = Math.max(20, Math.round(contentH * 0.58))
-    const volH = Math.max(12, contentH - priceH - 3)
+    const priceH = Math.max(30, Math.round(contentH * 0.74))
+    const volH = Math.max(12, contentH - priceH - 2)
 
     const priceT = legendH
-    const volT = priceT + priceH + 3
-    const subPlotPad = 10
-    const subPlotH = Math.max(6, volH - subPlotPad)
+    const volT = priceT + priceH + 2
+    const subPlotH = Math.max(8, volH - 2)
 
     // Window slice
     const total = allBars.length

@@ -162,5 +162,10 @@ pub fn save_custom_seats(
     );
     let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
     cfg.custom_seats = seats;
-    crate::config::save(&app, &cfg).map_err(|e| format!("保存配置失败: {e}"))
+    let res = crate::config::save(&app, &cfg).map_err(|e| format!("保存配置失败: {e}"));
+    if res.is_ok() {
+        use tauri::Emitter;
+        let _ = app.emit("custom-seats-updated", ());
+    }
+    res
 }

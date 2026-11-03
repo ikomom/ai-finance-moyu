@@ -25,10 +25,12 @@ export function DragonTigerBadge(props: DragonTigerBadgeProps) {
 
   createEffect(() => {
     const code = props.code
-    if (!code || isIndexCode(code) || code === lastFetchedCode) {
+    if (!code || isIndexCode(code)) {
       setHasLhb(false)
+      lastFetchedCode = ''
       return
     }
+    if (code === lastFetchedCode) return
     lastFetchedCode = code
     void fetchStockDragonTiger(code).then((detail) => {
       const dt = detail?.dragon_tiger

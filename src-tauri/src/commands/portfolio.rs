@@ -273,23 +273,6 @@ pub async fn set_active_broker(app: AppHandle, broker_id: String) -> Result<Port
     get_portfolio_summary(app).await
 }
 
-pub(crate) fn sync_watchlist_costs(app: &AppHandle, state: &AppState) {
-    {
-        let mut cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
-        let guard = state.portfolio.lock().unwrap_or_else(|e| e.into_inner());
-        let active_id = guard.active_broker_id.as_deref().unwrap_or_default();
-        for item in cfg.watchlist.iter_mut() {
-            if let Some(pos) = guard.positions.iter().find(|p| p.broker_id == active_id && p.code == item.code) {
-                item.cost_price = Some(pos.cost_price);
-                item.shares = Some(pos.shares as f64);
-            } else if guard.positions.iter().any(|p| p.code == item.code)
-                || guard.trades.iter().any(|t| t.code == item.code)
-            {
-                item.cost_price = None;
-                item.shares = None;
-            }
-        }
-        let _ = crate::config::save(app, &cfg);
-    }
+pub(crate) fn sync_watchlist_costs(app: &AppHandle, _state: &AppState) {
     crate::poller::emit_snapshot(app);
 }

@@ -14,16 +14,50 @@ export function CostAlertModal(props: CostAlertModalProps) {
   const quote = () => s()?.quotes.find((q) => q.code === props.code)
   const watchItem = () => s()?.config.watchlist.find((w) => w.code === props.code)
 
-  const [costPrice, setCostPrice] = createSignal(watchItem()?.costPrice?.toString() ?? '')
-  const [shares, setShares] = createSignal(watchItem()?.shares?.toString() ?? '')
+  const isPortfolio = () => Boolean(s()?.config.enablePortfolio)
+  const portfolioPos = () => {
+    if (!isPortfolio()) return null
+    return (
+      (s()?.positions ?? []).find(
+        (p) => p.code.toLowerCase() === props.code.toLowerCase() && p.shares > 0
+      ) ?? null
+    )
+  }
+
+  const initialCost = () => {
+    if (isPortfolio()) {
+      const pos = portfolioPos()
+      return pos ? pos.costPrice.toFixed(2) : ''
+    }
+    return watchItem()?.costPrice?.toString() ?? ''
+  }
+
+  const initialShares = () => {
+    if (isPortfolio()) {
+      const pos = portfolioPos()
+      return pos ? String(pos.shares) : ''
+    }
+    return watchItem()?.shares?.toString() ?? ''
+  }
+
+  const [costPrice, setCostPrice] = createSignal(initialCost())
+  const [shares, setShares] = createSignal(initialShares())
   const [isSaving, setIsSaving] = createSignal(false)
 
   const parsedCost = () => {
+    if (isPortfolio()) {
+      const pos = portfolioPos()
+      return pos ? pos.costPrice : null
+    }
     const val = parseFloat(costPrice().trim())
     return isNaN(val) || val <= 0 ? null : val
   }
 
   const parsedShares = () => {
+    if (isPortfolio()) {
+      const pos = portfolioPos()
+      return pos ? pos.shares : null
+    }
     const val = parseInt(shares().trim(), 10)
     return isNaN(val) || val <= 0 ? null : val
   }
@@ -120,6 +154,12 @@ export function CostAlertModal(props: CostAlertModalProps) {
           </Show>
         </div>
 
+        <Show when={isPortfolio()}>
+          <div style="font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.28); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px;">
+            🔒 已开启模拟账本：此标的成本由模拟买卖自动核算锁定，清仓后成本线自动消失。如需调整请使用主悬浮窗「买卖」下单。
+          </div>
+        </Show>
+
         <div class="cost-modal-fields">
           <div class="cost-modal-field">
             <label>持仓成本 (元)</label>
@@ -127,12 +167,13 @@ export function CostAlertModal(props: CostAlertModalProps) {
               type="number"
               step="0.01"
               min="0"
+              disabled={isPortfolio()}
               class="cost-modal-input"
-              placeholder="0.00"
+              placeholder={isPortfolio() ? (portfolioPos() ? '' : '未持仓') : '0.00'}
               value={costPrice()}
               onInput={(e) => setCostPrice(e.currentTarget.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
-              autofocus
+              onKeyDown={(e) => !isPortfolio() && e.key === 'Enter' && void handleSave()}
+              autofocus={!isPortfolio()}
             />
           </div>
 
@@ -142,11 +183,12 @@ export function CostAlertModal(props: CostAlertModalProps) {
               type="number"
               step="100"
               min="0"
+              disabled={isPortfolio()}
               class="cost-modal-input"
-              placeholder="100"
+              placeholder={isPortfolio() ? (portfolioPos() ? '' : '未持仓') : '100'}
               value={shares()}
               onInput={(e) => setShares(e.currentTarget.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
+              onKeyDown={(e) => !isPortfolio() && e.key === 'Enter' && void handleSave()}
             />
           </div>
         </div>
@@ -168,7 +210,7 @@ export function CostAlertModal(props: CostAlertModalProps) {
         </Show>
 
         <div class="cost-modal-actions">
-          <Show when={watchItem()?.costPrice || watchItem()?.shares}>
+          <Show when={!isPortfolio() && (watchItem()?.costPrice || watchItem()?.shares)}>
             <button
               type="button"
               class="cost-modal-btn clear"
@@ -184,16 +226,18 @@ export function CostAlertModal(props: CostAlertModalProps) {
             onClick={props.onClose}
             disabled={isSaving()}
           >
-            取消
+            {isPortfolio() ? '关闭' : '取消'}
           </button>
-          <button
-            type="button"
-            class="cost-modal-btn confirm"
-            onClick={handleSave}
-            disabled={isSaving()}
-          >
-            保存
-          </button>
+          <Show when={!isPortfolio()}>
+            <button
+              type="button"
+              class="cost-modal-btn confirm"
+              onClick={handleSave}
+              disabled={isSaving()}
+            >
+              保存
+            </button>
+          </Show>
         </div>
       </div>
     </div>

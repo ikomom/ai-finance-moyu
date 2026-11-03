@@ -66,12 +66,26 @@
   user-select: none;
 }
 
+:root[data-theme="light"] .mini-trade-badge-btn {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.28);
+  color: #0284c7;
+  font-weight: 600;
+}
+
 .mini-trade-badge-btn:hover {
   background: rgba(59, 130, 246, 0.28);
   border-color: rgba(96, 165, 250, 0.6);
   color: #bfdbfe;
   box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
   transform: translateY(-0.5px);
+}
+
+:root[data-theme="light"] .mini-trade-badge-btn:hover {
+  background: rgba(2, 132, 199, 0.16);
+  border-color: rgba(2, 132, 199, 0.45);
+  color: #0369a1;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.15);
 }
 
 .mini-trade-badge-btn:active {

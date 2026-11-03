@@ -52,8 +52,30 @@ export function createMiniDerived(args: MiniDerivedArgs) {
   const hoveredKBar = args.hoveredKBar
   const hoveredKExtra = args.hoveredKExtra
 
-  const cost = () => item()?.costPrice ?? null
-  const shares = () => item()?.shares ?? null
+  const portfolioPos = () => {
+    if (!s().config.enablePortfolio) return null
+    return (
+      (s().positions ?? []).find(
+        (p) => p.code.toLowerCase() === q().code.toLowerCase() && p.shares > 0
+      ) ?? null
+    )
+  }
+
+  const cost = () => {
+    if (s().config.enablePortfolio) {
+      const pos = portfolioPos()
+      return pos && pos.shares > 0 ? pos.costPrice : null
+    }
+    return item()?.costPrice ?? null
+  }
+
+  const shares = () => {
+    if (s().config.enablePortfolio) {
+      const pos = portfolioPos()
+      return pos && pos.shares > 0 ? pos.shares : null
+    }
+    return item()?.shares ?? null
+  }
   const pnl = () => profitAmount(q().price, cost(), shares())
   const trend = () => s().trends[q().code]
   const auction = () => s().auctions?.[q().code]

@@ -9,9 +9,13 @@
 }
 
 .lhb-sub-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   gap: 4px;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--surface-card-bg, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--surface-border-subtle, rgba(0, 0, 0, 0.06));
   border-radius: 6px;
   padding: 2px;
 }
@@ -22,7 +26,7 @@
   border: none;
   font-size: 10px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--text-muted, #64748b);
   padding: 3px 6px;
   border-radius: 4px;
   cursor: pointer;
@@ -30,13 +34,14 @@
 }
 
 .lhb-sub-tab-btn:hover {
-  color: #cbd5e1;
+  color: var(--text-primary, #0f172a);
 }
 
 .lhb-sub-tab-btn.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
+  background: var(--surface-popover-bg, #ffffff);
+  color: var(--text-primary, #0f172a);
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .market-lhb-wrap::-webkit-scrollbar {
@@ -53,10 +58,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-card-bg, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--surface-border-subtle, transparent);
   border-radius: 6px;
   font-size: 10px;
-  color: #64748b;
+  color: var(--text-muted, #64748b);
 }
 
 .market-lhb-date-badge {
@@ -76,10 +82,27 @@
 .market-lhb-sec-title {
   font-size: 11px;
   font-weight: 700;
-  color: #e2e8f0;
+  color: var(--text-primary, #e2e8f0);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
+}
+
+.market-lhb-expand-btn {
+  font-size: 10px;
+  font-weight: 500;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.market-lhb-expand-btn:hover {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.35);
 }
 
 .market-lhb-stock-list {
@@ -93,16 +116,16 @@
   align-items: center;
   justify-content: space-between;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--surface-card-bg, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.04));
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .market-lhb-stock-row:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--surface-card-hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--surface-border-subtle, rgba(255, 255, 255, 0.1));
   transform: translateX(2px);
 }
 
@@ -115,7 +138,7 @@
 .market-lhb-stock-name {
   font-size: 12px;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--text-primary, #f8fafc);
 }
 
 .market-lhb-stock-code {
@@ -171,8 +194,8 @@
 
 .trader-move-card {
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--surface-card-bg, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.05));
   border-radius: 6px;
   display: flex;
   flex-direction: column;
@@ -220,7 +243,7 @@
 
 .trader-target-stock {
   font-size: 11px;
-  color: #cbd5e1;
+  color: var(--text-primary, #cbd5e1);
   font-weight: 600;
 }
 

@@ -44,6 +44,7 @@ export function Chart(props: ChartProps) {
       subchartMode: props.subchartMode,
       macdParams: props.macdParams,
       isGlobal: props.isGlobal,
+      trades: props.trades,
     })
 
   onMount(() => {

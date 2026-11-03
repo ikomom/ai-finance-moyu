@@ -13,10 +13,10 @@
   background: rgba(56, 189, 248, 0.12);
   border: 1px solid rgba(56, 189, 248, 0.35);
   color: #38bdf8;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
-  border-radius: var(--radius-card, 4px);
-  padding: 1px 5px;
+  border-radius: var(--radius-sm, 4px);
+  padding: 2px 6px;
   cursor: pointer;
   white-space: nowrap;
   /* 分组名再长也不能把顶栏撑破 */
@@ -27,6 +27,17 @@
 .group-dropdown-trigger > span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+:root[data-theme="light"] .group-dropdown-trigger {
+  color: var(--color-accent, #0284c7);
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .group-dropdown-trigger:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(2, 132, 199, 0.35);
 }
 
 .group-dropdown-trigger:hover {
@@ -51,10 +62,10 @@
   min-width: 110px;
   max-height: 180px;
   overflow-y: auto;
-  background: #181b22;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--surface-popover-bg, #ffffff);
+  border: 1px solid var(--surface-glass-border, rgba(0, 0, 0, 0.12));
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+  box-shadow: var(--shadow-popover, 0 8px 24px rgba(0, 0, 0, 0.2));
   padding: 4px;
   z-index: 10000;
   display: flex;
@@ -70,7 +81,7 @@
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;
-  color: var(--text-base, #e2e8f0);
+  color: var(--text-primary, #0f172a);
   cursor: pointer;
   white-space: nowrap;
   max-width: 168px;
@@ -82,13 +93,13 @@
 }
 
 .group-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--surface-card-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text-primary, #0f172a);
 }
 
 .group-dropdown-item.active {
   background: rgba(56, 189, 248, 0.18);
-  color: #38bdf8;
+  color: var(--color-accent, #0284c7);
   font-weight: 600;
 }
 
@@ -100,18 +111,18 @@
 
 .group-dropdown-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-border-divider, rgba(0, 0, 0, 0.08));
   margin: 2px 0;
 }
 
 .group-dropdown-action {
-  color: #38bdf8;
+  color: var(--color-accent, #0284c7);
   font-weight: 500;
   justify-content: center;
 }
 
 .group-dropdown-action:hover {
-  background: rgba(56, 189, 248, 0.15);
+  background: rgba(56, 189, 248, 0.12);
 }
 
 /* Mini modal backdrop for creating group */
@@ -128,12 +139,12 @@
 }
 
 .group-modal {
-  background: #1e222d;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--surface-popover-bg, #ffffff);
+  border: 1px solid var(--surface-glass-border, rgba(0, 0, 0, 0.12));
   border-radius: 8px;
   padding: 12px;
   width: 220px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  box-shadow: var(--shadow-popover, 0 10px 30px rgba(0, 0, 0, 0.3));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -142,14 +153,14 @@
 .group-modal-title {
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary, #0f172a);
 }
 
 .group-modal-input {
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--surface-input-bg, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--surface-input-border, rgba(0, 0, 0, 0.16));
   border-radius: 4px;
-  color: #fff;
+  color: var(--text-primary, #0f172a);
   font-size: 12px;
   padding: 4px 8px;
   outline: none;
@@ -175,8 +186,8 @@
 }
 
 .group-modal-btn.cancel {
-  background: rgba(255, 255, 255, 0.08);
-  color: #94a3b8;
+  background: var(--surface-card-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text-muted, #64748b);
 }
 
 .group-modal-btn.confirm {

@@ -61,13 +61,34 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
         <For each={filteredQuotes()}>
           {(q, i) => {
             const item = () => itemFor(q.code)
+            const portfolioPos = () => {
+              if (!props.snapshot.config.enablePortfolio) return null
+              return (
+                (props.snapshot.positions ?? []).find(
+                  (p) => p.code.toLowerCase() === q.code.toLowerCase() && p.shares > 0
+                ) ?? null
+              )
+            }
+            const activeCost = () => {
+              if (props.snapshot.config.enablePortfolio) {
+                const pos = portfolioPos()
+                return pos && pos.shares > 0 ? pos.costPrice : null
+              }
+              return item()?.costPrice ?? null
+            }
+            const activeShares = () => {
+              if (props.snapshot.config.enablePortfolio) {
+                const pos = portfolioPos()
+                return pos && pos.shares > 0 ? pos.shares : null
+              }
+              return item()?.shares ?? null
+            }
             const pnlMoney = () =>
-              profitAmount(q.price, item()?.costPrice, item()?.shares)
+              profitAmount(q.price, activeCost(), activeShares())
             const todayMoney = () =>
-              todayProfitAmount(q.price, q.preClose, item()?.shares)
+              todayProfitAmount(q.price, q.preClose, activeShares())
 
             const tooltip = () => {
-              const it = item()
               const parts = [`${q.name} (${q.code})`, `现价: ${fmtPrice(q.price)} (${fmtPct(q.changePct)})`]
               if (isIndexCode(q.code)) {
                 const diag = diagnoseIndex(q, props.snapshot.marketOverview, props.snapshot.trendSignals?.[q.code])
@@ -89,16 +110,18 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
                   parts.push(`多空能量: ${sdiag.scoreLabel}`)
                 }
               }
-              if (it?.costPrice != null) {
-                const pct = profitPct(q.price, it.costPrice)
+              const ac = activeCost()
+              const as = activeShares()
+              if (ac != null) {
+                const pct = profitPct(q.price, ac)
                 if (pct !== null) {
-                  parts.push(`成本: ${fmtPrice(it.costPrice)} | 浮盈率: ${fmtPct(pct)}`)
+                  parts.push(`成本: ${fmtPrice(ac)} | 浮盈率: ${fmtPct(pct)}`)
                 } else {
-                  parts.push(`成本: ${fmtPrice(it.costPrice)}`)
+                  parts.push(`成本: ${fmtPrice(ac)}`)
                 }
               }
-              if (it?.shares) {
-                parts.push(`持仓: ${it.shares}股`)
+              if (as != null && as > 0) {
+                parts.push(`持仓: ${as}股`)
                 const td = todayMoney()
                 if (td != null) parts.push(`今日盈亏: ${fmtMoney(td)}`)
                 const pf = pnlMoney()

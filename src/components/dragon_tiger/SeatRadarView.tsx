@@ -1,9 +1,10 @@
-import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createSignal, For, onMount, Show } from 'solid-js'
 import './SeatRadarView.css'
 import type { SeatRadarItem } from './types'
 import { fetchSeatRadar } from '../../tauri'
-import { fmtPct, fmtPrice, trendClass } from '../../types'
-import { searchBranchDictionary, resolveSeatLabel, type BranchDictItem } from './seatDict'
+import { alignToTradeDay } from './utils'
+import { SeatRadarCard } from './SeatRadarCard'
+import { SeatPoolBar } from './SeatPoolBar'
 
 export interface SeatRadarViewProps {
   onOpenDrawer?: (code: string, name?: string, highlightBranch?: string) => void
@@ -25,35 +26,6 @@ const DEFAULT_SEATS: SeatWatchItem[] = [
   { name: '陈小群', label: '陈小群', active: true },
   { name: '机构专用', label: '机构专用', active: true },
 ]
-
-function fmtAmount(amt: number): string {
-  const abs = Math.abs(amt)
-  const sign = amt > 0 ? '+' : amt < 0 ? '-' : ''
-  if (abs >= 1e8) return `${sign}${(abs / 1e8).toFixed(2)}亿`
-  if (abs >= 1e4) return `${sign}${(abs / 1e4).toFixed(0)}万`
-  return `${sign}${abs.toFixed(0)}`
-}
-
-function alignToTradeDay(dateStr: string): string {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const day = d.getDay()
-  if (day === 0) d.setDate(d.getDate() - 2)
-  else if (day === 6) d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
-}
-
-function cleanShortName(name: string, label?: string): string {
-  if (label) return label
-  if (name === '机构专用' || name === '深股通专用' || name === '沪股通专用') return name
-  return name
-    .replace(/^中国/, '')
-    .replace(/股份有限公司|有限责任公司/g, '')
-    .replace(/证券营业部|营业部/g, '')
-    .replace(/^东方财富证券/, '东财')
-    .replace(/证券(分公司|路|街|桥|道|门|支)/g, '$1')
-    .trim() || name
-}
 
 export function SeatRadarView(props: SeatRadarViewProps) {
   // 从本地持久化初始化关注席位池
@@ -78,8 +50,6 @@ export function SeatRadarView(props: SeatRadarViewProps) {
     return DEFAULT_SEATS
   })())
 
-  const [searchQuery, setSearchQuery] = createSignal('')
-  const [isSuggestOpen, setIsSuggestOpen] = createSignal(false)
   const [tradeDate, setTradeDate] = createSignal('')
   const [direction, setDirection] = createSignal<'all' | 'buy' | 'sell'>('all')
   const [loading, setLoading] = createSignal(false)
@@ -101,8 +71,7 @@ export function SeatRadarView(props: SeatRadarViewProps) {
     void doQuery()
   }
 
-  const removeSeat = (name: string, e: MouseEvent) => {
-    e.stopPropagation()
+  const removeSeat = (name: string) => {
     const next = seatPool().filter((item) => item.name !== name)
     savePool(next)
     void doQuery()
@@ -126,13 +95,8 @@ export function SeatRadarView(props: SeatRadarViewProps) {
     } else {
       savePool([...cur, { name: clean, label, active: true }])
     }
-    setSearchQuery('')
-    setIsSuggestOpen(false)
     void doQuery()
   }
-
-  // 联想建议列表
-  const suggestions = () => searchBranchDictionary(searchQuery())
 
   const doQuery = async () => {
     const activeBranches = seatPool()
@@ -160,21 +124,6 @@ export function SeatRadarView(props: SeatRadarViewProps) {
     void doQuery()
   })
 
-  // 点击外部关闭搜索下拉
-  const handleWindowClick = (e: MouseEvent) => {
-    const target = e.target as HTMLElement
-    if (!target.closest('.seat-input-container')) {
-      setIsSuggestOpen(false)
-    }
-  }
-
-  onMount(() => {
-    window.addEventListener('click', handleWindowClick)
-  })
-  onCleanup(() => {
-    window.removeEventListener('click', handleWindowClick)
-  })
-
   const filteredItems = () => {
     const dir = direction()
     return items().filter((item) => {
@@ -186,135 +135,18 @@ export function SeatRadarView(props: SeatRadarViewProps) {
 
   return (
     <div class="seat-radar-wrap">
-      {/* 席位配置条 */}
-      <div class="seat-radar-bar">
-        <div class="seat-radar-title" style={{ "justify-content": "space-between" }}>
-          <span>🎯 关注席位池 ({seatPool().filter((s) => s.active).length}/{seatPool().length} 生效)</span>
-          <Show when={seatPool().length === 0}>
-            <button
-              type="button"
-              class="seat-action-btn"
-              style={{ "font-size": "9px", padding: "1px 6px" }}
-              onClick={restoreDefaults}
-            >
-              恢复推荐游资
-            </button>
-          </Show>
-        </div>
-
-        {/* 关注席位池胶囊列表（包含所有已添加的营业部，支持点击开关与点击 × 删除） */}
-        <div class="seat-capsules-grid">
-          <For each={seatPool()}>
-            {(seat) => (
-              <span
-                class={`seat-capsule-btn ${seat.active ? 'active' : ''}`}
-                onClick={() => toggleSeatActive(seat.name)}
-                title={`点击切换开启/关闭；点右侧 × 删除（${seat.name}）`}
-              >
-                <span>{cleanShortName(seat.name, seat.label)}</span>
-                <span
-                  class="seat-capsule-del"
-                  onClick={(e) => removeSeat(seat.name, e)}
-                  title="从关注池中删除"
-                >
-                  ×
-                </span>
-              </span>
-            )}
-          </For>
-        </div>
-
-        {/* 智能搜索与添加输入框 (带实时联想下拉浮层) */}
-        <div class="seat-input-container">
-          <div class="seat-input-row">
-            <input
-              type="text"
-              class="seat-custom-input"
-              placeholder="搜索营业部或游资（如：六一、呼家、拉萨、江苏路…）"
-              value={searchQuery()}
-              onInput={(e) => {
-                setSearchQuery(e.currentTarget.value)
-                setIsSuggestOpen(e.currentTarget.value.trim().length > 0)
-              }}
-              onFocus={() => {
-                if (searchQuery().trim().length > 0) setIsSuggestOpen(true)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const s = suggestions()
-                  if (s.length > 0) {
-                    addSeatToPool(s[0].branchName, s[0].traderLabel)
-                  } else if (searchQuery().trim()) {
-                    addSeatToPool(searchQuery().trim())
-                  }
-                } else if (e.key === 'Escape') {
-                  setIsSuggestOpen(false)
-                }
-              }}
-            />
-            <button
-              type="button"
-              class="seat-action-btn"
-              onClick={() => {
-                const s = suggestions()
-                if (s.length > 0) {
-                  addSeatToPool(s[0].branchName, s[0].traderLabel)
-                } else if (searchQuery().trim()) {
-                  addSeatToPool(searchQuery().trim())
-                }
-              }}
-            >
-              + 添加
-            </button>
-          </div>
-
-          {/* 实时搜索下拉联想菜单 */}
-          <Show when={isSuggestOpen() && searchQuery().trim().length > 0}>
-            <div class="seat-suggest-menu">
-              <For each={suggestions()}>
-                {(item: BranchDictItem) => {
-                  const isAdded = () =>
-                    seatPool().some((s) => s.name === item.branchName)
-                  return (
-                    <div
-                      class="seat-suggest-item"
-                      onClick={() => addSeatToPool(item.branchName, item.traderLabel)}
-                      title={item.branchName}
-                    >
-                      <div class="seat-suggest-left">
-                        <Show when={item.traderLabel}>
-                          <span class="seat-suggest-tag">{item.traderLabel}</span>
-                        </Show>
-                        <span class="seat-suggest-name">{item.branchName}</span>
-                      </div>
-                      <button
-                        type="button"
-                        class={`seat-suggest-btn ${isAdded() ? 'added' : ''}`}
-                      >
-                        {isAdded() ? '已关注' : '+ 关注'}
-                      </button>
-                    </div>
-                  )
-                }}
-              </For>
-              <Show when={suggestions().length === 0}>
-                <div
-                  class="seat-suggest-item"
-                  onClick={() => addSeatToPool(searchQuery().trim())}
-                >
-                  <span class="seat-suggest-name" style={{ color: '#38bdf8' }}>
-                    ＋ 将 "{searchQuery().trim()}" 作为自定义营业部添加
-                  </span>
-                </div>
-              </Show>
-            </div>
-          </Show>
-        </div>
+      <SeatPoolBar
+        seatPool={seatPool()}
+        onToggleActive={toggleSeatActive}
+        onRemoveSeat={removeSeat}
+        onAddSeat={addSeatToPool}
+        onRestoreDefaults={restoreDefaults}
+      />
 
         {/* 过滤控制栏 (日期 + 方向切换 + 刷新按钮) */}
         <div class="seat-filter-controls">
           <div style={{ display: 'flex', 'align-items': 'center', gap: '4px' }}>
-            <span style={{ color: '#64748b', 'font-size': '10px' }}>日期:</span>
+            <span style={{ color: 'var(--text-muted)', 'font-size': '10px' }}>日期:</span>
             <input
               type="date"
               class="seat-date-input"
@@ -375,11 +207,10 @@ export function SeatRadarView(props: SeatRadarViewProps) {
             ⚡ 筛选
           </button>
         </div>
-      </div>
 
       {/* 披露日提示栏 */}
       <Show when={currentQueryDate()}>
-        <div style={{ display: 'flex', 'justify-content': 'space-between', color: '#64748b', 'font-size': '10px', 'padding': '0 2px' }}>
+        <div style={{ display: 'flex', 'justify-content': 'space-between', color: 'var(--text-muted)', 'font-size': '10px', 'padding': '0 2px' }}>
           <span>披露日: {currentQueryDate()}</span>
           <span>命中标目: {filteredItems().length} 只</span>
         </div>
@@ -403,41 +234,7 @@ export function SeatRadarView(props: SeatRadarViewProps) {
             }
           >
             {(item: SeatRadarItem) => (
-              <div
-                class="seat-result-card"
-                onClick={() =>
-                  props.onOpenDrawer?.(item.code, item.name || item.code, item.branch_name)
-                }
-                title={`点击查看 ${item.name || item.code} 龙虎榜席位详情（高亮该营业部）`}
-              >
-                <div class="seat-res-top">
-                  <div class="seat-res-stock">
-                    <span class="seat-res-name">{item.name || item.code}</span>
-                    <span class="seat-res-code">{item.code}</span>
-                  </div>
-                  <div class="seat-res-quote">
-                    <span class={`seat-res-price ${trendClass(item.change_pct)}`}>
-                      {fmtPrice(item.close_price, 2)}
-                    </span>
-                    <span class={`seat-res-pct ${trendClass(item.change_pct)}`}>
-                      {fmtPct(item.change_pct)}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="seat-res-bottom">
-                  <div class="seat-hit-badge" title={item.branch_name}>
-                    <Show when={resolveSeatLabel(item.branch_name, item.trader_label)}>
-                      {(tag) => <span class="seat-trader-tag">{tag().label}</span>}
-                    </Show>
-                    <span>{cleanShortName(item.branch_name)}</span>
-                  </div>
-                  <div class={`seat-action-val ${item.is_buy ? 'buy' : 'sell'}`}>
-                    <span>{item.is_buy ? '买入' : '卖出'}</span>
-                    <span>{fmtAmount(item.is_buy ? item.buy_amount : item.sell_amount)}</span>
-                  </div>
-                </div>
-              </div>
+              <SeatRadarCard item={item} onOpenDrawer={props.onOpenDrawer} />
             )}
           </For>
         </div>

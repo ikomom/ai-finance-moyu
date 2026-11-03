@@ -118,7 +118,7 @@ impl DragonTigerClient {
         let mut famous_trader_moves = Vec::new();
         let mut trade_date = String::new();
 
-        for item in data_arr.iter().take(5) {
+        for item in data_arr.iter() {
             let bare_code = item["SECURITY_CODE"].as_str().unwrap_or_default();
             let name = item["SECURITY_NAME_ABBR"].as_str().unwrap_or_default();
             let price = item["CLOSE_PRICE"].as_f64().unwrap_or(0.0);
@@ -191,15 +191,18 @@ impl DragonTigerClient {
             }
         }
 
-        let detail = self.do_fetch_stock_detail(&norm_code, stock_name).await
-            .unwrap_or_else(|e| {
+        match self.do_fetch_stock_detail(&norm_code, stock_name).await {
+            Ok(detail) => {
+                let mut guard = self.stock_cache.lock().unwrap_or_else(|e| e.into_inner());
+                guard.insert(norm_code, (today, detail.clone()));
+                detail
+            }
+            Err(e) => {
                 log::info!(target: "NET", "个股龙虎榜拉取未命中或异常({norm_code}): {e}");
+                // 网络异常时不写入当日缓存，允许后续重试
                 StockDetailInfo { code: norm_code.clone(), dragon_tiger: None }
-            });
-
-        let mut guard = self.stock_cache.lock().unwrap_or_else(|e| e.into_inner());
-        guard.insert(norm_code, (today, detail.clone()));
-        detail
+            }
+        }
     }
 
     async fn do_fetch_stock_detail(&self, code: &str, stock_name: Option<&str>) -> Result<StockDetailInfo, String> {

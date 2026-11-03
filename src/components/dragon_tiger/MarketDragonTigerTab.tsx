@@ -3,22 +3,11 @@ import './MarketDragonTigerTab.css'
 import type { FamousTraderMove, MarketDragonTigerOverview, MarketLhbStockItem } from './types'
 import { fetchMarketDragonTiger } from '../../tauri'
 import { fmtPct, fmtPrice, trendClass } from '../../types'
+import { fmtMoney, trendMoneyClass } from './utils'
 import { SeatRadarView } from './SeatRadarView'
 
 export interface MarketDragonTigerTabProps {
   onOpenDrawer?: (code: string, name?: string, highlightBranch?: string) => void
-}
-
-function fmtAmount(amt: number): string {
-  const abs = Math.abs(amt)
-  const sign = amt > 0 ? '+' : amt < 0 ? '-' : ''
-  if (abs >= 1e8) {
-    return `${sign}${(abs / 1e8).toFixed(2)}亿`
-  }
-  if (abs >= 1e4) {
-    return `${sign}${(abs / 1e4).toFixed(0)}万`
-  }
-  return `${sign}${abs.toFixed(0)}`
 }
 
 function getSessionNotice(tradeDate?: string): { text: string; badge: string } {
@@ -53,6 +42,7 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
   const setSubTab = setPersistedSubTab
   const [data, setData] = createSignal<MarketDragonTigerOverview | null>(null)
   const [loading, setLoading] = createSignal(true)
+  const [showAllLhb, setShowAllLhb] = createSignal(false)
 
   onMount(async () => {
     try {
@@ -62,6 +52,11 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
       setLoading(false)
     }
   })
+
+  const displayedStocks = () => {
+    const list = data()?.top_institution_stocks ?? []
+    return showAllLhb() ? list : list.slice(0, 5)
+  }
 
   return (
     <div class="market-lhb-wrap">
@@ -97,101 +92,124 @@ export function MarketDragonTigerTab(props: MarketDragonTigerTabProps) {
         </div>
 
         <Show
-          when={!loading() && data()}
+          when={!loading()}
           fallback={
-            <div style={{ padding: "20px", "text-align": "center", color: "#64748b", "font-size": "11px" }}>
+            <div style={{ padding: "24px 0", "text-align": "center", color: "#64748b", "font-size": "11px" }}>
               ⌛ 正在拉取龙虎榜机构与游资动向…
             </div>
           }
         >
-        {/* 龙虎榜大额净买入 Top 5 */}
-        <div class="market-lhb-section">
-          <div class="market-lhb-sec-title">
-            <span>🏆 龙虎榜大额净买入 Top 5</span>
-          </div>
-          <div class="market-lhb-stock-list">
-            <For each={data()!.top_institution_stocks}>
-              {(stock: MarketLhbStockItem) => (
-                <div
-                  class="market-lhb-stock-row"
-                  onClick={() => props.onOpenDrawer?.(stock.code, stock.name)}
-                  title="点击查看该股龙虎榜席位详情"
-                >
-                  <div class="market-lhb-stock-main">
-                    <span class="market-lhb-stock-name">{stock.name}</span>
-                    <span class="market-lhb-stock-code">{stock.code}</span>
-                  </div>
-
-                  <div class="market-lhb-stock-price-box">
-                    <span class={`market-lhb-stock-price ${trendClass(stock.change_pct)}`}>
-                      {fmtPrice(stock.price, 2)}
-                    </span>
-                    <span class={`market-lhb-stock-pct ${trendClass(stock.change_pct)}`}>
-                      {fmtPct(stock.change_pct)}
-                    </span>
-                  </div>
-
-                  <div class="market-lhb-stock-net">
-                    <span class="market-lhb-net-label">榜单净买</span>
-                    <span class={`market-lhb-net-val ${stock.net_total >= 0 ? 'up' : 'down'}`}>
-                      {fmtAmount(stock.net_total)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </For>
-          </div>
-        </div>
-
-        {/* 游资大佬动向 */}
-        <div class="market-lhb-section" style={{ "margin-top": "6px" }}>
-          <div class="market-lhb-sec-title">
-            <span>⚡ 知名游资动向追踪</span>
-          </div>
-          <div class="trader-moves-grid">
-            <For
-              each={data()!.famous_trader_moves}
-              fallback={
-                <div class="trader-moves-empty">
-                  <span>🏛️ 今日官方披露榜单中暂无预设顶流游资上榜</span>
+          <Show
+            when={data()}
+            fallback={
+              <div style={{ padding: "24px 0", "text-align": "center", color: "#64748b", "font-size": "11px" }}>
+                🏛️ 暂无公开披露的龙虎榜数据
+              </div>
+            }
+          >
+            {/* 龙虎榜大额净买入 Top 5 / 查看全部 */}
+            <div class="market-lhb-section">
+              <div class="market-lhb-sec-title">
+                <span>🏆 龙虎榜大额净买入 {showAllLhb() ? `(全部 ${data()!.top_institution_stocks.length} 只)` : 'Top 5'}</span>
+                <Show when={data()!.top_institution_stocks.length > 5}>
                   <button
                     type="button"
-                    class="trader-moves-goto-radar"
-                    onClick={() => setSubTab('radar')}
+                    class="market-lhb-expand-btn"
+                    onClick={() => setShowAllLhb(!showAllLhb())}
+                    title="切换展示完整龙虎榜大额净买入标的"
                   >
-                    🎯 切换至席位雷达自定义回溯 ›
+                    {showAllLhb() ? '收起 ▴' : `查看全部 (${data()!.top_institution_stocks.length}) ▾`}
                   </button>
-                </div>
-              }
-            >
-              {(move: FamousTraderMove) => {
-                const isBuy = move.action.includes('买') || move.net_amount >= 0
-                return (
-                  <div
-                    class="trader-move-card"
-                    onClick={() => props.onOpenDrawer?.(move.stock_code, move.stock_name, move.trader_name)}
-                    title={`点击查看 ${move.stock_name} 龙虎榜详情（高亮 ${move.trader_name} 席位）`}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <div class="trader-move-top">
-                      <span class="trader-name-badge">{move.trader_name}</span>
-                      <span class={`trader-action-pill ${isBuy ? 'buy' : 'sell'}`}>
-                        {move.action}
-                      </span>
+                </Show>
+              </div>
+              <div class="market-lhb-stock-list">
+                <For each={displayedStocks()}>
+                  {(stock: MarketLhbStockItem) => (
+                    <div
+                      class="market-lhb-stock-row"
+                      onClick={() => props.onOpenDrawer?.(stock.code, stock.name)}
+                      title="点击查看该股龙虎榜席位详情"
+                    >
+                      <div class="market-lhb-stock-main">
+                        <span class="market-lhb-stock-name">{stock.name}</span>
+                        <span class="market-lhb-stock-code">{stock.code}</span>
+                      </div>
+
+                      <div class="market-lhb-stock-price-box">
+                        <span class={`market-lhb-stock-price ${trendClass(stock.change_pct)}`}>
+                          {fmtPrice(stock.price, 2)}
+                        </span>
+                        <span class={`market-lhb-stock-pct ${trendClass(stock.change_pct)}`}>
+                          {fmtPct(stock.change_pct)}
+                        </span>
+                      </div>
+
+                      <div class="market-lhb-stock-net">
+                        <span class="market-lhb-net-label">榜单净买</span>
+                        <span class={`market-lhb-net-val ${trendMoneyClass(stock.net_total)}`}>
+                          {fmtMoney(stock.net_total)}
+                        </span>
+                      </div>
                     </div>
-                    <div class="trader-move-bottom">
-                      <span class="trader-target-stock">{move.stock_name}</span>
-                      <span class={`trader-target-amt ${isBuy ? 'up' : 'down'}`}>
-                        {fmtAmount(move.net_amount)}
-                      </span>
+                  )}
+                </For>
+              </div>
+            </div>
+
+            {/* 游资大佬动向 */}
+            <div class="market-lhb-section" style={{ "margin-top": "6px" }}>
+              <div class="market-lhb-sec-title">
+                <span>⚡ 知名游资动向追踪</span>
+              </div>
+              <div class="trader-moves-grid">
+                <For
+                  each={data()!.famous_trader_moves}
+                  fallback={
+                    <div class="trader-moves-empty">
+                      <span>🏛️ 今日官方披露榜单中暂无预设顶流游资上榜</span>
+                      <button
+                        type="button"
+                        class="trader-moves-goto-radar"
+                        onClick={() => setSubTab('radar')}
+                      >
+                        🎯 切换至席位雷达自定义回溯 ›
+                      </button>
                     </div>
-                  </div>
-                )
-              }}
-            </For>
-          </div>
-        </div>
-      </Show>
+                  }
+                >
+                  {(move: FamousTraderMove) => {
+                    const isBuy = move.action.includes('买')
+                      ? true
+                      : move.action.includes('卖')
+                      ? false
+                      : move.net_amount > 0
+                    return (
+                      <div
+                        class="trader-move-card"
+                        onClick={() => props.onOpenDrawer?.(move.stock_code, move.stock_name, move.trader_name)}
+                        title={`点击查看 ${move.stock_name} 龙虎榜详情（高亮 ${move.trader_name} 席位）`}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div class="trader-move-top">
+                          <span class="trader-name-badge">{move.trader_name}</span>
+                          <span class={`trader-action-pill ${isBuy ? 'buy' : 'sell'}`}>
+                            {move.action}
+                          </span>
+                        </div>
+                        <div class="trader-move-bottom">
+                          <span class="trader-target-stock">{move.stock_name}</span>
+                          <span class={`trader-target-amt ${isBuy ? 'up' : 'down'}`}>
+                            {fmtMoney(move.net_amount)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }}
+                </For>
+              </div>
+            </div>
+          </Show>
+        </Show>
       </Show>
     </div>
   )

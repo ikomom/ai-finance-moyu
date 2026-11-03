@@ -113,6 +113,12 @@ export function MiniBody(props: MiniBodyProps) {
   const isAuctionSession = () =>
     ['CallAuctionCancelable', 'CallAuctionLocked', 'PreTrade'].includes(s().status?.session ?? '')
 
+  const currentTrades = () => {
+    if (!s().config.enablePortfolio || isIndex()) return []
+    const code = q().code
+    return (s().trades ?? []).filter((t) => t.code === code)
+  }
+
   return (
     <>
       {/* Unified Stock Header */}
@@ -217,6 +223,7 @@ export function MiniBody(props: MiniBodyProps) {
                 orbLow={s().trendSignals?.[q().code]?.orbLow}
                 subchartMode={subchartMode()}
                 macdParams={indicatorParams().macd}
+                trades={currentTrades()}
                 onHover={(point, extra) => {
                   setHoveredPoint(point)
                   setHoveredPointExtra(extra ?? null)
@@ -229,6 +236,7 @@ export function MiniBody(props: MiniBodyProps) {
               quote={q()}
               costPrice={cost()}
               priceLines={item()?.priceLines ?? []}
+              trades={currentTrades()}
               subchartMode={subchartMode()}
               maPeriods={indicatorParams().ma}
               macdParams={indicatorParams().macd}

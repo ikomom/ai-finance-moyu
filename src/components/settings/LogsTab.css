@@ -235,9 +235,72 @@
 }
 
 .log-message {
-  color: #e2e8f0;
+  color: var(--text-primary, #e2e8f0);
   word-break: break-all;
   flex: 1;
+}
+
+:root[data-theme="light"] .log-list-container {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme="light"] .log-row {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .log-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme="light"] .log-time {
+  color: #64748b;
+}
+
+:root[data-theme="light"] .log-message {
+  color: #1e293b;
+}
+
+:root[data-theme="light"] .log-search-box input {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.14);
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .log-filter-pill {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #475569;
+}
+
+:root[data-theme="light"] .log-filter-pill.active {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #1d4ed8;
+}
+
+:root[data-theme="light"] .log-badge-level.level-info {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+:root[data-theme="light"] .log-badge-target.target-alert {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+:root[data-theme="light"] .log-badge-target.target-ai {
+  background: rgba(126, 34, 206, 0.1);
+  color: #7e22ce;
+  border-color: rgba(126, 34, 206, 0.3);
+}
+
+:root[data-theme="light"] .log-badge-target.target-trade {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.3);
 }
 
 .log-row.level-warn .log-message {

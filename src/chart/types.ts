@@ -1,4 +1,4 @@
-import type { AuctionData, PriceLine, Trend } from '../types'
+import type { AuctionData, PriceLine, TradeRecord, Trend } from '../types'
 
 export interface DrawOptions {
   trend: Trend | undefined
@@ -16,6 +16,7 @@ export interface DrawOptions {
   subchartMode?: 'vol' | 'macd'
   macdParams?: [number, number, number]
   isGlobal?: boolean
+  trades?: TradeRecord[]
 }
 
 export interface LevelOptions {

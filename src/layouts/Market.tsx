@@ -27,6 +27,8 @@ export function Market(props: { flash: boolean }) {
   const drawerHighlight = marketDrawerHighlight
   const setDrawerHighlight = setMarketDrawerHighlight
 
+  const [showAllSectors, setShowAllSectors] = createSignal(false)
+
   const s = () => snapshot()!
   const overview = () => s()?.marketOverview
 
@@ -65,9 +67,15 @@ export function Market(props: { flash: boolean }) {
             🐉 龙虎游资
           </button>
         </div>
-        <div class="market-time">
+        <div class="market-time" title="全市场行情数据最后更新时间">
           <Show when={overview()?.updatedAt}>
-            {(t) => <span class="update-badge">{t()}</span>}
+            {(t) => (
+              <span class="update-badge">
+                <span class="update-dot" />
+                <span class="update-label">数据更新</span>
+                <span class="update-time">{t()}</span>
+              </span>
+            )}
           </Show>
         </div>
       </div>
@@ -174,9 +182,21 @@ export function Market(props: { flash: boolean }) {
 
             {/* 热门领涨板块 */}
             <div class="sectors-section">
-              <div class="sectors-title">热门领涨行业</div>
+              <div class="sectors-title-row">
+                <span class="sectors-title">热门领涨行业</span>
+                <Show when={data().topSectors.length > 4}>
+                  <button
+                    type="button"
+                    class="sectors-expand-btn"
+                    onClick={() => setShowAllSectors(!showAllSectors())}
+                    title="切换展开或收起更多领涨行业"
+                  >
+                    {showAllSectors() ? '收起 ▴' : `查看更多 (${Math.min(data().topSectors.length, 12)}) ▾`}
+                  </button>
+                </Show>
+              </div>
               <div class="sectors-grid">
-                <For each={data().topSectors.slice(0, 4)}>
+                <For each={data().topSectors.slice(0, showAllSectors() ? 12 : 4)}>
                   {(sec) => (
                     <div class="sector-badge">
                       <div class="sec-top">

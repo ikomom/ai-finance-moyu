@@ -56,6 +56,11 @@ impl Session {
         )
     }
 
+    /// Whether this session is continuous trading (09:30–11:30 or 13:00–14:56).
+    pub fn is_continuous_trading(self) -> bool {
+        matches!(self, Session::Morning | Session::Afternoon)
+    }
+
     /// Whether error-recovery polling is allowed to hit the network.
     ///
     /// The poller retries fast while a feed is broken, but a retry loop running

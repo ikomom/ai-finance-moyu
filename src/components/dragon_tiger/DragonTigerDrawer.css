@@ -11,8 +11,8 @@
 }
 
 .lhb-drawer-container {
-  background: rgba(18, 22, 31, 0.98);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--surface-popover-bg, rgba(18, 22, 31, 0.98));
+  border-top: 1px solid var(--surface-glass-border, rgba(255, 255, 255, 0.12));
   border-radius: 0;
   padding: 10px 12px 12px;
   /* 下钻弹层铺满整个挂件面板：席位名单和分时图都需要纵向空间 */
@@ -24,7 +24,7 @@
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
   animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 91;
-  color: #f1f5f9;
+  color: var(--text-primary, #f1f5f9);
 }
 
 @keyframes slideUp {
@@ -51,7 +51,7 @@
   align-items: center;
   gap: 6px;
 }
-.lhb-title-name { font-size: 13px; font-weight: 700; color: #f8fafc; }
+.lhb-title-name { font-size: 13px; font-weight: 700; color: var(--text-primary, #f8fafc); }
 .lhb-title-code { font-size: 11px; color: #64748b; font-family: monospace; }
 .lhb-badge-title-tag {
   font-size: 9.5px;
@@ -243,6 +243,24 @@
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
 }
 
+.lhb-seat-row.is-paired-hover {
+  background: rgba(14, 165, 233, 0.16) !important;
+  border-left: 3px solid #38bdf8 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.lhb-seat-t-tag {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .lhb-seat-arrow {
   font-size: 11px;
   color: #64748b;
@@ -276,7 +294,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #e2e8f0;
+  color: var(--text-primary, #e2e8f0);
   font-size: 11px;
   flex: 1;
   min-width: 0;
@@ -294,7 +312,7 @@
 .lhb-seat-tag.institution { background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.4); }
 .lhb-seat-tag.north { background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); }
 .lhb-seat-tag.quant { background: rgba(13, 148, 136, 0.2); color: #2dd4bf; border: 1px solid rgba(13, 148, 136, 0.4); }
-.lhb-seat-tag.custom { background: rgba(148, 163, 184, 0.2); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.4); }
+.lhb-seat-tag.custom { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary, #e2e8f0); border: 1px solid rgba(148, 163, 184, 0.4); }
 
 .lhb-seat-right {
   font-family: monospace;
@@ -304,6 +322,36 @@
   flex-shrink: 0;
   min-width: 52px;
 }
+
+.lhb-seat-right-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 58px;
+}
+
+.lhb-seat-main-amt {
+  font-family: monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.lhb-seat-main-amt.up { color: #f43f5e; }
+.lhb-seat-main-amt.down { color: #10b981; }
+
+.lhb-seat-sub-amt {
+  font-family: monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  margin-top: 1px;
+}
+.lhb-seat-sub-amt.up { color: #fb7185; }
+.lhb-seat-sub-amt.down { color: #34d399; }
 
 .lhb-empty-card {
   padding: 20px;

@@ -5,6 +5,7 @@ import {
   type KLineData,
   type PriceLine,
   type Quote,
+  type TradeRecord,
 } from '../types'
 import { computeKLineMacd, computeKLineMovingAverages } from '../utils/indicators'
 import { drawKline } from './klineDraw'
@@ -16,6 +17,7 @@ export interface KlineCanvasProps {
   costPrice?: number | null
   priceLines?: PriceLine[]
   compact?: boolean
+  trades?: TradeRecord[]
   subchartMode?: 'vol' | 'macd'
   maPeriods?: [number, number, number]
   macdParams?: [number, number, number]

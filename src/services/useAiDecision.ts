@@ -8,9 +8,72 @@ import { diagnoseStock } from '../utils/stockDiagnosis'
 import type { Quote, Snapshot, KLineData } from '../types'
 import type { StockDecisionPayload, StockDecisionResult } from '../types/aiDecision'
 
-const DECISION_CACHE = new Map<string, { result: StockDecisionResult; ts: number }>()
+export interface DecisionCacheEntry {
+  result: StockDecisionResult
+  ts: number
+  date?: string
+  quoteTime?: string
+  session?: string
+  isClosing?: boolean
+}
+
+export interface DecisionCacheCheckContext {
+  now?: number
+  session?: string
+  tradingToday?: boolean
+  quoteDate?: string
+  quoteTime?: string
+  feedDate?: string
+}
+
+export const DECISION_CACHE = new Map<string, DecisionCacheEntry>()
 const IN_FLIGHT_REQUESTS = new Map<string, Promise<StockDecisionResult>>()
 const CACHE_TTL_MS = 30_000
+
+/**
+ * 校验决策缓存有效性（包含交易时段感知与收盘智能冻结）.
+ * 守则：不开盘不重复请求，除非最后一次决策不是收盘时候的.
+ */
+export function isDecisionCacheValid(
+  cached: DecisionCacheEntry | undefined,
+  ctx: DecisionCacheCheckContext,
+  ttlMs = CACHE_TTL_MS
+): boolean {
+  if (!cached) return false
+
+  const curDate = ctx.quoteDate || ctx.feedDate
+  if (curDate && cached.date && cached.date !== curDate) {
+    return false
+  }
+
+  const isTradingToday = ctx.tradingToday ?? true
+  const session = ctx.session
+  const now = ctx.now ?? Date.now()
+
+  // 1. 收盘或非交易日（周末/法定节假日）：
+  // 核心守则：除非最后一次决策不是收盘时候的，否则收盘终评永久有效直至跨日
+  if (!isTradingToday || session === 'Closed') {
+    return Boolean(cached.isClosing)
+  }
+
+  // 2. 午间休市 (11:31 - 12:59)：
+  // 若已具备针对上午收盘盘面 (>=11:30) 的决策，午休期间不再重复发起请求
+  if (session === 'LunchBreak') {
+    if (cached.session === 'LunchBreak' || (cached.quoteTime && cached.quoteTime >= '11:30:00')) {
+      return true
+    }
+    return now - cached.ts < ttlMs
+  }
+
+  // 3. 盘前未开盘 (00:00 - 09:14)：
+  // 若已存在缓存（如昨日收盘结论或盘前基准），无需重复请求
+  if (session === 'PreOpen') {
+    return true
+  }
+
+  // 4. 连续交易及竞价时段：依常规 TTL 随盘面轮询刷新
+  return now - cached.ts < ttlMs
+}
 
 export interface AiDecisionHook {
   result: Accessor<StockDecisionResult | null>
@@ -74,10 +137,22 @@ export function useAiDecision(
     }
 
     const now = Date.now()
+    const status = snap?.status
+    const session = status?.session
+    const isTradingToday = status?.tradingToday ?? true
+    const checkCtx: DecisionCacheCheckContext = {
+      now,
+      session,
+      tradingToday: isTradingToday,
+      quoteDate: q.date,
+      quoteTime: q.time,
+      feedDate: status?.feedDate ?? undefined,
+    }
+
     if (!force) {
       const cached = DECISION_CACHE.get(cacheKey)
-      if (cached && now - cached.ts < CACHE_TTL_MS) {
-        setResult(cached.result)
+      if (isDecisionCacheValid(cached, checkCtx, CACHE_TTL_MS)) {
+        setResult(cached!.result)
         setErrorMsg(null)
         return
       }
@@ -155,7 +230,18 @@ export function useAiDecision(
       const res = await promise
       if (quote()?.code === code) {
         setResult(res)
-        DECISION_CACHE.set(cacheKey, { result: res, ts: Date.now() })
+        const isClosing =
+          !isTradingToday ||
+          session === 'Closed' ||
+          Boolean(q.time && q.time >= '15:00:00')
+        DECISION_CACHE.set(cacheKey, {
+          result: res,
+          ts: Date.now(),
+          date: q.date || status?.feedDate || undefined,
+          quoteTime: q.time,
+          session,
+          isClosing,
+        })
       }
     } catch (e) {
       if (quote()?.code === code) {
@@ -194,8 +280,12 @@ export function useAiDecision(
 
   createEffect(
     on(
-      [() => quote()?.code, () => snapshot()?.config?.aiDecision?.mode],
-      ([code, mode]) => {
+      [
+        () => quote()?.code,
+        () => snapshot()?.config?.aiDecision?.mode,
+        () => snapshot()?.status?.session,
+      ],
+      ([code, mode, session]) => {
         if (debounceTimer) clearTimeout(debounceTimer)
         if (autoRefreshTimer) {
           clearInterval(autoRefreshTimer)
@@ -207,8 +297,17 @@ export function useAiDecision(
         }
         const cacheKey = modeType === 'kline' ? `${code}:kline` : code
         const cached = DECISION_CACHE.get(cacheKey)
-        if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
-          setResult(cached.result)
+        const status = snapshot()?.status
+        const checkCtx: DecisionCacheCheckContext = {
+          now: Date.now(),
+          session: session ?? status?.session,
+          tradingToday: status?.tradingToday ?? true,
+          quoteDate: quote()?.date,
+          quoteTime: quote()?.time,
+          feedDate: status?.feedDate ?? undefined,
+        }
+        if (isDecisionCacheValid(cached, checkCtx, CACHE_TTL_MS)) {
+          setResult(cached!.result)
           setErrorMsg(null)
         } else {
           debounceTimer = setTimeout(() => {
@@ -217,9 +316,19 @@ export function useAiDecision(
         }
 
         // 持续看盘自动研判轮询：本地量化极速 (6ms) 每 5 秒刷新，线上大模型每 30 秒刷新
+        // 遵循交易时段守则：仅在连续交易时段（早盘/午盘/尾盘竞价）自动轮询；未开盘、午休与收盘闭市彻底静默
         const intervalMs = mode === 'local' ? 5_000 : 30_000
         autoRefreshTimer = setInterval(() => {
           if (loading()) return
+          const curStatus = snapshot()?.status
+          const curSession = curStatus?.session
+          const isTradingToday = curStatus?.tradingToday ?? true
+          if (!isTradingToday) return
+          const isLiveSession =
+            curSession === 'Morning' ||
+            curSession === 'Afternoon' ||
+            curSession === 'ClosingAuction'
+          if (!isLiveSession) return
           runDecision(true)
         }, intervalMs)
       },

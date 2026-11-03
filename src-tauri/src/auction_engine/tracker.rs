@@ -57,10 +57,15 @@ impl AuctionTracker {
         let b1_vol = quote.bids.first().map(|b| b.1).unwrap_or(0.0);
         let a1_vol = quote.asks.first().map(|a| a.1).unwrap_or(0.0);
 
-        let is_match_finish = (is_morning && time_hhmm == 925) || (is_closing && time_hhmm == 1500);
+        let is_morning_match = is_morning && time_hhmm == 925;
+        let is_closing_match = is_closing && time_hhmm == 1500;
 
-        let (matched_vol, unmatched_vol, unmatched_side) = if is_match_finish {
+        let (matched_vol, unmatched_vol, unmatched_side) = if is_morning_match {
             (quote.volume.max(0.0), 0.0, UnmatchedSide::None)
+        } else if is_closing_match {
+            let m = b1_vol.min(a1_vol);
+            let u = (b1_vol - a1_vol).abs();
+            (m, u, UnmatchedSide::None)
         } else if b1_vol > 0.0 && a1_vol > 0.0 {
             let m = b1_vol.min(a1_vol);
             let u = (b1_vol - a1_vol).abs();
@@ -77,9 +82,9 @@ impl AuctionTracker {
         } else if a1_vol > 0.0 && b1_vol <= 0.0 {
             (0.0, a1_vol, UnmatchedSide::Sell)
         } else {
-            (quote.volume.max(0.0), 0.0, UnmatchedSide::None)
+            (0.0, 0.0, UnmatchedSide::None)
         };
-        let total_vol = (matched_vol + unmatched_vol).max(quote.volume);
+        let total_vol = matched_vol + unmatched_vol;
 
         let entry = self.data.entry(quote.code.clone()).or_insert_with(|| AuctionData {
             code: quote.code.clone(),
@@ -138,6 +143,9 @@ impl AuctionTracker {
             return;
         }
         self.check_date_or_reset(&quote.date);
+        let (_, _, time_hhmm) = parse_time_details(&quote.time);
+        let open_vol = if time_hhmm <= 925 { quote.volume } else { 0.0 };
+
         let entry = self.data.entry(quote.code.clone()).or_insert_with(|| {
             let open_pct = ((quote.open - quote.pre_close) / quote.pre_close * 100.0 * 100.0).round() / 100.0;
             let (label, detail) = if open_pct > 0.0 {
@@ -164,8 +172,8 @@ impl AuctionTracker {
                     time: 92500,
                     raw_time: "09:25:00".to_string(),
                     price: quote.open,
-                    volume: quote.volume,
-                    matched_volume: quote.volume,
+                    volume: open_vol,
+                    matched_volume: open_vol,
                     unmatched_volume: 0.0,
                     unmatched_side: UnmatchedSide::None,
                 }],
@@ -181,13 +189,13 @@ impl AuctionTracker {
             }
         });
 
-        if entry.points.is_empty() {
+        if entry.points.is_empty() && quote.open > 0.0 {
             entry.points.push(AuctionPoint {
                 time: 92500,
                 raw_time: "09:25:00".to_string(),
                 price: quote.open,
-                volume: quote.volume,
-                matched_volume: quote.volume,
+                volume: open_vol,
+                matched_volume: open_vol,
                 unmatched_volume: 0.0,
                 unmatched_side: UnmatchedSide::None,
             });

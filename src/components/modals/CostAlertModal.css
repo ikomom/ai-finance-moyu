@@ -25,29 +25,29 @@
 .cost-modal {
   width: 240px;
   max-width: 95%;
-  background: #181b22;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--surface-popover-bg, #ffffff);
+  border: 1px solid var(--surface-glass-border, rgba(0, 0, 0, 0.12));
   border-radius: 8px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.85);
+  box-shadow: var(--shadow-popover, 0 8px 30px rgba(0, 0, 0, 0.25));
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: #e2e8f0;
+  color: var(--text-primary, #0f172a);
 }
 
 .cost-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--surface-border-divider, rgba(0, 0, 0, 0.08));
   padding-bottom: 6px;
 }
 
 .cost-modal-title {
   font-size: 11.5px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary, #0f172a);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -56,7 +56,7 @@
 .cost-modal-close {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--text-muted, #94a3b8);
   font-size: 14px;
   cursor: pointer;
   padding: 0 4px;
@@ -64,7 +64,7 @@
 }
 
 .cost-modal-close:hover {
-  color: #fff;
+  color: var(--text-primary, #0f172a);
 }
 
 .cost-modal-stock-info {
@@ -72,19 +72,19 @@
   justify-content: space-between;
   align-items: center;
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-card-bg, rgba(0, 0, 0, 0.04));
   padding: 4px 8px;
   border-radius: 4px;
 }
 
 .cost-modal-stock-name {
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--text-primary, #0f172a);
 }
 
 .cost-modal-stock-code {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--text-muted, #94a3b8);
   font-family: var(--font-mono, monospace);
   margin-left: 4px;
 }
@@ -109,16 +109,16 @@
 }
 
 .cost-modal-field label {
-  color: #94a3b8;
+  color: var(--text-muted, #64748b);
   flex-shrink: 0;
 }
 
 .cost-modal-input {
   width: 110px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--surface-input-bg, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--surface-input-border, rgba(0, 0, 0, 0.16));
   border-radius: 4px;
-  color: #fff;
+  color: var(--text-primary, #0f172a);
   font-family: var(--font-mono, monospace);
   font-size: 11px;
   padding: 3px 6px;
@@ -138,7 +138,7 @@
   padding: 4px 8px;
   background: rgba(56, 189, 248, 0.08);
   border-radius: 4px;
-  color: #94a3b8;
+  color: var(--text-muted, #94a3b8);
 }
 
 .cost-modal-preview .val {
@@ -163,13 +163,13 @@
 }
 
 .cost-modal-btn.cancel {
-  background: rgba(255, 255, 255, 0.08);
-  color: #94a3b8;
+  background: var(--surface-card-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text-muted, #64748b);
 }
 
 .cost-modal-btn.cancel:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--surface-card-active, rgba(0, 0, 0, 0.1));
+  color: var(--text-primary, #0f172a);
 }
 
 .cost-modal-btn.clear {

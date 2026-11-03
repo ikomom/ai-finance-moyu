@@ -188,11 +188,11 @@ fn test_summary_frozen_cash_and_price_fallback() {
 #[test]
 fn test_matcher_restores_frozen_cash_on_execution_failure() {
     let (mut data, b_id) = mock_test_broker();
-    data.brokers[0].available_cash = 5000.0;
+    data.brokers[0].available_cash = 500.0;
     data.pending_orders.push(PendingOrder {
         id: "order_fail".into(), broker_id: b_id.clone(), broker_name: "测试券商".into(),
         code: "sh600000".into(), name: "浦发银行".into(), action: TradeAction::Buy,
-        price: 10.0, shares: 1000, frozen_cash: 10005.0, created_at: "2026-10-30 09:30:00".into(),
+        price: 10.0, shares: 1000, frozen_cash: 500.0, created_at: "2026-10-30 09:30:00".into(),
     });
 
     let mut quotes = HashMap::new();

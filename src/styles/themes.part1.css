@@ -52,6 +52,8 @@
                  radial-gradient(circle at 90% 92%, rgba(139, 92, 246, 0.06) 0%, transparent 45%);
   --sidebar-bg: rgba(16, 19, 26, 0.82);
   --card: rgba(22, 26, 35, 0.8);
+  --bg-card: rgba(22, 26, 35, 0.8);
+  --border-color: rgba(255, 255, 255, 0.08);
   --card-hover: rgba(28, 33, 44, 0.95);
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.16);
@@ -70,14 +72,14 @@
 
   /* Surfaces & Glass */
   --surface-app-bg: #f8fafc;
-  --surface-glass-bg: rgba(255, 255, 255, 0.94);
+  --surface-glass-bg: #ffffff;
   --surface-glass-border: rgba(0, 0, 0, 0.12);
   --surface-card-bg: rgba(0, 0, 0, 0.035);
   --surface-card-hover: rgba(0, 0, 0, 0.065);
   --surface-card-active: rgba(0, 0, 0, 0.095);
   --surface-border-subtle: rgba(0, 0, 0, 0.08);
   --surface-border-divider: rgba(0, 0, 0, 0.06);
-  --surface-popover-bg: rgba(255, 255, 255, 0.98);
+  --surface-popover-bg: #ffffff;
   --surface-input-bg: rgba(0, 0, 0, 0.04);
   --surface-input-border: rgba(0, 0, 0, 0.16);
 
@@ -110,8 +112,10 @@
   --bg-gradient: radial-gradient(circle at 10% 8%, rgba(37, 99, 235, 0.06) 0%, transparent 45%),
                  radial-gradient(circle at 90% 92%, rgba(99, 102, 241, 0.04) 0%, transparent 45%);
   --sidebar-bg: rgba(255, 255, 255, 0.88);
-  --card: rgba(255, 255, 255, 0.94);
-  --card-hover: rgba(255, 255, 255, 1);
+  --card: #ffffff;
+  --bg-card: #ffffff;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --card-hover: #f8fafc;
   --line: rgba(0, 0, 0, 0.08);
   --line-strong: rgba(0, 0, 0, 0.16);
   --fg: #0f172a;

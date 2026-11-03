@@ -98,6 +98,7 @@ pub fn show_context_menu(
         let remove_item = MenuItemBuilder::with_id(format!("stock:remove:{code}"), "🗑️ 从自选中移除").build(app)?;
 
         let add_stock_item = MenuItemBuilder::with_id("stock:quick_add", "🔍 添加自选…").build(app)?;
+        let stock_refresh = MenuItemBuilder::with_id("refresh", "🔄 立即刷新").build(app)?;
 
         // Nested Submenu: 系统菜单
         let sys_refresh = MenuItemBuilder::with_id("refresh", "立即刷新").build(app)?;
@@ -144,6 +145,8 @@ pub fn show_context_menu(
             builder = builder.item(l);
         }
         builder = builder
+            .separator()
+            .item(&stock_refresh)
             .separator()
             .item(&group_sub)
             .item(&pin_item)

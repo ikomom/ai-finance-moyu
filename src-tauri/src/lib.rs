@@ -121,6 +121,31 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if window.label() == window::SETTINGS {
+                match event {
+                    WindowEvent::Focused(focused) => {
+                        if let Some(main_win) = window.app_handle().get_webview_window(window::DISPLAY) {
+                            if *focused {
+                                let _ = main_win.set_always_on_top(false);
+                            } else {
+                                let state = window.app_handle().state::<AppState>();
+                                let mode = state.config.lock().map(|c| c.visibility_mode).unwrap_or_default();
+                                if mode == config::VisibilityMode::Always {
+                                    let _ = main_win.set_always_on_top(true);
+                                }
+                            }
+                        }
+                    }
+                    WindowEvent::Destroyed => {
+                        if let Some(main_win) = window.app_handle().get_webview_window(window::DISPLAY) {
+                            let state = window.app_handle().state::<AppState>();
+                            let mode = state.config.lock().map(|c| c.visibility_mode).unwrap_or_default();
+                            if mode == config::VisibilityMode::Always {
+                                let _ = main_win.set_always_on_top(true);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
                 return;
             }
             if window.label() != window::DISPLAY {

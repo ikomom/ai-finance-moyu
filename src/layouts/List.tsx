@@ -48,7 +48,13 @@ export function List(props: { flash: boolean }) {
   const itemFor = (code: string): WatchItem | undefined =>
     filteredWatchlist().find((w) => w.code === code)
 
-  const totalStats = () => computeTotalStats(filteredQuotes(), filteredWatchlist())
+  const totalStats = () =>
+    computeTotalStats(
+      filteredQuotes(),
+      filteredWatchlist(),
+      s()?.positions,
+      s()?.config.enablePortfolio
+    )
 
   const handleRowDblClick = (e: MouseEvent, index: number) => {
     e.preventDefault()
@@ -120,8 +126,29 @@ export function List(props: { flash: boolean }) {
             <For each={filteredQuotes()}>
               {(q, i) => {
                 const item = () => itemFor(q.code)
-                const cost = () => item()?.costPrice ?? null
-                const shares = () => item()?.shares ?? null
+                const portfolioPos = () => {
+                  if (!s()?.config.enablePortfolio) return null
+                  return (
+                    (s()?.positions ?? []).find(
+                      (p: import('../types/portfolio').PortfolioPosition) =>
+                        p.code.toLowerCase() === q.code.toLowerCase() && p.shares > 0
+                    ) ?? null
+                  )
+                }
+                const cost = () => {
+                  if (s()?.config.enablePortfolio) {
+                    const pos = portfolioPos()
+                    return pos && pos.shares > 0 ? pos.costPrice : null
+                  }
+                  return item()?.costPrice ?? null
+                }
+                const shares = () => {
+                  if (s()?.config.enablePortfolio) {
+                    const pos = portfolioPos()
+                    return pos && pos.shares > 0 ? pos.shares : null
+                  }
+                  return item()?.shares ?? null
+                }
                 const pnl = () => profitAmount(q.price, cost(), shares())
                 const todayPnl = () => todayProfitAmount(q.price, q.preClose, shares())
 

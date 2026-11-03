@@ -129,7 +129,7 @@ impl SeatClient {
         let mut merged_map: HashMap<(String, String), SeatOperationItem> = HashMap::new();
         let target_date = trade_date.unwrap_or("");
 
-        for (is_buy_record, item) in raw_items {
+        for (_is_buy_record, item) in raw_items {
             let bare_code = item["SECURITY_CODE"].as_str().unwrap_or_default().to_string();
             let name = item["SECURITY_NAME_ABBR"].as_str().unwrap_or_default().to_string();
             let td = item["TRADE_DATE"].as_str().map(|s| s.chars().take(10).collect::<String>()).unwrap_or_default();
@@ -154,12 +154,11 @@ impl SeatClient {
                 reason,
             });
 
-            if is_buy_record {
-                if buy > 0.0 {
-                    entry.buy_amount = buy;
-                }
-            } else if sell > 0.0 {
-                entry.sell_amount = sell;
+            if buy > 0.0 {
+                entry.buy_amount = entry.buy_amount.max(buy);
+            }
+            if sell > 0.0 {
+                entry.sell_amount = entry.sell_amount.max(sell);
             }
             entry.net_amount = entry.buy_amount - entry.sell_amount;
         }

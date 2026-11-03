@@ -9,6 +9,7 @@ import { fetchSeatDragonTiger } from '../../tauri'
 import { cleanBranchName, shortenLhbReason } from './DragonTigerDrawer'
 import { StockTrendView } from './StockTrendView'
 import { resolveSeatLabel } from './seatDict'
+import { fmtMoney, trendMoneyClass } from './utils'
 
 export interface SeatDetailViewProps {
   branchName: string
@@ -17,18 +18,6 @@ export interface SeatDetailViewProps {
   onSelectStock: (code: string, name?: string) => void
   /** Jump the widget to a stock that is already in the watchlist. */
   onOpenInWidget?: (code: string) => void
-}
-
-function fmtMoney(amt: number): string {
-  const sign = amt > 0 ? '+' : amt < 0 ? '-' : ''
-  const abs = Math.abs(amt)
-  if (abs >= 1e8) {
-    return `${sign}${(abs / 1e8).toFixed(2)}亿`
-  }
-  if (abs >= 1e4) {
-    return `${sign}${(abs / 1e4).toFixed(0)}万`
-  }
-  return `${sign}${abs.toFixed(0)}`
 }
 
 export function SeatDetailView(props: SeatDetailViewProps) {
@@ -68,7 +57,7 @@ export function SeatDetailView(props: SeatDetailViewProps) {
       </div>
 
       <div class="seat-op-right">
-        <span class={`seat-op-amt ${op.net_amount >= 0 ? 'up' : 'down'}`}>
+        <span class={`seat-op-amt ${trendMoneyClass(op.net_amount)}`}>
           {fmtMoney(op.net_amount)}
         </span>
         <span class="seat-op-arrow">›</span>

@@ -108,6 +108,17 @@
   border: 1px solid rgba(34, 197, 94, 0.28);
 }
 
+:root[data-theme="light"] .profit-badge.up {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+:root[data-theme="light"] .profit-badge.down {
+  color: #15803d;
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
 /* 模拟买卖按钮 (优雅蓝系列配色，不刺眼) */
 .stock-header-trade-btn,
 .mini-trade-badge-btn {
@@ -126,6 +137,15 @@
   align-items: center;
   user-select: none;
 }
+
+:root[data-theme="light"] .stock-header-trade-btn,
+:root[data-theme="light"] .mini-trade-badge-btn {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.28);
+  color: #0284c7;
+  font-weight: 600;
+}
+
 .stock-header-trade-btn:hover,
 .mini-trade-badge-btn:hover {
   background: rgba(59, 130, 246, 0.28);
@@ -133,6 +153,14 @@
   color: #bfdbfe;
   box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
   transform: translateY(-0.5px);
+}
+
+:root[data-theme="light"] .stock-header-trade-btn:hover,
+:root[data-theme="light"] .mini-trade-badge-btn:hover {
+  background: rgba(2, 132, 199, 0.16);
+  border-color: rgba(2, 132, 199, 0.45);
+  color: #0369a1;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.15);
 }
 .stock-header-trade-btn:active,
 .mini-trade-badge-btn:active {

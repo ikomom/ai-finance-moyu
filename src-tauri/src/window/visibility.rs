@@ -121,6 +121,11 @@ static SETTINGS_LOCK: Mutex<()> = Mutex::new(());
 /// Open the settings window, creating it on first use.
 pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     let _guard = SETTINGS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // 打开设置时主窗口临时释放置顶，确保设置中心绝对不被主挂件/K线图遮挡
+    if let Some(main_win) = app.get_webview_window(DISPLAY) {
+        let _ = main_win.set_always_on_top(false);
+    }
+
     if let Some(win) = app.get_webview_window(SETTINGS) {
         reveal_secondary(&win, "#settings-root");
         return Ok(());

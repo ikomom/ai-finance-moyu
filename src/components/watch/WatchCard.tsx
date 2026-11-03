@@ -2,6 +2,7 @@ import { For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { indicatorPresetBadge, numOrNull } from './types'
 import { WatchDrawer } from './WatchDrawer'
+import { useSettings } from '../settings/SettingsContext'
 import type { PriceLine, SearchResult, WatchGroup, WatchItem } from '../../types'
 
 export interface WatchCardProps {
@@ -25,6 +26,34 @@ export interface WatchCardProps {
 }
 
 export function WatchCard(props: WatchCardProps) {
+  let settings: ReturnType<typeof useSettings> | null = null
+  try {
+    settings = useSettings()
+  } catch {}
+
+  const isPortfolio = () => Boolean(settings?.form.enablePortfolio)
+  const portfolioPos = () => {
+    if (!isPortfolio() || !settings) return null
+    return (
+      settings.positions().find(
+        (p) => p.code.toLowerCase() === props.item.code.toLowerCase() && p.shares > 0
+      ) ?? null
+    )
+  }
+
+  const holdingText = () => {
+    if (isPortfolio()) {
+      const pos = portfolioPos()
+      if (!pos || pos.shares <= 0) return null
+      return `${pos.costPrice.toFixed(2)}元 · ${pos.shares}股`
+    }
+    if (props.item.costPrice == null && props.item.shares == null) return null
+    const c = props.item.costPrice != null ? `${props.item.costPrice}元` : ''
+    const sep = props.item.costPrice != null && props.item.shares != null ? ' · ' : ''
+    const s = props.item.shares != null ? `${props.item.shares}股` : ''
+    return `${c}${sep}${s}`
+  }
+
   const resolveInlineCode = async (rawInput: string) => {
     const trimmed = rawInput.trim()
     if (!trimmed) return
@@ -119,11 +148,9 @@ export function WatchCard(props: WatchCardProps) {
         {/* Summary badges when collapsed */}
         <Show when={!props.isExpanded}>
           <div class="watch-summary-badges">
-            <Show when={props.item.costPrice != null || props.item.shares != null}>
+            <Show when={holdingText()}>
               <span class="summary-badge holding">
-                {props.item.costPrice != null ? `${props.item.costPrice}元` : ''}
-                {props.item.costPrice != null && props.item.shares != null ? ' · ' : ''}
-                {props.item.shares != null ? `${props.item.shares}股` : ''}
+                {holdingText()}
               </span>
             </Show>
             <Show when={indicatorPresetBadge(props.item.indicatorMode)}>

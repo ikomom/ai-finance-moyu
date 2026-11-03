@@ -65,6 +65,10 @@ pub struct Snapshot {
     /// single XSS can no longer exfiltrate the user's credentials.
     pub has_iwencai_key: bool,
     pub pending_orders: Vec<crate::portfolio::PendingOrder>,
+    #[serde(default)]
+    pub trades: Vec<crate::portfolio::TradeRecord>,
+    #[serde(default)]
+    pub positions: Vec<crate::portfolio::PortfolioPosition>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -200,7 +204,10 @@ impl AppState {
         // the settings form to render its state.
         config.iwencai_api_key = None;
 
-        let pending_orders = self.portfolio.lock().unwrap_or_else(|e| e.into_inner()).pending_orders.clone();
+        let (pending_orders, trades, positions) = {
+            let p = self.portfolio.lock().unwrap_or_else(|e| e.into_inner());
+            (p.pending_orders.clone(), p.trades.clone(), p.positions.clone())
+        };
         let quotes = self.quotes.lock().unwrap_or_else(|e| e.into_inner());
         let trends = self.trends.lock().unwrap_or_else(|e| e.into_inner());
         let trend_signals = self.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -237,6 +244,8 @@ impl AppState {
             market_overview,
             has_iwencai_key,
             pending_orders,
+            trades,
+            positions,
         }
     }
 }

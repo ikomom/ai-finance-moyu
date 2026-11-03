@@ -81,6 +81,7 @@ export function SettingsProvider(props: { children: JSX.Element }) {
    * this flag drives the "已保存（留空表示不修改）" hint instead.
    */
   const [hasIwenCaiKey, setHasIwenCaiKey] = createSignal(false)
+  const [positions, setPositions] = createSignal<import('../../types/portfolio').PortfolioPosition[]>([])
 
   const say = (text: string, kind: '' | 'ok' | 'bad' = '') => setMsg({ text, kind })
 
@@ -122,6 +123,7 @@ export function SettingsProvider(props: { children: JSX.Element }) {
       })
       setReady(true)
       setHasIwenCaiKey(Boolean(snapshot.hasIwenCaiKey))
+      setPositions(snapshot.positions ?? [])
       // One line per open: how long the window took to become usable.
       logToBackend(`设置页就绪 ${Math.round(performance.now() - mountStarted)}ms`)
     } catch (e) {
@@ -131,14 +133,23 @@ export function SettingsProvider(props: { children: JSX.Element }) {
     getVersion().then((v) => setCurrentAppVersion(v)).catch(() => {})
 
     let unlistenTray: (() => void) | undefined
+    let unlistenSnap: (() => void) | undefined
     listen('trigger-check-update', () => {
       setActiveTab('system')
       void handleManualCheckUpdate()
     }).then((unlisten) => {
       unlistenTray = unlisten
     })
+    listen<Snapshot>('snapshot', (ev) => {
+      if (ev.payload?.positions) {
+        setPositions(ev.payload.positions)
+      }
+    }).then((unlisten) => {
+      unlistenSnap = unlisten
+    })
     onCleanup(() => {
       if (unlistenTray) unlistenTray()
+      if (unlistenSnap) unlistenSnap()
     })
 
     const bgTimer = setTimeout(async () => {
@@ -246,6 +257,7 @@ export function SettingsProvider(props: { children: JSX.Element }) {
     sources,
     ready,
     hasIwenCaiKey,
+    positions,
     activeTab,
     setActiveTab,
     msg,

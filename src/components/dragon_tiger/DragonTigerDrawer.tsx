@@ -4,7 +4,18 @@ import type { DragonTigerSeat, StockDetailInfo } from './types'
 import { fetchStockDragonTiger } from '../../tauri'
 import { navigateToStock } from '../../store'
 import { SeatDetailView } from './SeatDetailView'
-import { resolveSeatLabel } from './seatDict'
+import { SeatRow } from './SeatRow'
+import {
+  fmtMoney,
+  cleanBranchName,
+  getLhbPeriodType,
+  getDaysDiff,
+  shortenLhbReason,
+  trendMoneyClass,
+  analyzeSeatPairs,
+} from './utils'
+
+export { cleanBranchName, getLhbPeriodType, getDaysDiff, shortenLhbReason, fmtMoney, trendMoneyClass }
 
 export interface DragonTigerDrawerProps {
   code: string
@@ -13,68 +24,11 @@ export interface DragonTigerDrawerProps {
   onClose: () => void
 }
 
-function fmtMoney(amt: number): string {
-  const sign = amt > 0 ? '+' : amt < 0 ? '-' : ''
-  const abs = Math.abs(amt)
-  if (abs >= 1e8) return `${sign}${(abs / 1e8).toFixed(2)}亿`
-  if (abs >= 1e4) return `${sign}${(abs / 1e4).toFixed(0)}万`
-  return `${sign}${abs.toFixed(0)}`
-}
-
-/** Clean up verbose corporate entity suffixes to maximize space for branch city and road name. */
-export function cleanBranchName(name: string): string {
-  if (!name) return '--'
-  if (name === '机构专用' || name === '深股通专用' || name === '沪股通专用') return name
-  return name
-    .replace(/^中国/, '')
-    .replace(/股份有限公司|有限责任公司/g, '')
-    .replace(/证券营业部|营业部/g, '')
-    .replace(/^东方财富证券/, '东财')
-    .replace(/证券(分公司|路|街|桥|道|门|支)/g, '$1')
-    .trim()
-}
-
-/** Determine whether this report is a 3-day cumulative or 1-day list. */
-export function getLhbPeriodType(reason: string): '3day' | '1day' {
-  if (!reason) return '1day'
-  return reason.includes('连续三个交易日') || reason.includes('3日') ? '3day' : '1day'
-}
-
-/** Calculate days elapsed since trade_date (to flag stale historical records). */
-export function getDaysDiff(tradeDate: string): number {
-  if (!tradeDate) return 0
-  const d = new Date(tradeDate + 'T00:00:00')
-  const now = new Date()
-  const diffTime = now.getTime() - d.getTime()
-  return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)))
-}
-
-/** Shorten verbose official exchange explanation strings to concise trader terminology. */
-export function shortenLhbReason(reason: string): string {
-  if (!reason) return '龙虎榜披露'
-  let s = reason
-    .replace(/^非(?:ST、\*ST和|ST和|ST、)?S?证券/, '')
-    .replace(/的前\d+只证券$/, '')
-    .replace(/的证券$/, '')
-    .trim()
-  s = s
-    .replace(/连续三个交易日内收盘价格涨幅偏离值累计达到(\d+%)?/, '3日涨幅偏离达$1')
-    .replace(/连续三个交易日内收盘价格跌幅偏离值累计达到(\d+%)?/, '3日跌幅偏离达$1')
-    .replace(/连续三个交易日内收盘价涨幅偏离值累计达到(\d+%)?/, '3日涨幅偏离达$1')
-    .replace(/连续三个交易日内收盘价跌幅偏离值累计达到(\d+%)?/, '3日跌幅偏离达$1')
-    .replace(/日收盘价涨幅偏离值达到(\d+%)?/, '日涨幅偏离达$1')
-    .replace(/日收盘价跌幅偏离值达到(\d+%)?/, '日跌幅偏离达$1')
-    .replace(/日涨幅偏离值达到(\d+%)?/, '日涨幅偏离达$1')
-    .replace(/日跌幅偏离值达到(\d+%)?/, '日跌幅偏离达$1')
-    .replace(/日换手率达到(\d+%)?/, '日换手率达$1')
-    .replace(/日振幅值达到(\d+%)?/, '日振幅达$1')
-    .replace(/无价格涨跌幅限制/, '无涨跌幅限制')
-  return s.length > 18 ? s.slice(0, 16) + '…' : s
-}
-
 export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
   const [currentCode, setCurrentCode] = createSignal(props.code)
   const [currentName, setCurrentName] = createSignal(props.name)
+  const [highlightBranch, setHighlightBranch] = createSignal(props.highlightBranch)
+  const [hoveredPairId, setHoveredPairId] = createSignal<string | null>(null)
   const [selectedSeat, setSelectedSeat] = createSignal<{ branchName: string; tradeDate?: string } | null>(null)
 
   const [data, setData] = createSignal<StockDetailInfo | null>(null)
@@ -83,6 +37,7 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
   createEffect(() => {
     setCurrentCode(props.code)
     setCurrentName(props.name)
+    setHighlightBranch(props.highlightBranch)
   })
 
   let lastLoadedCode = ''
@@ -124,11 +79,7 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
       class="lhb-drawer-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          if (selectedSeat()) {
-            setSelectedSeat(null)
-          } else {
-            props.onClose()
-          }
+          selectedSeat() ? setSelectedSeat(null) : props.onClose()
         }
       }}
     >
@@ -140,12 +91,7 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
             <span class="lhb-title-code">{currentCode()}</span>
             <span class="lhb-badge-title-tag">🐉 龙虎榜席位</span>
           </div>
-          <button
-            type="button"
-            class="lhb-close-btn"
-            onClick={props.onClose}
-            title="关闭 (Esc)"
-          >
+          <button type="button" class="lhb-close-btn" onClick={props.onClose} title="关闭 (Esc)">
             ✕
           </button>
         </div>
@@ -159,26 +105,21 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
               tradeDate={selectedSeat()!.tradeDate}
               onBack={() => setSelectedSeat(null)}
               onSelectStock={(code, name) => {
+                const seatToHighlight = selectedSeat()?.branchName
                 setSelectedSeat(null)
+                if (seatToHighlight) setHighlightBranch(seatToHighlight)
                 setCurrentCode(code)
                 setCurrentName(name)
                 lastLoadedCode = ''
                 void loadData(code)
               }}
-              onOpenInWidget={(code) => {
-                navigateToStock(code)
-                props.onClose()
-              }}
+              onOpenInWidget={(code) => { navigateToStock(code); props.onClose(); }}
             />
           }
         >
           <Show
             when={!loading()}
-            fallback={
-              <div class="lhb-empty-card">
-                <span>⌛ 正在拉取龙虎榜席位数据…</span>
-              </div>
-            }
+            fallback={<div class="lhb-empty-card"><span>⌛ 正在拉取龙虎榜席位数据…</span></div>}
           >
             <div class="lhb-drawer-content">
               <Show
@@ -224,24 +165,20 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                           <span class="lhb-stat-lbl">
                             {getLhbPeriodType(l().reason) === '3day' ? '3日总净买' : '单日总净买'}
                           </span>
-                          <span class={`lhb-stat-val ${l().net_total >= 0 ? 'up' : 'down'}`}>
+                          <span class={`lhb-stat-val ${trendMoneyClass(l().net_total)}`}>
                             {fmtMoney(l().net_total)}
                           </span>
                         </div>
                         <div class="lhb-stat-box">
                           <span class="lhb-stat-lbl">机构净参与</span>
-                          <span
-                            class={`lhb-stat-val ${
-                              l().institution_net > 0 ? 'up' : l().institution_net < 0 ? 'down' : 'flat'
-                            }`}
-                          >
+                          <span class={`lhb-stat-val ${trendMoneyClass(l().institution_net)}`}>
                             {l().institution_net === 0 ? '0' : fmtMoney(l().institution_net)}
                           </span>
                         </div>
                         <Show when={l().close_price > 0}>
                           <div class="lhb-stat-box">
                             <span class="lhb-stat-lbl">当日收盘</span>
-                            <span class={`lhb-stat-val ${l().change_pct >= 0 ? 'up' : 'down'}`}>
+                            <span class={`lhb-stat-val ${l().change_pct > 0 ? 'up' : l().change_pct < 0 ? 'down' : 'flat'}`}>
                               {l().close_price.toFixed(2)}
                               <span class="lhb-stat-pct">
                                 {l().change_pct >= 0 ? '+' : ''}
@@ -253,111 +190,54 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
                       </div>
                     </div>
 
-                    <div class="lhb-section-header buy">
-                      <span>🔺 买入前五席位</span>
-                    </div>
-                    <div class="lhb-seat-list">
-                      <For each={l().top_buyers}>
-                        {(seat: DragonTigerSeat, idx) => {
-                          const seatTag = () => resolveSeatLabel(seat.branch_name, seat.trader_label)
-                          const isHighlighted = () => {
-                            const h = props.highlightBranch?.trim()
-                            if (!h) return false
-                            const st = seatTag()
-                            return (
-                              seat.branch_name.includes(h) ||
-                              h.includes(seat.branch_name) ||
-                              Boolean(st && (h.includes(st.label) || st.label.includes(h)))
-                            )
-                          }
-                          return (
-                            <div
-                              class="lhb-seat-row is-clickable"
-                              classList={{ 'is-highlighted-seat': Boolean(isHighlighted()) }}
-                              onClick={() =>
-                                setSelectedSeat({
-                                  branchName: seat.branch_name,
-                                  tradeDate: l().trade_date,
-                                })
-                              }
-                              title="点击下钻查看该席位操盘战绩与买卖标的"
-                            >
-                              <div class="lhb-seat-left">
-                                <span class="lhb-seat-rank">{idx() + 1}</span>
-                                <span class="lhb-seat-branch">
-                                  {cleanBranchName(seat.branch_name)}
-                                </span>
-                                <Show when={seatTag()}>
-                                  {(tag) => (
-                                    <span class={`lhb-seat-tag ${tag().category}`}>
-                                      {tag().label}
-                                    </span>
-                                  )}
-                                </Show>
-                              </div>
-                              <div class={`lhb-seat-right ${seat.net_amount >= 0 ? 'up' : 'down'}`}>
-                                {fmtMoney(seat.net_amount)}
-                                <span class="lhb-seat-arrow">›</span>
-                              </div>
-                            </div>
-                          )
-                        }}
-                      </For>
-                    </div>
+                    {(() => {
+                      const pairs = () => analyzeSeatPairs(l().top_buyers, l().top_sellers)
+                      return (
+                        <>
+                          <div class="lhb-section-header buy">
+                            <span>🔺 买入前五席位</span>
+                          </div>
+                          <div class="lhb-seat-list">
+                            <For each={l().top_buyers}>
+                              {(seat: DragonTigerSeat, idx) => (
+                                <SeatRow
+                                  idx={idx()}
+                                  seat={seat}
+                                  meta={pairs().buyerMetas[idx()]}
+                                  isBuy={true}
+                                  highlightBranch={highlightBranch()}
+                                  hoveredPairId={hoveredPairId()}
+                                  onHover={setHoveredPairId}
+                                  onClick={() => setSelectedSeat({ branchName: seat.branch_name, tradeDate: l().trade_date })}
+                                />
+                              )}
+                            </For>
+                          </div>
 
-                    <Show when={l().top_sellers.length > 0}>
-                      <div class="lhb-section-header sell" style={{ "margin-top": "8px" }}>
-                        <span>🔻 卖出前五席位</span>
-                      </div>
-                      <div class="lhb-seat-list">
-                        <For each={l().top_sellers}>
-                          {(seat: DragonTigerSeat, idx) => {
-                            const seatTag = () => resolveSeatLabel(seat.branch_name, seat.trader_label)
-                            const isHighlighted = () => {
-                              const h = props.highlightBranch?.trim()
-                              if (!h) return false
-                              const st = seatTag()
-                              return (
-                                seat.branch_name.includes(h) ||
-                                h.includes(seat.branch_name) ||
-                                Boolean(st && (h.includes(st.label) || st.label.includes(h)))
-                              )
-                            }
-                            return (
-                              <div
-                                class="lhb-seat-row is-clickable"
-                                classList={{ 'is-highlighted-seat': Boolean(isHighlighted()) }}
-                                onClick={() =>
-                                  setSelectedSeat({
-                                    branchName: seat.branch_name,
-                                    tradeDate: l().trade_date,
-                                  })
-                                }
-                                title="点击下钻查看该席位操盘战绩与买卖标的"
-                              >
-                                <div class="lhb-seat-left">
-                                  <span class="lhb-seat-rank">{idx() + 1}</span>
-                                  <span class="lhb-seat-branch">
-                                    {cleanBranchName(seat.branch_name)}
-                                  </span>
-                                  <Show when={seatTag()}>
-                                    {(tag) => (
-                                      <span class={`lhb-seat-tag ${tag().category}`}>
-                                        {tag().label}
-                                      </span>
-                                    )}
-                                  </Show>
-                                </div>
-                                <div class="lhb-seat-right down">
-                                  {fmtMoney(seat.net_amount)}
-                                  <span class="lhb-seat-arrow">›</span>
-                                </div>
-                              </div>
-                            )
-                          }}
-                        </For>
-                      </div>
-                    </Show>
+                          <Show when={l().top_sellers.length > 0}>
+                            <div class="lhb-section-header sell" style={{ "margin-top": "8px" }}>
+                              <span>🔻 卖出前五席位</span>
+                            </div>
+                            <div class="lhb-seat-list">
+                              <For each={l().top_sellers}>
+                                {(seat: DragonTigerSeat, idx) => (
+                                  <SeatRow
+                                    idx={idx()}
+                                    seat={seat}
+                                    meta={pairs().sellerMetas[idx()]}
+                                    isBuy={false}
+                                    highlightBranch={highlightBranch()}
+                                    hoveredPairId={hoveredPairId()}
+                                    onHover={setHoveredPairId}
+                                    onClick={() => setSelectedSeat({ branchName: seat.branch_name, tradeDate: l().trade_date })}
+                                  />
+                                )}
+                              </For>
+                            </div>
+                          </Show>
+                        </>
+                      )
+                    })()}
                   </>
                 )}
               </Show>

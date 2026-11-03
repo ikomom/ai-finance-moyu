@@ -12,18 +12,18 @@
   gap: 4px;
   width: 100%;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--surface-input-bg, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--surface-input-border, rgba(0, 0, 0, 0.14));
   border-radius: 5px;
-  color: #e2e8f0;
+  color: var(--text-primary, #0f172a);
   font-size: 10.5px;
   line-height: 1.3;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .select-menu-trigger:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--surface-card-hover, rgba(0, 0, 0, 0.06));
+  border-color: var(--color-accent-border, rgba(56, 189, 248, 0.35));
 }
 
 .select-menu-current {
@@ -35,7 +35,7 @@
 
 .select-menu-caret {
   font-size: 8px;
-  color: #94a3b8;
+  color: var(--text-muted, #94a3b8);
   flex-shrink: 0;
   transition: transform 0.15s ease;
 }
@@ -50,10 +50,10 @@
   min-width: 100%;
   max-height: 148px;
   overflow-y: auto;
-  background: #181b22;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--surface-popover-bg, #ffffff);
+  border: 1px solid var(--surface-glass-border, rgba(0, 0, 0, 0.12));
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+  box-shadow: var(--shadow-popover, 0 8px 24px rgba(0, 0, 0, 0.2));
   padding: 3px;
   display: flex;
   flex-direction: column;
@@ -70,7 +70,7 @@
   width: 3px;
 }
 .select-menu-panel::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--surface-card-hover, rgba(0, 0, 0, 0.18));
   border-radius: 2px;
 }
 
@@ -81,7 +81,7 @@
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #e2e8f0;
+  color: var(--text-primary, #0f172a);
   font-size: 10.5px;
   cursor: pointer;
   white-space: nowrap;
@@ -90,11 +90,11 @@
   transition: background 0.1s ease;
 }
 .select-menu-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--surface-card-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text-primary, #0f172a);
 }
 .select-menu-item.active {
   background: rgba(56, 189, 248, 0.18);
-  color: #38bdf8;
+  color: var(--color-accent, #0284c7);
   font-weight: 600;
 }

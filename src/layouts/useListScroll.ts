@@ -13,7 +13,9 @@ export interface TotalStats {
  */
 export function computeTotalStats(
   quotes: Quote[] | undefined,
-  watchlist: WatchItem[] | undefined
+  watchlist: WatchItem[] | undefined,
+  positions?: import('../types/portfolio').PortfolioPosition[],
+  enablePortfolio?: boolean
 ): TotalStats | null {
   if (!quotes || !watchlist) return null
   let totalToday = 0
@@ -22,16 +24,32 @@ export function computeTotalStats(
   let hasShares = false
 
   for (const q of quotes) {
-    const it = watchlist.find((w) => w.code === q.code)
-    if (it?.shares && it.shares > 0) {
+    let costPrice: number | null = null
+    let shares: number | null = null
+
+    if (enablePortfolio) {
+      const pos = positions?.find(
+        (p) => p.code.toLowerCase() === q.code.toLowerCase() && p.shares > 0
+      )
+      if (pos) {
+        costPrice = pos.costPrice
+        shares = pos.shares
+      }
+    } else {
+      const it = watchlist.find((w) => w.code.toLowerCase() === q.code.toLowerCase())
+      costPrice = it?.costPrice ?? null
+      shares = it?.shares ?? null
+    }
+
+    if (shares && shares > 0) {
       hasShares = true
       if (q.price > 0) {
         if (q.preClose > 0) {
-          totalToday += (q.price - q.preClose) * it.shares
+          totalToday += (q.price - q.preClose) * shares
         }
-        if (it.costPrice != null && it.costPrice > 0) {
-          totalFloating += (q.price - it.costPrice) * it.shares
-          totalCost += it.costPrice * it.shares
+        if (costPrice != null && costPrice > 0) {
+          totalFloating += (q.price - costPrice) * shares
+          totalCost += costPrice * shares
         }
       }
     }

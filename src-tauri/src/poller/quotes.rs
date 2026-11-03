@@ -53,26 +53,28 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
 
         let now = crate::market::beijing_now();
         let session = crate::market::session_at(now);
-        let in_auction_or_pretrade = session.is_call_auction() || session == crate::market::Session::PreTrade;
+        let is_continuous = session.is_continuous_trading();
 
         // Evaluate crossings against the *previous* tick before we replace the
         // stored quotes, otherwise every poll would look like a fresh seed.
         let mut tracker = state.tracker.lock().unwrap_or_else(|e| e.into_inner());
         let mut events = Vec::new();
 
-        // During 09:15-09:30 call auction and pre-trade silence:
-        // Do not evaluate anomaly triggers (rapid_change, intraday_extremes, etc.)
-        // to prevent false alarms caused by virtual matching orders and cancellations.
+        // Intraday anomaly triggers (rapid_change, intraday_extremes, volume_burst, limit_board)
+        // are strictly restricted to continuous trading sessions (09:30-11:30 and 13:00-14:56).
+        // During pre-open (09:10), call auctions (09:15-09:25, 14:57-15:00), pre-trade (09:25-09:29),
+        // lunch break, and closed hours, anomaly evaluation is completely silenced to eliminate
+        // false alarms (such as yesterday's limit board being flagged as broken at 09:10).
         let empty_anomalies = crate::config::AnomalyAlertConfig {
             rapid_change: false,
             intraday_extremes: false,
             volume_burst: false,
             limit_board: false,
         };
-        let anomaly_cfg = if in_auction_or_pretrade {
-            &empty_anomalies
-        } else {
+        let anomaly_cfg = if is_continuous {
             &cfg.anomaly_alerts
+        } else {
+            &empty_anomalies
         };
 
         for q in &quotes {
@@ -91,8 +93,8 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let names: std::collections::HashMap<&str, &str> =
             quotes.iter().map(|q| (q.code.as_str(), q.name.as_str())).collect();
 
-        // Silence all notifications (desktop OS and in-app toasts) during call auction and pre-trade
-        let notifications: Vec<AlertNotification> = if in_auction_or_pretrade {
+        // Silence all notifications (desktop OS and in-app toasts) outside continuous trading
+        let notifications: Vec<AlertNotification> = if !is_continuous {
             Vec::new()
         } else {
             let mut grouped_events: Vec<(&str, Vec<&crate::crossing::CrossingEvent>)> = Vec::new();

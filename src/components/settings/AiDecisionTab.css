@@ -119,3 +119,48 @@
   gap: 8px;
   margin-top: 10px;
 }
+
+/* Light theme adaptability (AGENTS.md §15) */
+:root[data-theme="light"] .ai-mode-option {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .ai-mode-option:hover {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+:root[data-theme="light"] .ai-mode-option.active {
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.3);
+}
+
+:root[data-theme="light"] .ai-mode-head {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .ai-mode-desc {
+  color: #64748b;
+}
+
+:root[data-theme="light"] .ai-status-banner {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #334155;
+}
+
+:root[data-theme="light"] .ai-download-progress-container {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .ai-download-bar-track {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .ai-download-info-row {
+  color: #64748b;
+}

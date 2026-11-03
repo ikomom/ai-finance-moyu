@@ -50,6 +50,8 @@
   --surface-popover-bg: rgba(18, 22, 31, 0.96);
   --surface-input-bg: rgba(0, 0, 0, 0.28);
   --surface-input-border: rgba(255, 255, 255, 0.14);
+  --bg-card: var(--card, var(--surface-card-bg));
+  --border-color: var(--line, var(--surface-border-subtle));
 
   /* ------------------------------------------------ Typography & Text */
   --text-primary: #f3f4f6;

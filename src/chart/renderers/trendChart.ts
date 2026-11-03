@@ -8,6 +8,7 @@ import { buildUnifiedChartData, computeUnifiedMaxDev, isFullSpectrumActive } fro
 import { drawMacdSubchart } from './macdRenderer'
 import { drawMinuteVolumeSubchart } from './volumeRenderer'
 import { drawTrendPrice } from './trendRenderer'
+import { drawTradePoints } from './tradePointsRenderer'
 
 export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const dpi = setupCanvasDpi(canvas)
@@ -28,13 +29,12 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const plotW = Math.max(1, cssW - pad.left - pad.right)
   const plotH = Math.max(1, cssH - pad.top - pad.bottom)
 
-  // Split plotH into price section (58%) and subchart (42%)
-  const priceH = Math.max(20, Math.round(plotH * 0.58))
-  const volGap = 3
+  // Split plotH into price section (74%) and subchart (26%)
+  const priceH = Math.max(30, Math.round(plotH * 0.74))
+  const volGap = 2
   const volT = plotT + priceH + volGap
   const volH = Math.max(12, plotH - priceH - volGap)
-  const subTextPad = 10
-  const subPlotH = Math.max(6, volH - subTextPad)
+  const subPlotH = Math.max(8, volH - 2)
 
   const points = opts.trend?.points ?? []
   const preClose = opts.preClose || opts.trend?.preClose || 0
@@ -253,6 +253,24 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       color: 'rgba(74, 222, 128, 0.45)',
       dash: [3, 2],
       label: 'L15',
+    })
+  }
+
+  // --- Trade Markers (B / S / T) ------------------------------------------
+  if (opts.trades && opts.trades.length > 0) {
+    drawTradePoints({
+      ctx,
+      trades: opts.trades,
+      tradeDate: opts.auction?.date,
+      xOf,
+      yOf,
+      plotL,
+      plotW,
+      plotT,
+      priceH,
+      useFullSpectrum,
+      isGlobal,
+      hoverSlot: opts.hoverSlot,
     })
   }
 }

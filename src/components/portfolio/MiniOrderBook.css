@@ -6,8 +6,8 @@
   min-width: 98px;
   max-width: 98px;
   flex-shrink: 0;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface-card-bg, rgba(15, 23, 42, 0.45));
+  border: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.08));
   border-radius: 4px;
   padding: 2px 3px;
   box-sizing: border-box;
@@ -103,7 +103,7 @@
 .ob-tier-label {
   position: relative;
   z-index: 1;
-  color: #64748b;
+  color: var(--text-muted, #64748b);
   font-size: 9px;
   font-weight: 500;
   min-width: 17px;
@@ -122,7 +122,7 @@
 .ob-vol {
   position: relative;
   z-index: 1;
-  color: #94a3b8;
+  color: var(--text-dim, #94a3b8);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 8.5px;
   text-align: right;
@@ -131,6 +131,6 @@
 
 .ob-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-border-divider, rgba(255, 255, 255, 0.08));
   margin: 1px 0;
 }

@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import type { FocusSeatEntity } from './seatEntities'
 import type { SeatCategory } from '../dragon_tiger/types'
 
@@ -48,20 +48,19 @@ export function SeatEntityCard(props: SeatEntityCardProps) {
     }
   }
 
-  // 点击外部关闭下拉菜单
-  const handleClickOutside = (e: MouseEvent) => {
-    const target = e.target as HTMLElement
-    if (!target.closest('.seat-category-selector')) {
-      setShowCatMenu(false)
+  // 仅在下拉菜单展开期间按需注册全局点击外部监听器，避免常驻监听器泛滥
+  createEffect(() => {
+    if (!showCatMenu()) return
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.seat-category-selector')) {
+        setShowCatMenu(false)
+      }
     }
-  }
-
-  onMount(() => {
     window.addEventListener('click', handleClickOutside)
-  })
-
-  onCleanup(() => {
-    window.removeEventListener('click', handleClickOutside)
+    onCleanup(() => {
+      window.removeEventListener('click', handleClickOutside)
+    })
   })
 
   // 预览显示的马甲（最多 2 个）

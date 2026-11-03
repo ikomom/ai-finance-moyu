@@ -144,6 +144,48 @@ describe('Mini layout', () => {
     host.remove()
   })
 
+  it('hides cost and profit badge when enablePortfolio is true and position is empty/cleared', () => {
+    const snap = snapshotWith({
+      config: {
+        ...snapshotWith().config,
+        enablePortfolio: true,
+      },
+      positions: [],
+    })
+    setSnapshot(snap)
+    const host = mount(() => Mini({ flash: false }))
+
+    expect(host.textContent).toContain('浦发银行')
+    // Cleared/empty in ledger -> cost line & profit badge must disappear
+    expect(host.textContent).not.toContain('浮盈')
+    host.remove()
+  })
+
+  it('renders ledger profit badge when enablePortfolio is true and position exists', () => {
+    const snap = snapshotWith({
+      config: {
+        ...snapshotWith().config,
+        enablePortfolio: true,
+      },
+      positions: [
+        {
+          brokerId: 'test-broker',
+          code: 'sh600000',
+          name: '浦发银行',
+          shares: 500,
+          costPrice: 9.2,
+          updatedAt: '2026-11-03',
+        },
+      ],
+    })
+    setSnapshot(snap)
+    const host = mount(() => Mini({ flash: false }))
+
+    expect(host.textContent).toContain('浦发银行')
+    expect(host.textContent).toContain('浮盈')
+    host.remove()
+  })
+
   it('renders the empty-state when no quote has arrived', () => {
     setSnapshot(snapshotWith({ quotes: [] }))
     const host = mount(() => Mini({ flash: false }))

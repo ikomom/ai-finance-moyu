@@ -25,6 +25,15 @@ export async function syncCustomSeats(): Promise<CustomSeatMapping[]> {
 // Auto-sync on import
 void syncCustomSeats()
 
+// Listen for updates from settings window across Tauri windows
+if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+  import('@tauri-apps/api/event').then(({ listen }) => {
+    void listen('custom-seats-updated', () => {
+      void syncCustomSeats()
+    })
+  }).catch(() => {})
+}
+
 export function getCachedCustomSeats(): CustomSeatMapping[] {
   return cachedCustomSeats
 }

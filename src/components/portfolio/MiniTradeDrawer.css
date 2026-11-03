@@ -283,3 +283,95 @@
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* Light Theme Overrides */
+:root[data-theme="light"] .mini-trade-overlay {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme="light"] .mini-trade-drawer {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme="light"] .mini-trade-broker-label {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .mini-trade-broker-select {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+:root[data-theme="light"] .mini-trade-cash {
+  color: #16a34a;
+}
+
+:root[data-theme="light"] .mini-trade-close-x {
+  color: #64748b;
+}
+:root[data-theme="light"] .mini-trade-close-x:hover {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .direction-tab {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #475569;
+}
+
+:root[data-theme="light"] .direction-tab.buy.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 1px 4px rgba(2, 132, 199, 0.25);
+}
+
+:root[data-theme="light"] .direction-tab.sell.active {
+  background: #4f46e5;
+  color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.25);
+}
+
+:root[data-theme="light"] .field-label {
+  color: #64748b;
+}
+
+:root[data-theme="light"] .trade-num-input {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.16);
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .field-action-btn {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #334155;
+}
+
+:root[data-theme="light"] .field-action-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .ratio-chip {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #475569;
+}
+
+:root[data-theme="light"] .ratio-chip:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .summary-line-main {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .summary-line-sub {
+  color: #64748b;
+}

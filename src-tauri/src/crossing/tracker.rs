@@ -224,6 +224,21 @@ impl CrossingTracker {
         true
     }
 
+    /// Reset intraday anomaly tracking states across session/day boundaries.
+    pub fn reset_intraday(&mut self) {
+        self.intraday_states.clear();
+        self.desktop_notif_fired.clear();
+        self.last_fired.retain(|k, _| {
+            !k.contains(":broken_")
+                && !k.contains(":vol_burst")
+                && !k.contains(":near_")
+                && !k.contains(":sealed_")
+                && !k.contains(":seal_loosening")
+                && !k.contains(":rapid_")
+                && !k.contains(":extreme_")
+        });
+    }
+
     /// Drop remembered state for codes no longer watched, so removed-then-
     /// re-added securities re-arm from scratch.
     pub fn retain(&mut self, keep: &[String]) {

@@ -3,6 +3,7 @@
 import { COLOR_MA10, COLOR_MA20, COLOR_MA5, diagnoseMacd, FONT } from '../chart'
 import { DOWN, fmtPrice, fmtVol, UP } from '../types'
 import type { KlinePaint } from './klinePaintTypes'
+import { paintKlineTradeMarkers } from './klineTradeMarkers'
 
 export function paintBarsAndOverlay(c: KlinePaint): void {
   const { ctx, props, xOfIdx, yOfPrice, volT, volH, plotL, plotW, priceT, slice, allBars, startIdx, barW, chartTheme, hoveredIndex } = c
@@ -70,6 +71,20 @@ export function paintBarsAndOverlay(c: KlinePaint): void {
     drawMA('ma5', COLOR_MA5)
     drawMA('ma10', COLOR_MA10)
     drawMA('ma20', COLOR_MA20)
+
+    // Trade markers (B / S / T)
+    paintKlineTradeMarkers({
+      ctx,
+      slice,
+      trades: props.trades,
+      xOfIdx,
+      yOfPrice,
+      plotL,
+      plotW,
+      priceT,
+      priceH: c.priceH,
+      hoveredIndex: hoveredIndex(),
+    })
 
     // 6. Timeline Labels (e.g. 3 date stamps at bottom)
     ctx.font = FONT

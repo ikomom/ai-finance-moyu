@@ -7,6 +7,7 @@ import type { SetStoreFunction } from 'solid-js/store'
 
 import type { CheckResult } from '../../services/updater'
 import type { Config, DataSource, PriceLine, WatchItem } from '../../types'
+import type { PortfolioPosition } from '../../types/portfolio'
 import type { TabKey } from './settingsMeta'
 
 export interface SettingsContextValue {
@@ -15,6 +16,7 @@ export interface SettingsContextValue {
   sources: Accessor<Array<[DataSource, string]>>
   ready: Accessor<boolean>
   hasIwenCaiKey: Accessor<boolean>
+  positions: Accessor<PortfolioPosition[]>
   activeTab: Accessor<TabKey>
   setActiveTab: Setter<TabKey>
   msg: Accessor<{ text: string; kind: '' | 'ok' | 'bad' }>

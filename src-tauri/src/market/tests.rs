@@ -100,6 +100,19 @@
     }
 
     #[test]
+    fn is_continuous_trading_matches_morning_and_afternoon() {
+        assert!(Session::Morning.is_continuous_trading());
+        assert!(Session::Afternoon.is_continuous_trading());
+        assert!(!Session::PreOpen.is_continuous_trading());
+        assert!(!Session::CallAuctionCancelable.is_continuous_trading());
+        assert!(!Session::CallAuctionLocked.is_continuous_trading());
+        assert!(!Session::PreTrade.is_continuous_trading());
+        assert!(!Session::LunchBreak.is_continuous_trading());
+        assert!(!Session::ClosingAuction.is_continuous_trading());
+        assert!(!Session::Closed.is_continuous_trading());
+    }
+
+    #[test]
     fn parses_time_and_calculates_elapsed_minutes() {
         assert_eq!(parse_time_to_minutes("09:30:00"), Some(570));
         assert_eq!(parse_time_to_minutes("10:00:00"), Some(600));
