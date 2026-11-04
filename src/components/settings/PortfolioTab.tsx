@@ -7,6 +7,8 @@ import {
 } from '../../services/portfolio'
 import { FEE_PRESETS, type BrokerAccount, type BrokerFeeConfig, type PortfolioSummary } from '../../types/portfolio'
 import { PortfolioOrdersTable, PortfolioPositionsTable, PortfolioTradesTable } from './PortfolioTables'
+import { PortfolioClearedTable } from './PortfolioClearedTable'
+import { computeClearedPositions } from './portfolioClearedHelpers'
 import { PortfolioStatsGrid } from './PortfolioStatsGrid'
 import { PortfolioBrokerBar } from './PortfolioBrokerBar'
 import { PortfolioAccountModal } from './PortfolioAccountModal'
@@ -16,7 +18,7 @@ import { useSettings } from './SettingsContext'
 export function PortfolioTab() {
   const { form, setForm, save } = useSettings()
   const [summary, setSummary] = createSignal<PortfolioSummary | null>(null)
-  const [subTab, setSubTab] = createSignal<'positions' | 'trades' | 'orders'>('positions')
+  const [subTab, setSubTab] = createSignal<'positions' | 'cleared' | 'orders' | 'trades'>('positions')
   const [modalOpen, setModalOpen] = createSignal(false)
   const [transferModalOpen, setTransferModalOpen] = createSignal(false)
   const [editingBroker, setEditingBroker] = createSignal<BrokerAccount | null>(null)
@@ -60,6 +62,11 @@ export function PortfolioTab() {
     const bId = currentBroker()?.id ?? s?.activeBrokerId
     if (!s || !bId) return []
     return (s.pendingOrders ?? []).filter((o) => o.brokerId === bId)
+  }
+
+  const currentClearedPositions = () => {
+    const bId = currentBroker()?.id ?? summary()?.activeBrokerId ?? undefined
+    return computeClearedPositions(currentTrades(), currentPositions(), bId)
   }
 
   const handleCancelOrder = async (orderId: string) => {
@@ -107,9 +114,7 @@ export function PortfolioTab() {
 
   const handleResetBroker = async () => {
     const b = currentBroker()
-    if (!b) return
-    const msg = `确认重置券商【${b.name}】？\n清空全部持仓及交易流水，本金复原为 ¥${b.initialCash.toLocaleString()}。`
-    if (!confirm(msg)) return
+    if (!b || !confirm(`确认重置券商【${b.name}】？\n清空全部持仓及流水，本金复原为 ¥${b.initialCash.toLocaleString()}。`)) return
     setSummary(await resetBrokerAccount(b.id))
   }
 
@@ -119,18 +124,12 @@ export function PortfolioTab() {
     try {
       const updated = await deleteBrokerAccount(b.id)
       setSummary(updated)
-      if (updated.brokers.length === 0) {
-        setEditingBroker(null)
-        setModalOpen(true)
-      }
-    } catch (e) {
-      console.error(e)
-    }
+      if (updated.brokers.length === 0) { setEditingBroker(null); setModalOpen(true) }
+    } catch (e) { console.error(e) }
   }
 
   const handleTransferCash = async (brokerId: string, amount: number, isDeposit: boolean) => {
-    const updated = await transferBrokerCash(brokerId, amount, isDeposit)
-    setSummary(updated)
+    setSummary(await transferBrokerCash(brokerId, amount, isDeposit))
   }
 
   const handleSaveBrokerModal = async (
@@ -243,28 +242,25 @@ export function PortfolioTab() {
 
         <div class="portfolio-table-section">
           <div class="portfolio-subtabs">
-            <button
-              class={`subtab-btn ${subTab() === 'positions' ? 'active' : ''}`}
-              onClick={() => setSubTab('positions')}
-            >
+            <button class={`subtab-btn ${subTab() === 'positions' ? 'active' : ''}`} onClick={() => setSubTab('positions')}>
               持仓明细 ({currentPositions().length})
             </button>
-            <button
-              class={`subtab-btn ${subTab() === 'orders' ? 'active' : ''}`}
-              onClick={() => setSubTab('orders')}
-            >
+            <button class={`subtab-btn ${subTab() === 'cleared' ? 'active' : ''}`} onClick={() => setSubTab('cleared')}>
+              清仓战绩 ({currentClearedPositions().length})
+            </button>
+            <button class={`subtab-btn ${subTab() === 'orders' ? 'active' : ''}`} onClick={() => setSubTab('orders')}>
               排队挂单 ({currentPendingOrders().length})
             </button>
-            <button
-              class={`subtab-btn ${subTab() === 'trades' ? 'active' : ''}`}
-              onClick={() => setSubTab('trades')}
-            >
+            <button class={`subtab-btn ${subTab() === 'trades' ? 'active' : ''}`} onClick={() => setSubTab('trades')}>
               交易记录 ({currentTrades().length})
             </button>
           </div>
 
           <Show when={subTab() === 'positions'}>
             <PortfolioPositionsTable positions={currentPositions()} />
+          </Show>
+          <Show when={subTab() === 'cleared'}>
+            <PortfolioClearedTable clearedPositions={currentClearedPositions()} />
           </Show>
           <Show when={subTab() === 'orders'}>
             <PortfolioOrdersTable
