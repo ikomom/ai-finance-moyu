@@ -96,7 +96,7 @@ export function MiniBody(props: MiniBodyProps) {
   const hoveredKExtra = props.hover.kbarExtra
   const setHoveredKExtra = props.hover.setKbarExtra
 
-  const { cost, pnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra } =
+  const { cost, shares, pnl, clearedPnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra } =
     createMiniDerived({
       quote: q,
       item,
@@ -175,19 +175,29 @@ export function MiniBody(props: MiniBodyProps) {
         hoverExtra={hoverExtra()}
         extraInfo={
           <div class="mini-pnl-group">
-            <Show when={cost()}>
-              {(c) => {
-                const pct = profitPct(q().price, c())
+            <Show when={cost() != null}>
+              {(_) => {
+                const c = cost()!
+                const pct = profitPct(q().price, c)
                 return pct !== null ? (
                   <span class={`profit-badge ${trendClass(pct)}`}>
                     浮盈 {fmtPct(pct)}
                   </span>
-                ) : null
+                ) : (
+                  <span class="profit-badge flat" title="保本价/摊薄成本">
+                    成本 ¥{c.toFixed(2)}
+                  </span>
+                )
               }}
             </Show>
             <Show when={pnl() !== null}>
               <span class={`profit-badge ${trendClass(pnl()!)}`}>
                 {fmtMoney(pnl()!)}
+              </span>
+            </Show>
+            <Show when={clearedPnl() !== null && shares() == null}>
+              <span class={`profit-badge ${trendClass(clearedPnl()!)}`}>
+                已结 {fmtMoney(clearedPnl()!)}
               </span>
             </Show>
             <Show when={s().config.enablePortfolio && !isIndex()}>

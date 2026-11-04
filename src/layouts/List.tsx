@@ -27,6 +27,7 @@ import {
   type WatchItem,
 } from '../types'
 import { computeTotalStats, useListScroll } from './useListScroll'
+import { getClearedPnl } from '../components/portfolio/tradeHelpers'
 
 /**
  * Layout 3 — 自选股列表 (紧凑金融看板).
@@ -151,6 +152,12 @@ export function List(props: { flash: boolean }) {
                 }
                 const pnl = () => profitAmount(q.price, cost(), shares())
                 const todayPnl = () => todayProfitAmount(q.price, q.preClose, shares())
+                const clearedPnl = () => {
+                  if (!s()?.config.enablePortfolio) return null
+                  const pos = portfolioPos()
+                  if (pos && pos.shares > 0) return null
+                  return getClearedPnl(q.code, s()?.trades)
+                }
 
                 return (
                   <div
@@ -202,29 +209,41 @@ export function List(props: { flash: boolean }) {
                       class="col-pnl cell-pnl"
                       title={
                         pnl() !== null
-                          ? `总盈亏: ${fmtMoney(pnl()!)} (${cost() && profitPct(q.price, cost()!) !== null ? fmtPct(profitPct(q.price, cost()!)!) : '--'})${todayPnl() !== null ? ` | 今日盈亏: ${fmtMoney(todayPnl()!)}` : ''}`
-                          : cost() && profitPct(q.price, cost()!) !== null
-                            ? `浮盈: ${fmtPct(profitPct(q.price, cost()!)!)}`
-                            : undefined
+                          ? `总盈亏: ${fmtMoney(pnl()!)} (成本: ¥${fmtPrice(cost()!)}${cost() && profitPct(q.price, cost()!) !== null ? ` / 浮盈率: ${fmtPct(profitPct(q.price, cost()!)!)}` : ''})${todayPnl() !== null ? ` | 今日盈亏: ${fmtMoney(todayPnl()!)}` : ''}`
+                          : clearedPnl() !== null
+                            ? `已结战绩: ${fmtMoney(clearedPnl()!)}`
+                            : cost() && profitPct(q.price, cost()!) !== null
+                              ? `浮盈: ${fmtPct(profitPct(q.price, cost()!)!)}`
+                              : undefined
                       }
                     >
                       <Show
                         when={pnl() !== null}
                         fallback={
                           <Show
-                            when={cost()}
-                            fallback={<span class="pnl-dash">-</span>}
+                            when={clearedPnl() !== null && shares() == null}
+                            fallback={
+                              <Show
+                                when={cost() != null}
+                                fallback={<span class="pnl-dash">-</span>}
+                              >
+                                {(_) => {
+                                  const c = cost()!
+                                  const p = profitPct(q.price, c)
+                                  return p !== null ? (
+                                    <span class={`pnl-val ${trendClass(p)}`}>
+                                      {fmtPct(p)}
+                                    </span>
+                                  ) : (
+                                    <span class="pnl-val flat">--</span>
+                                  )
+                                }}
+                              </Show>
+                            }
                           >
-                            {(c) => {
-                              const p = profitPct(q.price, c())
-                              return p !== null ? (
-                                <span class={`pnl-val ${trendClass(p)}`}>
-                                  {fmtPct(p)}
-                                </span>
-                              ) : (
-                                <span class="pnl-val flat">--</span>
-                              )
-                            }}
+                            <span class={`pnl-val ${trendClass(clearedPnl()!)}`}>
+                              已结 {fmtMoney(clearedPnl()!)}
+                            </span>
                           </Show>
                         }
                       >

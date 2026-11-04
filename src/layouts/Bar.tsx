@@ -21,6 +21,7 @@ import {
   trendClass,
   type Snapshot,
 } from '../types'
+import { getClearedPnl } from '../components/portfolio/tradeHelpers'
 
 /**
  * Layout 1 — 数字条 (横向胶囊形态).
@@ -126,6 +127,11 @@ export function Bar(props: { snapshot: Snapshot; flash: boolean }) {
                 if (td != null) parts.push(`今日盈亏: ${fmtMoney(td)}`)
                 const pf = pnlMoney()
                 if (pf != null) parts.push(`累计盈亏: ${fmtMoney(pf)}`)
+              } else if (props.snapshot.config.enablePortfolio) {
+                const cl = getClearedPnl(q.code, props.snapshot.trades)
+                if (cl !== null) {
+                  parts.push(`清仓已结: ${fmtMoney(cl)}`)
+                }
               }
               return parts.join('\n')
             }

@@ -168,7 +168,16 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                 pos.cost_price = (new_cost * 1000.0).round() / 1000.0;
                 pos.updated_at = now.clone();
             } else {
-                let init_cost = (total_cost / (order.shares as f64) * 1000.0).round() / 1000.0;
+                let hist_pnl: f64 = data
+                    .trades
+                    .iter()
+                    .filter(|t| t.status == TradeRecordStatus::Filled && t.broker_id == order.broker_id && t.code == order.code)
+                    .map(|t| match t.action {
+                        TradeAction::Buy => -(t.amount + t.fee),
+                        TradeAction::Sell => t.amount - t.fee,
+                    })
+                    .sum();
+                let init_cost = (((total_cost - hist_pnl) / (order.shares as f64)) * 1000.0).round() / 1000.0;
                 data.positions.push(PortfolioPosition {
                     broker_id: order.broker_id.clone(),
                     code: order.code.clone(),
@@ -237,8 +246,12 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
             if pos.shares == order.shares {
                 data.positions.remove(pos_idx);
             } else {
+                let remaining_shares = pos.shares - order.shares;
+                let old_cost_val = pos.cost_price * (pos.shares as f64);
+                let new_cost = (old_cost_val - net_proceeds) / (remaining_shares as f64);
                 let pos_mut = &mut data.positions[pos_idx];
-                pos_mut.shares -= order.shares;
+                pos_mut.shares = remaining_shares;
+                pos_mut.cost_price = (new_cost * 1000.0).round() / 1000.0;
                 pos_mut.updated_at = now.clone();
             }
 

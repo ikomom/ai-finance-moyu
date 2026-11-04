@@ -186,6 +186,80 @@ describe('Mini layout', () => {
     host.remove()
   })
 
+  it('renders cleared settled profit badge (已结 +¥xxx) when position is 0 but historical trades exist', () => {
+    const snap = snapshotWith({
+      config: {
+        ...snapshotWith().config,
+        enablePortfolio: true,
+      },
+      positions: [],
+      trades: [
+        {
+          id: 't1',
+          brokerId: 'test-broker',
+          brokerName: '券商',
+          code: 'sh600000',
+          name: '浦发银行',
+          action: 'Buy',
+          price: 10,
+          shares: 1000,
+          amount: 10000,
+          fee: 5,
+          timestamp: '2026-11-04 10:00:00',
+          status: 'Filled',
+        },
+        {
+          id: 't2',
+          brokerId: 'test-broker',
+          brokerName: '券商',
+          code: 'sh600000',
+          name: '浦发银行',
+          action: 'Sell',
+          price: 12,
+          shares: 1000,
+          amount: 12000,
+          fee: 9,
+          timestamp: '2026-11-04 14:00:00',
+          status: 'Filled',
+        },
+      ],
+    })
+    setSnapshot(snap)
+    const host = mount(() => Mini({ flash: false }))
+
+    expect(host.textContent).toContain('浦发银行')
+    expect(host.textContent).toContain('已结')
+    expect(host.textContent).toContain('+¥1,986.00')
+    expect(host.textContent).not.toContain('浮盈')
+    host.remove()
+  })
+
+  it('renders negative cost and hides profit percentage when holding has negative cost', () => {
+    const snap = snapshotWith({
+      config: {
+        ...snapshotWith().config,
+        enablePortfolio: true,
+      },
+      positions: [
+        {
+          brokerId: 'test-broker',
+          code: 'sh600000',
+          name: '浦发银行',
+          shares: 100,
+          costPrice: -5.2,
+          updatedAt: '2026-11-03',
+        },
+      ],
+    })
+    setSnapshot(snap)
+    const host = mount(() => Mini({ flash: false }))
+
+    expect(host.textContent).toContain('浦发银行')
+    expect(host.textContent).toContain('成本 ¥-5.20')
+    expect(host.textContent).not.toContain('浮盈 +')
+    host.remove()
+  })
+
   it('renders the empty-state when no quote has arrived', () => {
     setSnapshot(snapshotWith({ quotes: [] }))
     const host = mount(() => Mini({ flash: false }))

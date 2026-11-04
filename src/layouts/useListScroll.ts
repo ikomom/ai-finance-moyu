@@ -47,7 +47,7 @@ export function computeTotalStats(
         if (q.preClose > 0) {
           totalToday += (q.price - q.preClose) * shares
         }
-        if (costPrice != null && costPrice > 0) {
+        if (costPrice != null) {
           totalFloating += (q.price - costPrice) * shares
           totalCost += costPrice * shares
         }

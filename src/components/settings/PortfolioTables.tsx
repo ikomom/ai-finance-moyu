@@ -53,7 +53,7 @@ export function PortfolioPositionsTable(props: PositionsTableProps) {
                     {fmtMoney(pos.floatingPnl)}
                   </td>
                   <td class={trendClass(pos.floatingPnl)}>
-                    {fmtPct(pos.floatingPnlPct)}
+                    {pos.costPrice > 0 ? fmtPct(pos.floatingPnlPct) : '--'}
                   </td>
                   <td class={trendClass(pos.todayPnl)}>
                     {fmtMoney(pos.todayPnl)}

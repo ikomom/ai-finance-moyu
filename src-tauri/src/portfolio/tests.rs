@@ -101,8 +101,45 @@ fn test_sell_position_and_realized_pnl() {
         _ => panic!("Expected filled status"),
     }
 
+    // Diluted cost check: remaining 500 shares should have diluted cost ~8.02
+    let pos_mid = data.positions.iter().find(|p| p.code == "sh600000").unwrap();
+    assert_eq!(pos_mid.shares, 500);
+    assert!((pos_mid.cost_price - 8.02).abs() < 0.1);
+
     execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Sell, 12.0, 500)).unwrap();
     assert!(!data.positions.iter().any(|p| p.code == "sh600000"));
+}
+
+#[test]
+fn test_diluted_cost_method_and_negative_cost() {
+    let (mut data, b_id) = test_portfolio_with_broker();
+    // 1. Buy 1000 shares @ 10.0
+    execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Buy, 10.0, 1000)).unwrap();
+
+    // 2. Sell 900 shares @ 20.0 (huge profit, proceeds ~17980, far exceeding total initial cost ~10001)
+    execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Sell, 20.0, 900)).unwrap();
+    let pos = data.positions.iter().find(|p| p.code == "sh600000").unwrap();
+    assert_eq!(pos.shares, 100);
+    // Cost should be strongly negative (around -79.8)
+    assert!(pos.cost_price < 0.0);
+    assert!((pos.cost_price - (-79.8)).abs() < 1.0);
+}
+
+#[test]
+fn test_cross_cycle_diluted_cost_on_reopening_position() {
+    let (mut data, b_id) = test_portfolio_with_broker();
+    // 1. Buy 1000 shares @ 10.0
+    execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Buy, 10.0, 1000)).unwrap();
+    // 2. Sell all 1000 shares @ 12.0 (cleared, made ~1985 net profit)
+    execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Sell, 12.0, 1000)).unwrap();
+    assert!(!data.positions.iter().any(|p| p.code == "sh600000"));
+
+    // 3. Re-buy 500 shares @ 10.0 after clearing
+    execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Buy, 10.0, 500)).unwrap();
+    let pos = data.positions.iter().find(|p| p.code == "sh600000").unwrap();
+    assert_eq!(pos.shares, 500);
+    // Cost should be diluted by the ~1985 historical profit: (5000 - 1985) / 500 ≈ 6.03
+    assert!((pos.cost_price - 6.03).abs() < 0.1);
 }
 
 #[test]

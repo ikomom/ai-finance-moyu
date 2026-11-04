@@ -1,4 +1,4 @@
-import type { BrokerFeeConfig, PortfolioPosition, PositionView, TradeAction } from '../../types/portfolio'
+import type { BrokerFeeConfig, PortfolioPosition, PositionView, TradeAction, TradeRecord } from '../../types/portfolio'
 
 export interface EstimatedFee {
   commission: number
@@ -119,4 +119,33 @@ export function isPendingLimitOrder(
     const bid1 = bids && bids.length > 0 && bids[0][0] > 0 ? bids[0][0] : currentPrice
     return bid1 > 0 && price > bid1
   }
+}
+
+/**
+ * Calculates settled/cleared profit & loss (元) for a security when shares === 0.
+ * Returns null if there are no historical filled trades for this security.
+ */
+export function getClearedPnl(
+  code: string,
+  trades?: TradeRecord[] | null,
+  brokerId?: string | null
+): number | null {
+  if (!trades || trades.length === 0) return null
+  const cleanCode = code.toLowerCase()
+  let hasFilledTrade = false
+  let totalBuyCost = 0
+  let totalSellNet = 0
+  for (const t of trades) {
+    if (brokerId && t.brokerId !== brokerId) continue
+    if (t.code.toLowerCase() === cleanCode && (t.status === 'Filled' || !t.status)) {
+      hasFilledTrade = true
+      if (t.action === 'Buy' || (t.action as string) === 'buy') {
+        totalBuyCost += t.amount + (t.fee ?? 0)
+      } else if (t.action === 'Sell' || (t.action as string) === 'sell') {
+        totalSellNet += t.amount - (t.fee ?? 0)
+      }
+    }
+  }
+  if (!hasFilledTrade) return null
+  return Math.round((totalSellNet - totalBuyCost) * 100) / 100
 }

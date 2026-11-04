@@ -16,6 +16,7 @@ import {
   type WatchItem,
 } from '../types'
 import type { HoverExtra } from '../components/Chart'
+import { getClearedPnl } from '../components/portfolio/tradeHelpers'
 
 export type MiniMode = 'trend' | 'kline' | 'auction'
 
@@ -77,6 +78,12 @@ export function createMiniDerived(args: MiniDerivedArgs) {
     return item()?.shares ?? null
   }
   const pnl = () => profitAmount(q().price, cost(), shares())
+  const clearedPnl = () => {
+    if (!s().config.enablePortfolio) return null
+    const pos = portfolioPos()
+    if (pos && pos.shares > 0) return null
+    return getClearedPnl(q().code, s().trades)
+  }
   const trend = () => s().trends[q().code]
   const auction = () => s().auctions?.[q().code]
 
@@ -188,5 +195,5 @@ export function createMiniDerived(args: MiniDerivedArgs) {
     return null
   }
 
-  return { cost, shares, pnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra }
+  return { cost, shares, pnl, clearedPnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra }
 }
