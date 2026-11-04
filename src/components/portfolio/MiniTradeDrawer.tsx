@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, Show, untrack } from 'solid-js'
 import './MiniTradeDrawer.css'
 import './MiniTradeToast.css'
 import {
@@ -63,10 +63,16 @@ export function MiniTradeDrawer(props: MiniTradeDrawerProps) {
   }
 
   createEffect(() => { loadData() })
+
+  // 委托价格仅在抽屉呼出或标的切换时初始化一次，之后锁定，绝不随盘中 Tick 实时覆写
+  let initializedCode = ''
   createEffect(() => {
-    if (props.initialPrice && props.initialPrice > 0) {
-      setPrice(props.initialPrice)
-    } else if (props.currentPrice > 0 && price() === 0) {
+    const curCode = props.code
+    if (curCode && curCode !== initializedCode) {
+      initializedCode = curCode
+      const p = untrack(() => props.initialPrice || props.currentPrice || 0)
+      if (p > 0) setPrice(p)
+    } else if (untrack(() => price() === 0) && props.currentPrice > 0) {
       setPrice(props.currentPrice)
     }
   })

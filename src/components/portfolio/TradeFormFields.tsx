@@ -46,14 +46,18 @@ export function TradeFormFields(props: TradeFormFieldsProps) {
             step="0.01"
             min="0.01"
             class="trade-num-input"
-            value={props.price}
-            onInput={(e) => props.onPriceChange(parseFloat(e.currentTarget.value) || 0)}
+            value={props.price > 0 ? props.price : ''}
+            onInput={(e) => {
+              const val = parseFloat(e.currentTarget.value)
+              props.onPriceChange(isNaN(val) ? 0 : val)
+            }}
             placeholder="委托价格"
           />
           <button
             type="button"
             class="field-action-btn"
             onClick={() => props.onPriceChange(props.currentPrice)}
+            title="快速填入最新现价"
           >
             现价
           </button>
