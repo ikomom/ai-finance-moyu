@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "tauri": "tauri",
+    "clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "release": "node scripts/release.js"
   },
   "dependencies": {
