@@ -1,6 +1,7 @@
-import { createEffect, createSignal, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
+import { createEffect, createSignal, ErrorBoundary, Match, onCleanup, onMount, Show, Switch } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
+import { logToBackend } from './tauri'
 
 import { ContextMenu, closeMenu, isContextMenuOpen, setContextMenuOpen } from './components/ContextMenu'
 import { GlobalModals } from './components/modals/GlobalModals'
@@ -31,10 +32,7 @@ export function Widget() {
   let leaveTimer: number | null = null
 
   const clearLeaveTimer = () => {
-    if (leaveTimer !== null) {
-      window.clearTimeout(leaveTimer)
-      leaveTimer = null
-    }
+    if (leaveTimer !== null) { window.clearTimeout(leaveTimer); leaveTimer = null }
   }
 
   const dockEdge = () => snapshot()?.dock?.edge ?? 'none'
@@ -247,23 +245,36 @@ export function Widget() {
               }
             >
               {(s) => (
-                <Switch>
-                  <Match when={s().config.layout === 'bar'}>
-                    <Bar snapshot={s()} flash={flash()} />
-                  </Match>
-                  <Match when={s().config.layout === 'list'}>
-                    <List flash={flash()} />
-                  </Match>
-                  <Match when={s().config.layout === 'market'}>
-                    <Market flash={flash()} />
-                  </Match>
-                  <Match when={s().config.layout === 'global'}>
-                    <Global flash={flash()} />
-                  </Match>
-                  <Match when={true}>
-                    <Mini flash={flash()} />
-                  </Match>
-                </Switch>
+                <ErrorBoundary
+                  fallback={(err, reset) => {
+                    logToBackend(`Widget 渲染异常: ${err}`, 'ERROR')
+                    return (
+                      <div class="card" style={{ padding: '8px', 'font-size': '11px', 'text-align': 'center' }}>
+                        <div style={{ color: '#ef4444', 'font-weight': '600', 'margin-bottom': '4px' }}>⚠️ 界面渲染异常</div>
+                        <div style={{ opacity: 0.7, 'margin-bottom': '6px', 'word-break': 'break-all' }}>{String(err)}</div>
+                        <button style={{ padding: '2px 8px', background: 'rgba(255,255,255,0.15)', border: 'none', 'border-radius': '3px', color: 'inherit', cursor: 'pointer' }} onClick={() => reset()}>重试恢复</button>
+                      </div>
+                    )
+                  }}
+                >
+                  <Switch>
+                    <Match when={s().config.layout === 'bar'}>
+                      <Bar snapshot={s()} flash={flash()} />
+                    </Match>
+                    <Match when={s().config.layout === 'list'}>
+                      <List flash={flash()} />
+                    </Match>
+                    <Match when={s().config.layout === 'market'}>
+                      <Market flash={flash()} />
+                    </Match>
+                    <Match when={s().config.layout === 'global'}>
+                      <Global flash={flash()} />
+                    </Match>
+                    <Match when={true}>
+                      <Mini flash={flash()} />
+                    </Match>
+                  </Switch>
+                </ErrorBoundary>
               )}
             </Show>
           }

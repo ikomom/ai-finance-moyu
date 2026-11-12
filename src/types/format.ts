@@ -101,6 +101,17 @@ export function fmtTurnover(turnover?: number | null): string {
   return `${(turnover / 1e4).toFixed(0)}万`
 }
 
+/** Format transaction amount (成交额) into adaptive Chinese financial units without signs. */
+export function fmtAmount(v?: number | null): string {
+  if (v == null || isNaN(v) || v <= 0) return '0元'
+  const abs = Math.abs(v)
+  if (abs >= 1e12) return `${(abs / 1e12).toFixed(2)}万亿`
+  if (abs >= 1e10) return `${(abs / 1e8).toFixed(1)}亿`
+  if (abs >= 1e8) return `${(abs / 1e8).toFixed(2)}亿`
+  if (abs >= 1e4) return `${(abs / 1e4).toFixed(1)}万`
+  return `${Math.round(abs)}元`
+}
+
 /** Check if symbol represents an index (no individual call auction or VWAP) */
 export function isIndexCode(code: string): boolean {
   return code.startsWith('sh000') || code.startsWith('sz399') || code.startsWith('bj899')

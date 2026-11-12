@@ -10,6 +10,7 @@ import { emit } from '@tauri-apps/api/event'
 import { AuctionBadge } from '../components/AuctionBadge'
 import { Chart, type HoverExtra } from '../components/Chart'
 import { DragonTigerBadge } from '../components/dragon_tiger/DragonTigerBadge'
+import { FiveDayCanvas } from '../components/FiveDayCanvas'
 import { FooterControls } from '../components/FooterControls'
 import { IndexBadge } from '../components/IndexBadge'
 import { KLineBadge } from '../components/KLineBadge'
@@ -24,17 +25,20 @@ import {
   profitPct,
   trendClass,
   type AuctionPoint,
+  type DayTrend,
   type KLineBar,
   type KLineData,
   type KlinePeriod,
+  type MultiDayTrend,
   type Quote,
   type Snapshot,
   type TrendPoint,
   type WatchItem,
 } from '../types'
+import { fetchHistoricalDayTrend } from '../tauri'
 import { createMiniDerived } from './useMiniDerived'
 
-export type MiniMode = 'trend' | 'kline' | 'auction'
+export type MiniMode = 'trend' | 'five_day' | 'kline' | 'auction'
 
 export interface MiniIndicatorParams {
   ma: [number, number, number]
@@ -60,41 +64,24 @@ export interface MiniHoverState {
 }
 
 export interface MiniBodyProps {
-  quote: Accessor<Quote>
-  item: Accessor<WatchItem | undefined>
-  snapshot: Accessor<Snapshot>
-  activeMode: Accessor<MiniMode>
-  isIndex: Accessor<boolean>
-  kline: Accessor<KLineData | undefined>
-  indicatorParams: Accessor<MiniIndicatorParams>
-  subchartMode: Accessor<'vol' | 'macd'>
-  onToggleSubchart: () => void
-  onSelectMode: (mode: MiniMode) => void
-  klinePeriod?: Accessor<KlinePeriod>
-  onSelectPeriod?: (period: KlinePeriod) => void
+  quote: Accessor<Quote>; item: Accessor<WatchItem | undefined>; snapshot: Accessor<Snapshot>
+  activeMode: Accessor<MiniMode>; isIndex: Accessor<boolean>; kline: Accessor<KLineData | undefined>
+  indicatorParams: Accessor<MiniIndicatorParams>; subchartMode: Accessor<'vol' | 'macd'>
+  onToggleSubchart: () => void; onSelectMode: (mode: MiniMode) => void
+  klinePeriod?: Accessor<KlinePeriod>; onSelectPeriod?: (period: KlinePeriod) => void
+  multiDayTrend?: Accessor<MultiDayTrend | undefined>; historyDrillDay?: Accessor<DayTrend | null>
+  drillOrigin?: Accessor<'five_day' | 'kline'>; hasPrevHistoryDay?: Accessor<boolean>; hasNextHistoryDay?: Accessor<boolean>
+  drillableDates?: Accessor<string[]>
+  onPrevHistoryDay?: () => void; onNextHistoryDay?: () => void
+  onSelectDay?: (day: DayTrend, origin?: 'five_day' | 'kline') => void; onExitHistoryDrill?: () => void
   hover: MiniHoverState
 }
 
 export function MiniBody(props: MiniBodyProps) {
-  const q = props.quote
-  const item = props.item
-  const s = props.snapshot
-  const activeMode = props.activeMode
-  const isIndex = props.isIndex
-  const kline = props.kline
-  const indicatorParams = props.indicatorParams
-  const subchartMode = props.subchartMode
-  const toggleSubchartMode = props.onToggleSubchart
-  const setManualMode = props.onSelectMode
-  const hoveredPoint = props.hover.point
-  const setHoveredPoint = props.hover.setPoint
-  const hoveredPointExtra = props.hover.pointExtra
-  const setHoveredPointExtra = props.hover.setPointExtra
-  const hoveredAuctionPoint = props.hover.auctionPoint
-  const hoveredKBar = props.hover.kbar
-  const setHoveredKBar = props.hover.setKbar
-  const hoveredKExtra = props.hover.kbarExtra
-  const setHoveredKExtra = props.hover.setKbarExtra
+  const q = props.quote, item = props.item, s = props.snapshot, activeMode = props.activeMode
+  const isIndex = props.isIndex, kline = props.kline, indicatorParams = props.indicatorParams
+  const subchartMode = props.subchartMode, toggleSubchartMode = props.onToggleSubchart, setManualMode = props.onSelectMode
+  const { point: hoveredPoint, setPoint: setHoveredPoint, pointExtra: hoveredPointExtra, setPointExtra: setHoveredPointExtra, auctionPoint: hoveredAuctionPoint, kbar: hoveredKBar, setKbar: setHoveredKBar, kbarExtra: hoveredKExtra, setKbarExtra: setHoveredKExtra } = props.hover
 
   const { cost, shares, pnl, clearedPnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra } =
     createMiniDerived({
@@ -119,6 +106,9 @@ export function MiniBody(props: MiniBodyProps) {
     return (s().trades ?? []).filter((t) => t.code === code)
   }
 
+  const showOrderBook = () =>
+    !!(s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline' && activeMode() !== 'five_day' && !props.historyDrillDay?.())
+
   return (
     <>
       {/* Unified Stock Header */}
@@ -132,44 +122,46 @@ export function MiniBody(props: MiniBodyProps) {
         high={stats().high}
         low={stats().low}
         badge={
-          <>
-            <Show
-              when={activeMode() === 'kline'}
-              fallback={
-                <Show
-                  when={isIndex()}
-                  fallback={
-                    <Show
-                      when={hoveredPointExtra()?.auctionPoint != null || isAuctionSession()}
-                      fallback={
-                        <Show when={s().config.trendEngine}>
-                          <StockBadge signal={s().trendSignals?.[q().code]} quote={q()} snapshot={s()} />
-                        </Show>
-                      }
-                    >
-                      <AuctionBadge auction={auction()} quote={q()} />
-                    </Show>
-                  }
-                >
-                  <IndexBadge
-                    quote={q()}
-                    overview={s().marketOverview}
-                    signal={s().trendSignals?.[q().code]}
-                  />
+          <Show
+            when={activeMode() === 'trend' && props.historyDrillDay?.()}
+            fallback={
+              <>
+                <Show when={activeMode() === 'kline'}>
+                  <KLineBadge kline={kline()} quote={q()} snapshot={s()} />
                 </Show>
+                <Show when={activeMode() !== 'kline' && isIndex()}>
+                  <IndexBadge quote={q()} overview={s().marketOverview} signal={s().trendSignals?.[q().code]} />
+                </Show>
+                <Show when={activeMode() !== 'kline' && !isIndex()}>
+                  <Show when={hoveredPointExtra()?.auctionPoint != null || isAuctionSession()} fallback={
+                    <Show when={s().config.trendEngine}>
+                      <StockBadge signal={s().trendSignals?.[q().code]} quote={q()} snapshot={s()} />
+                    </Show>
+                  }>
+                    <AuctionBadge auction={auction()} quote={q()} />
+                  </Show>
+                  <DragonTigerBadge code={q().code} onClick={() => { void emit('open-dragon-tiger-drawer', { code: q().code }) }} />
+                </Show>
+              </>
+            }
+          >
+            {(drillDay) => {
+              const dateStr = () => {
+                const d = drillDay().date
+                return d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d
               }
-            >
-              <KLineBadge kline={kline()} quote={q()} snapshot={s()} />
-            </Show>
-            <Show when={!isIndex()}>
-              <DragonTigerBadge
-                code={q().code}
-                onClick={() => {
-                  void emit('open-dragon-tiger-drawer', { code: q().code })
-                }}
-              />
-            </Show>
-          </>
+              return (
+                <div class="history-drill-navigator" title="支持鼠标滚轮切换前后日，侧键返回">
+                  <button type="button" class="history-drill-arrow" onClick={() => props.onPrevHistoryDay?.()} disabled={!props.hasPrevHistoryDay?.()} title="前一交易日">◀</button>
+                  <span class="history-drill-date">📅 {dateStr()}</span>
+                  <button type="button" class="history-drill-arrow" onClick={() => props.onNextHistoryDay?.()} disabled={!props.hasNextHistoryDay?.()} title="后一交易日">▶</button>
+                  <button type="button" class="history-drill-return" onClick={() => props.onExitHistoryDrill?.()} title={`返回${props.drillOrigin?.() === 'kline' ? '日K' : '5日分时'}`}>
+                    ✕ 返回{props.drillOrigin?.() === 'kline' ? 'K线' : '5日'}
+                  </button>
+                </div>
+              )
+            }}
+          </Show>
         }
         hoverTime={hoverTime()}
         hoverExtra={hoverExtra()}
@@ -180,34 +172,23 @@ export function MiniBody(props: MiniBodyProps) {
                 const c = cost()!
                 const pct = profitPct(q().price, c)
                 return pct !== null ? (
-                  <span class={`profit-badge ${trendClass(pct)}`}>
-                    浮盈 {fmtPct(pct)}
-                  </span>
+                  <span class={`profit-badge ${trendClass(pct)}`}>浮盈 {fmtPct(pct)}</span>
                 ) : (
-                  <span class="profit-badge flat" title="保本价/摊薄成本">
-                    成本 ¥{c.toFixed(2)}
-                  </span>
+                  <span class="profit-badge flat" title="保本价/摊薄成本">成本 ¥{c.toFixed(2)}</span>
                 )
               }}
             </Show>
             <Show when={pnl() !== null}>
-              <span class={`profit-badge ${trendClass(pnl()!)}`}>
-                {fmtMoney(pnl()!)}
-              </span>
+              <span class={`profit-badge ${trendClass(pnl()!)}`}>{fmtMoney(pnl()!)}</span>
             </Show>
             <Show when={clearedPnl() !== null && shares() == null}>
-              <span class={`profit-badge ${trendClass(clearedPnl()!)}`}>
-                已结 {fmtMoney(clearedPnl()!)}
-              </span>
+              <span class={`profit-badge ${trendClass(clearedPnl()!)}`}>已结 {fmtMoney(clearedPnl()!)}</span>
             </Show>
             <Show when={s().config.enablePortfolio && !isIndex()}>
               <button
                 class="mini-trade-badge-btn"
                 title="模拟投资 / 快速买卖"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void emit('trigger-open-trade', { code: q().code })
-                }}
+                onClick={(e) => { e.stopPropagation(); void emit('trigger-open-trade', { code: q().code }) }}
               >
                 买卖
               </button>
@@ -217,28 +198,51 @@ export function MiniBody(props: MiniBodyProps) {
       />
 
       {/* Unified Chart Canvas & Order Book */}
-      <div class="mini-chart-section" classList={{ 'with-order-book': !!(s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline') }}>
+      <div class="mini-chart-section" classList={{ 'with-order-book': showOrderBook() }}>
         <div class="mini-chart-left">
           <Show
             when={activeMode() === 'kline'}
             fallback={
-              <Chart
-                trend={trend()}
-                auction={auction()}
-                preClose={q().preClose}
-                costPrice={cost()}
-                priceLines={item()?.priceLines ?? []}
-                lastPrice={q().price}
-                orbHigh={s().trendSignals?.[q().code]?.orbHigh}
-                orbLow={s().trendSignals?.[q().code]?.orbLow}
-                subchartMode={subchartMode()}
-                macdParams={indicatorParams().macd}
-                trades={currentTrades()}
-                onHover={(point, extra) => {
-                  setHoveredPoint(point)
-                  setHoveredPointExtra(extra ?? null)
-                }}
-              />
+              <Show
+                when={activeMode() === 'five_day'}
+                fallback={
+                  <Chart
+                    trend={props.historyDrillDay?.() ? { code: q().code, date: props.historyDrillDay()!.date, preClose: props.historyDrillDay()!.preClose, points: props.historyDrillDay()!.points } : trend()}
+                    auction={props.historyDrillDay?.() ? undefined : auction()}
+                    preClose={props.historyDrillDay?.()?.preClose ?? q().preClose}
+                    costPrice={cost()}
+                    priceLines={item()?.priceLines ?? []}
+                    lastPrice={props.historyDrillDay?.() ? (props.historyDrillDay()!.points.slice(-1)[0]?.price ?? q().price) : q().price}
+                    orbHigh={props.historyDrillDay?.() ? undefined : s().trendSignals?.[q().code]?.orbHigh}
+                    orbLow={props.historyDrillDay?.() ? undefined : s().trendSignals?.[q().code]?.orbLow}
+                    subchartMode={subchartMode()}
+                    macdParams={indicatorParams().macd}
+                    trades={currentTrades()}
+                    onHover={(point, extra) => { setHoveredPoint(point); setHoveredPointExtra(extra ? { ...extra, date: props.historyDrillDay?.()?.date, preClose: props.historyDrillDay?.()?.preClose } : null) }}
+                  />
+                }
+              >
+                <Show
+                  when={props.multiDayTrend?.()}
+                  fallback={<div style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'center', height: '100%', 'font-size': '11px', color: 'var(--text-muted)' }}>正在加载五日分时…</div>}
+                >
+                  {(mt) => (
+                    <FiveDayCanvas
+                      multiTrend={mt()}
+                      costPrice={cost()}
+                      trades={currentTrades()}
+                      onSelectDay={(d) => props.onSelectDay?.(d, 'five_day')}
+                      onHover={(info) => {
+                        if (!info) { setHoveredPoint(null); setHoveredPointExtra(null) }
+                        else {
+                          setHoveredPoint({ time: info.timeNum, price: info.price, avgPrice: info.avgPrice, cumVolume: info.volume, cumAmount: info.amount })
+                          setHoveredPointExtra({ minVol: info.volume, amount: info.amount, date: info.day.date, preClose: info.day.preClose, tradeGroup: info.matchedTrade })
+                        }
+                      }}
+                    />
+                  )}
+                </Show>
+              </Show>
             }
           >
             <KlineCanvas
@@ -250,24 +254,25 @@ export function MiniBody(props: MiniBodyProps) {
               subchartMode={subchartMode()}
               maPeriods={indicatorParams().ma}
               macdParams={indicatorParams().macd}
-              onHoverBar={(bar, extra) => {
-                setHoveredKBar(bar)
-                setHoveredKExtra(extra ?? null)
+              period={props.klinePeriod?.()}
+              drillableDates={props.drillableDates?.() ?? props.multiDayTrend?.()?.days.map((d) => d.date.replace(/-/g, '').slice(0, 8)) ?? []}
+              onHoverBar={(bar, extra) => { setHoveredKBar(bar); setHoveredKExtra(extra ?? null) }}
+              onSelectBar={(bar) => {
+                if (!bar.date) return
+                const bDate = bar.date.replace(/-/g, '').slice(0, 8)
+                const target = props.multiDayTrend?.()?.days.find((d) => d.date.replace(/-/g, '').slice(0, 8) === bDate)
+                if (target) props.onSelectDay?.(target, 'kline')
+                else if (q().code) void fetchHistoricalDayTrend(q().code, bDate).then((d) => d && props.onSelectDay?.(d, 'kline'))
               }}
             />
           </Show>
         </div>
 
-        <Show when={s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline'}>
+        <Show when={showOrderBook()}>
           <MiniOrderBook
-            bids={q().bids}
-            asks={q().asks}
-            preClose={q().preClose}
-            currentPrice={q().price}
+            bids={q().bids} asks={q().asks} preClose={q().preClose} currentPrice={q().price}
             pendingOrders={(s().pendingOrders ?? []).filter((o) => o.code === q().code)}
-            onPickPrice={(p) => {
-              void emit('trigger-open-trade', { code: q().code, price: p })
-            }}
+            onPickPrice={(p) => { void emit('trigger-open-trade', { code: q().code, price: p }) }}
           />
         </Show>
       </div>

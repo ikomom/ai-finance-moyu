@@ -120,3 +120,17 @@ pub async fn get_stock_trend(app: AppHandle, code: String) -> Result<quote::Tren
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn get_multi_day_trend(app: AppHandle, code: String) -> Result<quote::MultiDayTrend, String> {
+    let state = app.state::<AppState>();
+    let norm_code = market::normalize_code(&code)?;
+    let result = state
+        .fetcher
+        .fetch_multi_day_trend(&norm_code)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::history_trend::archive_days(&app, &norm_code, &result.days);
+    Ok(result)
+}

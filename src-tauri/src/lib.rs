@@ -3,6 +3,7 @@ pub mod commands;
 mod config;
 mod crossing;
 pub mod dragon_tiger;
+pub mod history_trend;
 pub mod logger;
 mod market;
 pub mod market_overview;
@@ -11,6 +12,7 @@ pub mod portfolio;
 mod quote;
 mod search;
 mod state;
+pub mod storage;
 mod tray;
 mod trend_engine;
 pub mod window;
@@ -190,6 +192,7 @@ pub fn run() {
             commands::get_global_kline,
             commands::get_global_trend,
             commands::get_stock_trend,
+            commands::get_multi_day_trend,
             commands::get_recent_logs,
             commands::open_log_dir,
             commands::open_url,
@@ -234,6 +237,13 @@ pub fn run() {
             commands::get_seat_radar,
             commands::get_custom_seats,
             commands::save_custom_seats,
+            commands::get_storage_stats,
+            commands::clear_cache,
+            commands::migrate_data_dir,
+            commands::open_data_folder,
+            commands::select_folder,
+            commands::get_available_history_dates,
+            commands::get_historical_day_trend,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

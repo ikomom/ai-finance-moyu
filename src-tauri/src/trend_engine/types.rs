@@ -61,7 +61,7 @@ pub enum TrendState {
 impl TrendState {
     pub fn label(self) -> &'static str {
         match self {
-            TrendState::BreakoutPullback => "▲ 突破回踩",
+            TrendState::BreakoutPullback => "▲ 回踩均线",
             TrendState::VolumeSurge => "▲ 放量拉升",
             TrendState::SteadyBull => "▲ 稳步多头",
             TrendState::TopDivergence => "▼ 顶背离",

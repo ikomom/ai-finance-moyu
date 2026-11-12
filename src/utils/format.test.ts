@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  fmtAmount,
   fmtHHMM,
   fmtMoney,
   fmtPct,
@@ -42,6 +43,18 @@ describe('number formatting', () => {
     expect(fmtMoney(1234.5)).toBe('+¥1,234.50')
     expect(fmtMoney(-1234.5)).toBe('-¥1,234.50')
     expect(fmtMoney(0)).toBe('¥0.00')
+  })
+
+  it('formats adaptive transaction amount (fmtAmount) across financial scales without +/- signs', () => {
+    expect(fmtAmount(0)).toBe('0元')
+    expect(fmtAmount(850)).toBe('850元')
+    expect(fmtAmount(897_881)).toBe('89.8万')
+    expect(fmtAmount(2_402_792)).toBe('240.3万')
+    expect(fmtAmount(52_340_000)).toBe('5234.0万')
+    expect(fmtAmount(145_000_000)).toBe('1.45亿')
+    expect(fmtAmount(12_500_000_000)).toBe('125.0亿')
+    expect(fmtAmount(158_000_000_000)).toBe('1580.0亿')
+    expect(fmtAmount(1_250_000_000_000)).toBe('1.25万亿')
   })
 
   it('formats HHMM without dropping leading minutes', () => {

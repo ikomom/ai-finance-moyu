@@ -1,4 +1,5 @@
 export {
+  fmtAmount,
   fmtHHMM,
   fmtMoney,
   fmtPct,

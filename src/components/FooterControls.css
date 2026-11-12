@@ -77,13 +77,15 @@
   align-items: center;
 }
 
-.mode-pill.kline-main-pill {
+.mode-pill.kline-main-pill,
+.mode-pill.trend-main-pill {
   padding-right: 3px;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-.mode-pill.kline-arrow-pill {
+.mode-pill.kline-arrow-pill,
+.mode-pill.trend-arrow-pill {
   padding-left: 1px;
   padding-right: 4px;
   border-top-left-radius: 0;
@@ -95,7 +97,8 @@
   justify-content: center;
 }
 
-.mode-pill.kline-arrow-pill:hover {
+.mode-pill.kline-arrow-pill:hover,
+.mode-pill.trend-arrow-pill:hover {
   opacity: 1;
 }
 
@@ -103,6 +106,13 @@
 .mode-pill.kline-arrow-pill.active {
   background: rgba(56, 189, 248, 0.2);
   color: #38bdf8;
+  font-weight: 600;
+}
+
+.mode-pill.trend-main-pill.active,
+.mode-pill.trend-arrow-pill.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
   font-weight: 600;
 }
 

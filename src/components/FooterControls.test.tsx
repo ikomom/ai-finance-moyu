@@ -96,4 +96,52 @@ describe('FooterControls', () => {
     // Popover closes after selection
     expect(container.querySelector('.kline-period-popover')).toBeNull()
   })
+
+  it('toggles five_day mode and trend mode correctly', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const onToggleView = vi.fn()
+
+    render(
+      () => (
+        <FooterControls
+          viewMode="five_day"
+          onToggleView={onToggleView}
+          klinePeriod="day"
+        />
+      ),
+      container
+    )
+
+    const trendBtn = container.querySelector('.mode-pill.trend-main-pill') as HTMLButtonElement
+    expect(trendBtn?.textContent?.trim()).toBe('5日')
+    expect(trendBtn?.classList.contains('active')).toBe(true)
+
+    trendBtn.click()
+    expect(onToggleView).toHaveBeenCalledWith('trend')
+  })
+
+  it('restores saved five_day submode when returning from kline view', () => {
+    localStorage.setItem('trend_view_submode', 'five_day')
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const onToggleView = vi.fn()
+
+    render(
+      () => (
+        <FooterControls
+          viewMode="kline"
+          onToggleView={onToggleView}
+          klinePeriod="day"
+        />
+      ),
+      container
+    )
+
+    const trendBtn = container.querySelector('.mode-pill.trend-main-pill') as HTMLButtonElement
+    expect(trendBtn?.textContent?.trim()).toBe('5日')
+
+    trendBtn.click()
+    expect(onToggleView).toHaveBeenCalledWith('five_day')
+  })
 })

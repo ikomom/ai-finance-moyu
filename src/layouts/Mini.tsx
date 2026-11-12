@@ -1,21 +1,18 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
-import { emit } from '@tauri-apps/api/event'
 import './Mini.css'
 
+import { getSavedTrendSubmode, STORAGE_KEY_TREND_SUBMODE } from '../components/FooterControls'
 import { Grip } from '../components/Grip'
-import { MiniBody } from './MiniBody'
+import { MiniBody, type MiniMode } from './MiniBody'
+import { MiniEmpty } from './MiniEmpty'
 import { PillTabs } from '../components/PillTabs'
-import { StatusLine } from '../components/StatusLine'
 import { GroupDropdown } from '../components/watch/GroupDropdown'
+import { useHistoryDrill } from './useHistoryDrill'
 import { useSubchartMode } from '../hooks/useSubchartMode'
-import {
-  ALL_GROUP_ID,
-  filterQuotesByGroup,
-  filterWatchlistByGroup,
-} from '../services/watchlistGroups'
+import { ALL_GROUP_ID, filterQuotesByGroup, filterWatchlistByGroup } from '../services/watchlistGroups'
 import { miniModeOverride, selectedIndex, setMiniModeOverride, setSelected, snapshot } from '../store'
-import { fetchKLine, setTrendTargets } from '../tauri'
+import { fetchAvailableHistoryDates, fetchKLine, fetchMultiDayTrend, setTrendTargets } from '../tauri'
 import {
   isIndexCode,
   resolveIndicatorParams,
@@ -23,6 +20,7 @@ import {
   type KLineBar,
   type KLineData,
   type KlinePeriod,
+  type MultiDayTrend,
   type TrendPoint,
 } from '../types'
 
@@ -37,11 +35,14 @@ export function Mini(props: { flash: boolean }) {
   const [hoveredAuctionPoint, setHoveredAuctionPoint] = createSignal<AuctionPoint | null>(null)
   const [hoveredKBar, setHoveredKBar] = createSignal<KLineBar | null>(null)
   const [hoveredKExtra, setHoveredKExtra] = createSignal<{ ma5?: number | null; ma10?: number | null; ma20?: number | null; dif?: number | null; dea?: number | null; macd?: number | null; chgPct?: number | null } | null>(null)
-  const [manualMode, setManualMode] = createSignal<'trend' | 'kline' | 'auction' | null>(null)
+  const [manualMode, setManualMode] = createSignal<MiniMode | null>(
+    getSavedTrendSubmode() === 'five_day' ? 'five_day' : null
+  )
 
   createEffect(() => {
     const override = miniModeOverride()
     if (override) {
+      drill.clearHistoryDrill()
       setManualMode(override)
       setMiniModeOverride(null)
     }
@@ -51,9 +52,7 @@ export function Mini(props: { flash: boolean }) {
   const getSavedKlinePeriod = (): KlinePeriod => {
     try {
       const p = localStorage.getItem(STORAGE_KEY_KLINE_PERIOD) as KlinePeriod
-      if (p && ['15m', '30m', '60m', '120m', 'day', 'week'].includes(p)) {
-        return p
-      }
+      if (p && ['15m', '30m', '60m', '120m', 'day', 'week'].includes(p)) return p
     } catch {}
     return 'day'
   }
@@ -61,13 +60,15 @@ export function Mini(props: { flash: boolean }) {
   const [klineCache, setKlineCache] = createSignal<Record<string, KLineData>>({})
   const [klineLoading, setKlineLoading] = createSignal(false)
   const [klinePeriod, setKlinePeriod] = createSignal<KlinePeriod>(getSavedKlinePeriod())
+  const [multiTrendCache, setMultiTrendCache] = createSignal<Record<string, MultiDayTrend>>({})
+  const [multiTrendLoading, setMultiTrendLoading] = createSignal(false)
+  const [diskDatesCache, setDiskDatesCache] = createSignal<Record<string, string[]>>({})
   const { subchartMode, setSubchartMode: toggleSubchartMode } = useSubchartMode()
 
   const handleSelectPeriod = (p: KlinePeriod) => {
+    drill.clearHistoryDrill()
     setKlinePeriod(p)
-    try {
-      localStorage.setItem(STORAGE_KEY_KLINE_PERIOD, p)
-    } catch {}
+    try { localStorage.setItem(STORAGE_KEY_KLINE_PERIOD, p) } catch {}
   }
 
   const activeGroupId = () => s()?.config.activeGroupId ?? ALL_GROUP_ID
@@ -80,13 +81,10 @@ export function Mini(props: { flash: boolean }) {
 
   createEffect(() => {
     const n = quotes().length
-    if (n > 0 && selectedIndex() >= n) {
-      setSelected(0)
-    }
+    if (n > 0 && selectedIndex() >= n) setSelected(0)
   })
 
   const indicatorParams = () => resolveIndicatorParams(item(), s()?.config?.indicatorConfig)
-
   const quote = () => {
     const it = item()
     return it ? quotes().find((q) => q.code === it.code) : undefined
@@ -99,14 +97,57 @@ export function Mini(props: { flash: boolean }) {
   }
 
   const isIndex = () => isIndexCode(quote()?.code ?? '')
-
   const activeMode = () => {
     const m = manualMode()
-    if (m === 'kline') return 'kline'
-    if (m === 'trend') return 'trend'
-    if (isIndex()) return 'trend'
-    return 'trend'
+    if (m === 'kline' || m === 'five_day' || m === 'trend') return m
+    return getSavedTrendSubmode() === 'five_day' ? 'five_day' : 'trend'
   }
+
+  const clearHover = () => {
+    setHoveredPoint(null); setHoveredPointExtra(null); setHoveredAuctionPoint(null); setHoveredKBar(null); setHoveredKExtra(null)
+  }
+
+  const allDrillableDates = () => {
+    const c = quote()?.code
+    if (!c) return []
+    const mem = multiTrendCache()[c]?.days.map((d) => d.date.replace(/-/g, '').slice(0, 8)) ?? []
+    const disk = (diskDatesCache()[c] ?? []).map((d) => d.replace(/-/g, '').slice(0, 8))
+    return Array.from(new Set([...mem, ...disk])).sort()
+  }
+
+  const drill = useHistoryDrill({
+    quoteCode: () => quote()?.code,
+    multiTrendCache,
+    allDrillableDates,
+    setManualMode,
+    onClearHover: () => { setHoveredPoint(null); setHoveredPointExtra(null) },
+  })
+
+  // Load disk archived dates on security switch
+  createEffect(() => {
+    const code = quote()?.code
+    if (code && !diskDatesCache()[code]) {
+      void fetchAvailableHistoryDates(code).then((dates) => {
+        if (dates && dates.length > 0) {
+          setDiskDatesCache((prev) => ({ ...prev, [code]: dates }))
+        }
+      })
+    }
+  })
+
+  // Lazy-load 5-day trend data on demand (for five_day view or kline drill-down)
+  createEffect(() => {
+    const code = quote()?.code
+    const mode = activeMode()
+    if ((mode === 'five_day' || mode === 'kline') && code && !multiTrendCache()[code] && !multiTrendLoading()) {
+      setMultiTrendLoading(true)
+      fetchMultiDayTrend(code)
+        .then((data) => {
+          if (data) setMultiTrendCache((prev) => ({ ...prev, [code]: data }))
+        })
+        .finally(() => setMultiTrendLoading(false))
+    }
+  })
 
   // Lazy-load candlestick data on demand
   createEffect(() => {
@@ -118,27 +159,17 @@ export function Mini(props: { flash: boolean }) {
       setKlineLoading(true)
       fetchKLine(code, period)
         .then((data) => {
-          if (data) {
-            setKlineCache((prev) => ({ ...prev, [key]: data }))
-          }
+          if (data) setKlineCache((prev) => ({ ...prev, [key]: data }))
         })
-        .finally(() => {
-          setKlineLoading(false)
-        })
+        .finally(() => setKlineLoading(false))
     }
   })
 
-  // Clear hover state on item switch
   createEffect(() => {
     selectedIndex()
-    setHoveredPoint(null)
-    setHoveredAuctionPoint(null)
-    setHoveredKBar(null)
-    setHoveredKExtra(null)
+    clearHover()
   })
 
-  // Only report when the *code* changes: `item()` returns a fresh object on
-  // every snapshot, so an unguarded effect fired an IPC call every poll tick.
   let lastTrendTarget = ''
   createEffect(() => {
     const code = item()?.code
@@ -149,14 +180,16 @@ export function Mini(props: { flash: boolean }) {
   })
 
   const handleWheel = (e: WheelEvent) => {
+    if (activeMode() === 'trend' && drill.historyDrillDay()) {
+      e.preventDefault(); e.stopPropagation()
+      drill.stepHistoryDay(e.deltaY > 0 ? 1 : -1)
+      return
+    }
     const n = quotes().length
     if (n <= 1) return
     e.preventDefault()
-    if (e.deltaY > 0) {
-      setSelected((selectedIndex() + 1) % n)
-    } else if (e.deltaY < 0) {
-      setSelected((selectedIndex() - 1 + n) % n)
-    }
+    if (e.deltaY > 0) setSelected((selectedIndex() + 1) % n)
+    else if (e.deltaY < 0) setSelected((selectedIndex() - 1 + n) % n)
   }
 
   return (
@@ -165,14 +198,14 @@ export function Mini(props: { flash: boolean }) {
       classList={{ flash: props.flash }}
       data-tauri-drag-region
       onWheel={handleWheel}
+      onPointerDown={drill.handleSideButton}
+      onAuxClick={drill.handleSideButton}
       onContextMenu={(e) => {
-        e.preventDefault()
-        e.stopPropagation()
+        e.preventDefault(); e.stopPropagation()
         const c = quote()?.code
         void invoke('show_context_menu', c ? { code: c } : {})
       }}
     >
-      {/* Top stock pill tabs with GroupDropdown prefix */}
       <PillTabs
         prefix={<GroupDropdown />}
         items={quotes().map((q) => ({ id: q.code, label: q.name, title: `${q.name} (${q.code})` }))}
@@ -183,50 +216,7 @@ export function Mini(props: { flash: boolean }) {
         }}
       />
 
-      <Show
-        when={quote()}
-        fallback={
-          <div class="mini-empty">
-            <div class="mini-empty-main">
-              <Show
-                when={item()}
-                fallback={
-                  <>
-                    <svg class="mini-empty-art" viewBox="0 0 56 34" aria-hidden="true">
-                      <polyline
-                        points="1,27 12,19 21,23 31,11 41,16 55,5"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.6"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                      <line x1="1" y1="31" x2="55" y2="31" stroke="currentColor" stroke-width="1" opacity="0.3" />
-                      <circle cx="31" cy="11" r="2.2" fill="currentColor" opacity="0.65" />
-                    </svg>
-                    <span class="mini-empty-title">这个分组还没有股票</span>
-                    <span class="mini-empty-hint">右键添加，或直接搜一只加进来</span>
-                    <button
-                      type="button"
-                      class="mini-empty-add"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void emit('open-quick-add-modal')
-                      }}
-                    >
-                      ＋ 添加自选
-                    </button>
-                  </>
-                }
-              >
-                <span class="mini-empty-title">{item()?.code}</span>
-                <span class="mini-empty-hint">正在等待这只股票的行情…</span>
-              </Show>
-            </div>
-            <StatusLine status={s().status} />
-          </div>
-        }
-      >
+      <Show when={quote()} fallback={<MiniEmpty item={item()} status={s().status} />}>
         {(q) => (
           <MiniBody
             quote={q}
@@ -238,9 +228,28 @@ export function Mini(props: { flash: boolean }) {
             indicatorParams={indicatorParams}
             subchartMode={subchartMode}
             onToggleSubchart={() => toggleSubchartMode(subchartMode() === 'macd' ? 'vol' : 'macd')}
-            onSelectMode={(m) => setManualMode(m)}
+            onSelectMode={(m) => {
+              drill.clearHistoryDrill()
+              if (m === 'five_day' || m === 'trend') {
+                try { localStorage.setItem(STORAGE_KEY_TREND_SUBMODE, m) } catch {}
+              }
+              setManualMode(m)
+            }}
             klinePeriod={klinePeriod}
             onSelectPeriod={handleSelectPeriod}
+            multiDayTrend={() => {
+              const c = q().code
+              return c ? multiTrendCache()[c] : undefined
+            }}
+            drillableDates={allDrillableDates}
+            historyDrillDay={drill.historyDrillDay}
+            drillOrigin={drill.drillOrigin}
+            hasPrevHistoryDay={drill.hasPrevHistoryDay}
+            hasNextHistoryDay={drill.hasNextHistoryDay}
+            onPrevHistoryDay={() => drill.stepHistoryDay(-1)}
+            onNextHistoryDay={() => drill.stepHistoryDay(1)}
+            onSelectDay={(day, origin = 'five_day') => drill.enterHistoryDrill(day, origin)}
+            onExitHistoryDrill={drill.exitHistoryDrill}
             hover={{
               point: hoveredPoint,
               setPoint: setHoveredPoint,

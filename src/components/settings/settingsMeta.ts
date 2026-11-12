@@ -6,7 +6,7 @@
 
 import type { Layout, ThemeOption, VisibilityMode } from '../../types'
 
-export type TabKey = 'watchlist' | 'appearance' | 'alerts' | 'portfolio' | 'ai' | 'seats' | 'system' | 'logs'
+export type TabKey = 'watchlist' | 'appearance' | 'alerts' | 'portfolio' | 'ai' | 'seats' | 'storage' | 'system' | 'logs'
 
 export interface TabInfo {
   id: TabKey
@@ -22,6 +22,7 @@ export const TABS: TabInfo[] = [
   { id: 'portfolio', label: '模拟账本', icon: '💰', desc: '多券商模拟与仓位复盘' },
   { id: 'ai', label: 'AI 决策', icon: '🤖', desc: 'Jev/Laya 决策模型与服务' },
   { id: 'seats', label: '龙虎席位', icon: '🐉', desc: '游资与机构标记' },
+  { id: 'storage', label: '存储缓存', icon: '💾', desc: '数据目录与缓存管理' },
   { id: 'system', label: '系统设置', icon: '⚙️', desc: '热键、自启动与版本更新' },
   { id: 'logs', label: '运行日志', icon: '📋', desc: '异动留痕与运行记录' },
 ]

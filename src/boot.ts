@@ -9,9 +9,12 @@
 // would be blocked, and allowing `'unsafe-inline'` there would re-open inline
 // event handlers (`<img onerror=…>`) as an XSS execution primitive.
 
+import { logToBackend } from './tauri'
+
 const box = () => document.getElementById('boot-err')
 
 export function showBootError(label: string, detail: string): void {
+  logToBackend(`${label}: ${detail}`, 'ERROR')
   const el = box()
   if (!el) return
   el.hidden = false

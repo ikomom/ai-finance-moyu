@@ -172,6 +172,18 @@ impl log::Log for MoyuLogger {
     fn flush(&self) {}
 }
 
+fn install_panic_hook() {
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let msg = info.payload().downcast_ref::<&str>().copied()
+            .or_else(|| info.payload().downcast_ref::<String>().map(|s| s.as_str()))
+            .unwrap_or("未知异常");
+        let loc = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
+        log::error!(target: "SYSTEM", "【严重致命崩溃】Rust 线程发生 Panic! 位置: {loc}, 原因: {msg}");
+        prev(info);
+    }));
+}
+
 /// Initialize the logger. Should be called once during app setup.
 pub fn init(app: &AppHandle) -> Result<(), String> {
     let dir = log_dir(app)?;
@@ -186,23 +198,21 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
 
     let _ = log::set_logger(&LOGGER);
     log::set_max_level(LevelFilter::Debug);
+    install_panic_hook();
 
     log::info!(target: "SYSTEM", "摸鱼看盘悬浮窗启动，日志持久化就绪: {}", dir.display());
     Ok(())
 }
 
 pub fn log_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    if let Ok(dir) = app.path().app_log_dir() {
-        return Ok(dir);
-    }
-    Ok(crate::config::config_dir(app)?.join("logs"))
+    let conf_dir = crate::config::config_dir(app)?;
+    let default_conf = crate::config::default_config_dir(app).unwrap_or_default();
+    if conf_dir != default_conf { return Ok(conf_dir.join("logs")); }
+    app.path().app_log_dir().or_else(|_| Ok(conf_dir.join("logs")))
 }
 
 pub fn get_recent_entries(target_filter: Option<&str>, level_filter: Option<&str>) -> Vec<LogEntry> {
-    let guard = match LOGGER.ring_buffer.lock() {
-        Ok(g) => g,
-        Err(e) => e.into_inner(),
-    };
+    let guard = LOGGER.ring_buffer.lock().unwrap_or_else(|e| e.into_inner());
 
     guard
         .iter()

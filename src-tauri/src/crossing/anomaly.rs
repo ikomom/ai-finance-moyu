@@ -76,6 +76,12 @@ impl SecurityIntradayState {
         });
         self.samples.retain(|s| now.saturating_duration_since(s.time).as_secs() <= 120);
 
+        let prev_tick_price = if self.samples.len() >= 2 {
+            self.samples[self.samples.len() - 2].price
+        } else {
+            quote.price
+        };
+
         // 1. 急速拉升与急速跳水
         if anomaly_cfg.rapid_change && self.samples.len() >= 2 {
             let oldest = self.samples.first().unwrap();
@@ -159,7 +165,11 @@ impl SecurityIntradayState {
                 } else {
                     0.0
                 };
-                if breakout_pct >= 0.8 && quote.change_pct >= 1.5 {
+                let is_at_high = (quote.high > 0.0 && quote.price >= quote.high * 0.999)
+                    || self.session_high.is_some_and(|h| quote.price >= h * 0.999);
+                let is_moving_up = quote.price >= prev_tick_price;
+
+                if is_at_high && is_moving_up && breakout_pct >= 0.8 && quote.change_pct >= 1.5 {
                     let key = format!("{code}:new_high");
                     if check_cooldown(&key, Duration::from_secs(600)) {
                         events.push(CrossingEvent::IntradayExtreme {
@@ -181,7 +191,11 @@ impl SecurityIntradayState {
                 } else {
                     0.0
                 };
-                if breakdown_pct >= 0.8 && quote.change_pct <= -1.5 {
+                let is_at_low = (quote.low > 0.0 && quote.price <= quote.low * 1.001)
+                    || self.session_low.is_some_and(|l| quote.price <= l * 1.001);
+                let is_moving_down = quote.price <= prev_tick_price;
+
+                if is_at_low && is_moving_down && breakdown_pct >= 0.8 && quote.change_pct <= -1.5 {
                     let key = format!("{code}:new_low");
                     if check_cooldown(&key, Duration::from_secs(600)) {
                         events.push(CrossingEvent::IntradayExtreme {

@@ -5,6 +5,7 @@
 
 import type { Accessor } from 'solid-js'
 import {
+  fmtAmount,
   fmtHHMM,
   fmtVol,
   profitAmount,
@@ -18,7 +19,7 @@ import {
 import type { HoverExtra } from '../components/Chart'
 import { getClearedPnl } from '../components/portfolio/tradeHelpers'
 
-export type MiniMode = 'trend' | 'kline' | 'auction'
+export type MiniMode = 'trend' | 'five_day' | 'kline' | 'auction'
 
 export interface MiniDerivedArgs {
   quote: Accessor<Quote>
@@ -130,7 +131,10 @@ export function createMiniDerived(args: MiniDerivedArgs) {
     }
     const hp = hoveredPoint()
     if (hp) {
-      const base = q().preClose > 0 ? q().preClose : (q().open > 0 ? q().open : hp.price)
+      const hpe = hoveredPointExtra()
+      const base = (hpe?.preClose && hpe.preClose > 0)
+        ? hpe.preClose
+        : (q().preClose > 0 ? q().preClose : (q().open > 0 ? q().open : hp.price))
       return base > 0 ? ((hp.price - base) / base) * 100 : 0
     }
     return q().changePct
@@ -154,7 +158,14 @@ export function createMiniDerived(args: MiniDerivedArgs) {
       return ap.rawTime || fmtHHMM(ap.time)
     }
     const hp = hoveredPoint()
-    return hp ? fmtHHMM(hp.time) : null
+    if (!hp) return null
+    const timeStr = fmtHHMM(hp.time)
+    const hpe = hoveredPointExtra()
+    if (hpe?.date) {
+      const d = hpe.date.length === 8 ? `${hpe.date.slice(4, 6)}-${hpe.date.slice(6, 8)}` : hpe.date.slice(-5)
+      return `${d} ${timeStr}`
+    }
+    return timeStr
   }
 
   const hoverExtra = () => {
@@ -188,9 +199,19 @@ export function createMiniDerived(args: MiniDerivedArgs) {
       if (subchartMode() === 'macd' && hpe.dif != null && hpe.macd != null) {
         return `DIF ${hpe.dif.toFixed(2)} · MACD ${hpe.macd.toFixed(2)}`
       }
+      let text = ''
       if (hpe.minVol > 0) {
-        return `量 ${fmtVol(hpe.minVol)}手`
+        text = `量 ${fmtVol(hpe.minVol)}手`
+        if (hpe.amount && hpe.amount > 0) {
+          text += ` · 额 ${fmtAmount(hpe.amount)}`
+        }
       }
+      if (hpe.tradeGroup) {
+        const tg = hpe.tradeGroup
+        const verb = tg.type === 'B' ? '买' : tg.type === 'S' ? '卖' : '做T'
+        text += ` · ${verb} ${tg.trades.length}笔 (${tg.totalShares}股)`
+      }
+      if (text) return text
     }
     return null
   }

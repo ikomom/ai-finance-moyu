@@ -135,6 +135,13 @@ pub fn show_context_menu(
 
         let mut builder = MenuBuilder::new(app)
             .item(&title_item)
+            .separator()
+            .item(&stock_refresh)
+            .item(&add_stock_item)
+            .separator()
+            .item(&group_sub)
+            .item(&pin_item)
+            .item(&remove_item)
             .separator();
 
         if let Some(ref t) = trade_item {
@@ -144,27 +151,18 @@ pub fn show_context_menu(
         if let Some(ref l) = lhb_item {
             builder = builder.item(l);
         }
+
         builder = builder
-            .separator()
-            .item(&stock_refresh)
-            .separator()
-            .item(&group_sub)
-            .item(&pin_item)
-            .item(&remove_item)
-            .separator()
-            .item(&add_stock_item)
             .separator()
             .item(&sys_sub);
 
         builder.build()?
     } else {
         // Standard blank-space context menu
+        let refresh = MenuItemBuilder::with_id("refresh", "🔄 立即刷新").build(app)?;
         let add_stock_item = MenuItemBuilder::with_id("stock:quick_add", "🔍 添加自选…").build(app)?;
         let new_grp_item = MenuItemBuilder::with_id("stock:new_group:", "➕ 新建分组…").build(app)?;
         let sep0 = tauri::menu::PredefinedMenuItem::separator(app)?;
-
-        let refresh = MenuItemBuilder::with_id("refresh", "立即刷新").build(app)?;
-        let sep1 = tauri::menu::PredefinedMenuItem::separator(app)?;
 
         let bar = CheckMenuItemBuilder::with_id("layout:bar", "数字条")
             .checked(current_layout == crate::config::Layout::Bar)
@@ -210,8 +208,8 @@ pub fn show_context_menu(
 
         MenuBuilder::new(app)
             .items(&[
-                &add_stock_item, &new_grp_item, &sep0,
-                &refresh, &sep1, &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode,
+                &refresh, &add_stock_item, &new_grp_item, &sep0,
+                &bar, &mini, &list, &market, &global, &sep2, &mode_sub, &sep_mode,
                 &opacity_sub, &sep_opacity, &settings, &sep_settings, &autostart, &sep3, &quit,
             ])
             .build()?

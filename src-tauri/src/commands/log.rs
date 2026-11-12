@@ -8,8 +8,12 @@ use crate::logger;
 /// The frontend is a thin presentation layer, so anything it reports belongs to
 /// the same `SYSTEM` bucket as the rest of the app's own diagnostics.
 #[tauri::command]
-pub fn frontend_log(msg: String) {
-    log::info!(target: "SYSTEM", "[前端] {msg}");
+pub fn frontend_log(level: Option<String>, msg: String) {
+    match level.as_deref().unwrap_or("INFO").to_uppercase().as_str() {
+        "ERROR" => log::error!(target: "SYSTEM", "[前端异常] {msg}"),
+        "WARN" => log::warn!(target: "SYSTEM", "[前端警告] {msg}"),
+        _ => log::info!(target: "SYSTEM", "[前端] {msg}"),
+    }
 }
 
 #[tauri::command]

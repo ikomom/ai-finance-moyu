@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { KlinePeriod, KLineData, Trend } from './types'
+import type { DayTrend, KlinePeriod, KLineData, MigrateResult, MultiDayTrend, StorageStats, Trend } from './types'
 import type {
   CustomSeatMapping,
   MarketDragonTigerOverview,
@@ -20,9 +20,9 @@ export function inTauri(): boolean {
  * Best-effort bridge to the process log, for diagnosing a widget that renders
  * nothing (the webview console is not reachable from the terminal).
  */
-export function logToBackend(msg: string): void {
+export function logToBackend(msg: string, level: 'INFO' | 'WARN' | 'ERROR' = 'INFO'): void {
   if (!inTauri()) return
-  void invoke('frontend_log', { msg }).catch(() => {})
+  void invoke('frontend_log', { level, msg }).catch(() => {})
 }
 
 /**
@@ -42,6 +42,19 @@ export async function fetchKLine(code: string, period?: KlinePeriod): Promise<KL
     return await invoke<KLineData>('get_kline', { code, period })
   } catch (e) {
     logToBackend(`fetchKLine failed for ${code} (${period ?? 'day'}): ${e}`)
+    return null
+  }
+}
+
+/**
+ * Request 5-day intraday series from backend.
+ */
+export async function fetchMultiDayTrend(code: string): Promise<MultiDayTrend | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<MultiDayTrend>('get_multi_day_trend', { code })
+  } catch (e) {
+    logToBackend(`fetchMultiDayTrend failed for ${code}: ${e}`, 'WARN')
     return null
   }
 }
@@ -172,5 +185,60 @@ export async function saveCustomSeats(seats: CustomSeatMapping[]): Promise<void>
   } catch (e) {
     logToBackend(`saveCustomSeats failed: ${e}`)
     throw e
+  }
+}
+
+export async function fetchStorageStats(): Promise<StorageStats | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<StorageStats>('get_storage_stats')
+  } catch (e) {
+    logToBackend(`fetchStorageStats failed: ${e}`)
+    return null
+  }
+}
+
+export async function clearCacheCategory(category: string): Promise<boolean> {
+  if (!inTauri()) return false
+  try {
+    await invoke('clear_cache', { category })
+    return true
+  } catch (e) {
+    logToBackend(`clearCacheCategory failed: ${e}`)
+    return false
+  }
+}
+
+export async function migrateStorageDir(target: string): Promise<MigrateResult> {
+  return await invoke<MigrateResult>('migrate_data_dir', { target })
+}
+
+export async function openDataFolder(): Promise<void> {
+  if (!inTauri()) return
+  await invoke('open_data_folder')
+}
+
+export async function selectFolder(): Promise<string | null> {
+  if (!inTauri()) return null
+  return await invoke<string | null>('select_folder')
+}
+
+export async function fetchAvailableHistoryDates(code: string): Promise<string[]> {
+  if (!inTauri()) return []
+  try {
+    return await invoke<string[]>('get_available_history_dates', { code })
+  } catch (e) {
+    logToBackend(`fetchAvailableHistoryDates failed: ${e}`)
+    return []
+  }
+}
+
+export async function fetchHistoricalDayTrend(code: string, date: string): Promise<DayTrend | null> {
+  if (!inTauri()) return null
+  try {
+    return await invoke<DayTrend | null>('get_historical_day_trend', { code, date })
+  } catch (e) {
+    logToBackend(`fetchHistoricalDayTrend failed: ${e}`)
+    return null
   }
 }

@@ -43,6 +43,17 @@ export interface Trend {
   points: TrendPoint[]
 }
 
+export interface DayTrend {
+  date: string
+  preClose: number
+  points: TrendPoint[]
+}
+
+export interface MultiDayTrend {
+  code: string
+  days: DayTrend[]
+}
+
 export type UnmatchedSide = 'none' | 'buy' | 'sell'
 
 export type AuctionTag = 'normal' | 'bull_trap' | 'bear_trap' | 'snatching' | 'dumping'

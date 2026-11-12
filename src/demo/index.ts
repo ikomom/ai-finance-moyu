@@ -69,7 +69,7 @@ export function demoSnapshot(): Snapshot {
     trendSignals: {
       sh600000: {
         state: 'breakoutPullback',
-        label: '▲ 突破回踩',
+        label: '▲ 回踩均线',
         compactLabel: '回踩',
         score: 75,
         biasPct: 0.35,

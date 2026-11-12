@@ -111,7 +111,7 @@
     #[test]
     fn index_symbols_produce_no_anomaly_alerts() {
         let mut t = CrossingTracker::without_cooldown();
-        let s = WatchSpec { code: "sh000001".into(), alert_pct: Some(1.0), price_lines: vec![] };
+        let s = WatchSpec { code: "sh000001".into(), alert_pct: None, price_lines: vec![] };
         let cfg = crate::config::AnomalyAlertConfig::default();
         let t0 = Instant::now();
 

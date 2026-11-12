@@ -23,16 +23,13 @@ export interface KlineDrawProps {
   costPrice?: number | null
   priceLines?: PriceLine[]
   trades?: TradeRecord[]
+  period?: string
+  drillableDates?: string[]
 }
 
 export interface KlineHoverExtra {
-  ma5?: number | null
-  ma10?: number | null
-  ma20?: number | null
-  dif?: number | null
-  dea?: number | null
-  macd?: number | null
-  chgPct?: number | null
+  ma5?: number | null; ma10?: number | null; ma20?: number | null
+  dif?: number | null; dea?: number | null; macd?: number | null; chgPct?: number | null
 }
 
 export interface KlineDrawContext {
@@ -154,6 +151,43 @@ export function drawKline(ctxIn: KlineDrawContext): void {
     const xOfIdx = (i: number) => plotL + i * slotW + slotW / 2
 
     const chartTheme = getChartTheme()
+
+    // 0. Drillable cached history trend shimmer bands (for any day with cached intraday trend)
+    const isDay = !props.period || props.period === 'day'
+    if (isDay && props.drillableDates && props.drillableDates.length > 0) {
+      const drillSet = new Set(props.drillableDates.map((d) => d.replace(/-/g, '').slice(0, 8)))
+      const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
+      const by = priceT, bh = volT + volH - priceT
+
+      let segStart = -1
+      for (let i = 0; i <= slice.length; i++) {
+        const b = slice[i]
+        const dKey = b?.date ? b.date.replace(/-/g, '').slice(0, 8) : ''
+        const hasCache = !!(dKey && drillSet.has(dKey))
+        if (hasCache && segStart < 0) {
+          segStart = i
+        } else if (!hasCache && segStart >= 0) {
+          const segEnd = i - 1
+          const bx = Math.max(plotL, plotL + segStart * slotW)
+          const bw = Math.min(plotL + plotW, plotL + (segEnd + 1) * slotW) - bx
+
+          ctx.fillStyle = isLight ? 'rgba(37, 99, 235, 0.06)' : 'rgba(56, 189, 248, 0.07)'
+          ctx.fillRect(bx, by, bw, bh)
+
+          ctx.save()
+          ctx.setLineDash([2, 2])
+          ctx.strokeStyle = isLight ? 'rgba(37, 99, 235, 0.35)' : 'rgba(56, 189, 248, 0.35)'
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(Math.round(bx) + 0.5, by)
+          ctx.lineTo(Math.round(bx) + 0.5, by + bh)
+          ctx.stroke()
+          ctx.restore()
+
+          segStart = -1
+        }
+      }
+    }
 
     // 1. Grid & Price Axis
     ctx.strokeStyle = chartTheme.grid

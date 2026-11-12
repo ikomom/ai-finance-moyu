@@ -10,13 +10,18 @@ import {
   type DrawOptions,
 } from '../chart'
 import type { AuctionPoint, TrendPoint } from '../types'
+import type { TradeMarkerGroup } from '../chart/renderers/tradePointsRenderer'
 
 export interface HoverExtra {
   minVol: number
+  amount?: number
   dif?: number
   dea?: number
   macd?: number
   auctionPoint?: AuctionPoint | null
+  date?: string
+  preClose?: number
+  tradeGroup?: TradeMarkerGroup
 }
 
 export interface ChartProps extends DrawOptions {
@@ -154,11 +159,12 @@ export function Chart(props: ChartProps) {
     const pt = points[closestIdx]
     const prev = closestIdx > 0 ? points[closestIdx - 1] : null
     const minVol = prev ? Math.max(0, pt.cumVolume - prev.cumVolume) : pt.cumVolume
+    const minAmt = prev ? Math.max(0, pt.cumAmount - prev.cumAmount) : pt.cumAmount
     const macds = computeMinuteMacd(points, props.macdParams)
     const m = macds[closestIdx]
     return {
       point: pt,
-      extra: { minVol, dif: m?.dif, dea: m?.dea, macd: m?.macd },
+      extra: { minVol, amount: minAmt, dif: m?.dif, dea: m?.dea, macd: m?.macd },
     }
   }
 

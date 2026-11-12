@@ -21,6 +21,8 @@ export interface KlineCanvasProps {
   subchartMode?: 'vol' | 'macd'
   maPeriods?: [number, number, number]
   macdParams?: [number, number, number]
+  period?: string
+  drillableDates?: string[]
   onHoverBar?: (
     bar: KLineBar | null,
     extra?: {
@@ -33,6 +35,7 @@ export interface KlineCanvasProps {
       chgPct?: number | null
     } | null
   ) => void
+  onSelectBar?: (bar: KLineBar) => void
 }
 
 export function KlineCanvas(props: KlineCanvasProps) {
@@ -188,7 +191,13 @@ export function KlineCanvas(props: KlineCanvasProps) {
           chgPct,
         })
       }
+
+      const isDay = !props.period || props.period === 'day'
+      const bDate = bar.date ? bar.date.replace(/-/g, '').slice(0, 8) : ''
+      const isDrillable = isDay && !!props.drillableDates?.some((d) => d.replace(/-/g, '').slice(0, 8) === bDate)
+      canvas.style.cursor = isDrillable && props.onSelectBar ? 'pointer' : 'crosshair'
     } else {
+      canvas.style.cursor = 'crosshair'
       setHoveredIndex(null)
       if (props.onHoverBar) props.onHoverBar(null, null)
     }
@@ -199,9 +208,31 @@ export function KlineCanvas(props: KlineCanvasProps) {
   }
 
   const handleMouseLeave = () => {
+    if (canvasRef) canvasRef.style.cursor = 'crosshair'
     setIsDragging(false)
     setHoveredIndex(null)
     if (props.onHoverBar) props.onHoverBar(null, null)
+  }
+
+  const handleClick = (_e: MouseEvent) => {
+    if (!props.onSelectBar) return
+    const isDay = !props.period || props.period === 'day'
+    if (!isDay) return
+    const allBars = effectiveBars()
+    const total = allBars.length
+    const count = Math.min(total, visibleCount())
+    const off = Math.min(Math.max(0, total - count), Math.max(0, offsetRight()))
+    const startIdx = Math.max(0, total - off - count)
+    const slice = allBars.slice(startIdx, Math.min(total, startIdx + count))
+    const hIdx = hoveredIndex()
+    if (slice.length > 0 && hIdx != null && hIdx >= 0 && hIdx < slice.length) {
+      const bar = slice[hIdx]
+      const bDate = bar.date ? bar.date.replace(/-/g, '').slice(0, 8) : ''
+      const isDrillable = !!props.drillableDates?.some((d) => d.replace(/-/g, '').slice(0, 8) === bDate)
+      if (isDrillable) {
+        props.onSelectBar(bar)
+      }
+    }
   }
 
   // Reactive redraw
@@ -229,12 +260,14 @@ export function KlineCanvas(props: KlineCanvasProps) {
     <div
       ref={wrapRef}
       class="chart-wrap"
+      data-tauri-drag-region="none"
       style={{ cursor: isDragging() ? 'grabbing' : 'crosshair', 'user-select': 'none' }}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
     >
       <canvas ref={canvasRef} class="chart" />
     </div>

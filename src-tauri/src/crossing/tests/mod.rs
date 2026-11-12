@@ -220,7 +220,7 @@
         let mut t = CrossingTracker::without_cooldown();
         let s = WatchSpec {
             code: "sh000001".into(),
-            alert_pct: Some(1.0),
+            alert_pct: None,
             price_lines: vec![line(3300.0, LineDirection::Above)],
         };
         let cfg = crate::config::AnomalyAlertConfig::default();
@@ -257,3 +257,5 @@
 mod anomaly;
 #[path = "dedup.rs"]
 mod dedup;
+#[path = "trajectory.rs"]
+mod trajectory;

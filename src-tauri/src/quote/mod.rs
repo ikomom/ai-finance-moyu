@@ -7,6 +7,7 @@ pub mod indicators;
 pub mod yahoo;
 pub mod fetcher;
 pub mod global;
+pub mod multi_trend;
 
 #[allow(unused_imports)]
 pub use types::*;
@@ -18,6 +19,8 @@ pub use yahoo::*;
 pub use fetcher::*;
 #[allow(unused_imports)]
 pub use global::*;
+#[allow(unused_imports)]
+pub use multi_trend::*;
 
 #[cfg(test)]
 mod tests;

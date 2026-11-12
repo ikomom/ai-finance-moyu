@@ -19,6 +19,7 @@ pub struct CrossingTracker {
     /// Anti-spam cooldown duration. Repeated alerts for the same event key within this window are throttled.
     cooldown: Duration,
     intraday_states: HashMap<String, SecurityIntradayState>,
+    prev_pcts: HashMap<String, f64>,
 }
 
 impl Default for CrossingTracker {
@@ -46,6 +47,7 @@ impl CrossingTracker {
             desktop_notif_fired: HashMap::new(),
             cooldown,
             intraday_states: HashMap::new(),
+            prev_pcts: HashMap::new(),
         }
     }
 
@@ -89,28 +91,52 @@ impl CrossingTracker {
     ) -> Vec<CrossingEvent> {
         let mut events = Vec::new();
 
-        // --- 涨跌提醒: symmetric percent band with hysteresis ---
-        if let Some(threshold) = spec.alert_pct {
-            let prev_band = self.pct_band.get(&spec.code).copied();
-            let new_band = match prev_band {
-                None => band_of(pct, threshold),
-                Some(prev) => next_band(prev, pct, threshold),
-            };
-            self.pct_band.insert(spec.code.clone(), new_band);
+        // --- 涨跌提醒: adaptive multi-tiered percent band with hysteresis and trajectory awareness ---
+        if spec.alert_pct.is_some() {
+            let tiers = crate::crossing::tiers::adaptive_threshold_tiers(&spec.code, spec.alert_pct);
+            self.prev_pcts.insert(spec.code.clone(), pct);
 
-            match prev_band {
-                Some(prev) if prev != new_band && new_band != Band::In => {
-                    let key = format!("{}:pct:{:?}", spec.code, new_band);
-                    if Self::check_cooldown(&mut self.last_fired, self.cooldown, &key, now) {
-                        events.push(CrossingEvent::AlertPct {
-                            code: spec.code.clone(),
-                            pct,
-                            side: new_band,
-                            threshold,
-                        });
+            let mut tier_events = Vec::new();
+            for (idx, &threshold) in tiers.iter().enumerate() {
+                let tier = (idx + 1) as u8;
+                let tier_key = format!("{}:tier:{}", spec.code, tier);
+                let prev_band = self.pct_band.get(&tier_key).copied();
+                let new_band = match prev_band {
+                    None => band_of(pct, threshold),
+                    Some(prev) => next_band(prev, pct, threshold),
+                };
+                self.pct_band.insert(tier_key.clone(), new_band);
+
+                match prev_band {
+                    Some(prev) if prev != new_band && new_band != Band::In => {
+                        let dir_key = match new_band {
+                            Band::Above => "above",
+                            Band::Below => "below",
+                            Band::In => "in",
+                        };
+                        let key = format!("{}:pct:{}:{:.1}", spec.code, dir_key, threshold);
+                        if Self::check_cooldown(&mut self.last_fired, self.cooldown, &key, now) {
+                            tier_events.push(CrossingEvent::AlertPct {
+                                code: spec.code.clone(),
+                                pct,
+                                side: new_band,
+                                threshold,
+                                is_pullback: false,
+                                tier,
+                            });
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
+            }
+
+            if !tier_events.is_empty() {
+                if let Some(best) = tier_events.into_iter().max_by_key(|e| match e {
+                    CrossingEvent::AlertPct { tier, .. } => *tier,
+                    _ => 0,
+                }) {
+                    events.push(best);
+                }
             }
         }
 
@@ -172,15 +198,10 @@ impl CrossingTracker {
         now: Instant,
     ) -> Vec<CrossingEvent> {
         if crate::auction_engine::is_index_symbol(&quote.code) {
-            if spec.price_lines.is_empty() || quote.price <= 0.0 {
+            if quote.price <= 0.0 {
                 return Vec::new();
             }
-            let dummy_spec = WatchSpec {
-                code: spec.code.clone(),
-                alert_pct: None,
-                price_lines: spec.price_lines.clone(),
-            };
-            return self.update_at(&dummy_spec, quote.price, quote.change_pct, now);
+            return self.update_at(spec, quote.price, quote.change_pct, now);
         }
 
         let mut events = self.update_at(spec, quote.price, quote.change_pct, now);
@@ -242,7 +263,12 @@ impl CrossingTracker {
     /// Drop remembered state for codes no longer watched, so removed-then-
     /// re-added securities re-arm from scratch.
     pub fn retain(&mut self, keep: &[String]) {
-        self.pct_band.retain(|k, _| keep.contains(k));
+        self.pct_band.retain(|k, _| {
+            k.split_once(':')
+                .map(|(code, _)| keep.iter().any(|c| c == code))
+                .unwrap_or_else(|| keep.contains(k))
+        });
+        self.prev_pcts.retain(|k, _| keep.contains(k));
         self.line_above.retain(|k, _| keep.contains(k));
         self.desktop_notif_fired.retain(|k, _| keep.contains(k));
         self.intraday_states.retain(|k, _| keep.contains(k));

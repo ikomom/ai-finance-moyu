@@ -14,10 +14,27 @@ use crate::quote::{Quote, Trend};
 
 use super::types::*;
 
-pub fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub fn default_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_config_dir()
-        .map_err(|e| format!("无法定位配置目录: {e}"))
+        .map_err(|e| format!("无法定位默认配置目录: {e}"))
+}
+
+pub fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let default_dir = default_config_dir(app)?;
+    let pointer_file = default_dir.join("data_dir_pointer.txt");
+    if pointer_file.exists() {
+        if let Ok(content) = std::fs::read_to_string(&pointer_file) {
+            let trimmed = content.trim();
+            if !trimmed.is_empty() {
+                let custom_path = PathBuf::from(trimmed);
+                if custom_path.exists() && custom_path.is_dir() {
+                    return Ok(custom_path);
+                }
+            }
+        }
+    }
+    Ok(default_dir)
 }
 
 pub fn config_path(app: &AppHandle) -> Result<PathBuf, String> {

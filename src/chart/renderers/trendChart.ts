@@ -29,8 +29,8 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const plotW = Math.max(1, cssW - pad.left - pad.right)
   const plotH = Math.max(1, cssH - pad.top - pad.bottom)
 
-  // Split plotH into price section (74%) and subchart (26%)
-  const priceH = Math.max(30, Math.round(plotH * 0.74))
+  // Split plotH into price section (66%) and subchart (34%)
+  const priceH = Math.max(30, Math.round(plotH * 0.66))
   const volGap = 2
   const volT = plotT + priceH + volGap
   const volH = Math.max(12, plotH - priceH - volGap)

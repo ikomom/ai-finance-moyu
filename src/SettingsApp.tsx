@@ -10,6 +10,7 @@ import { AlertsTab } from './components/settings/AlertsTab'
 import { PortfolioTab } from './components/settings/PortfolioTab'
 import { AiDecisionTab } from './components/settings/AiDecisionTab'
 import { SeatsTab } from './components/settings/SeatsTab'
+import { StorageTab } from './components/settings/StorageTab'
 import { SystemTab } from './components/settings/SystemTab'
 import { LogsTab } from './components/settings/LogsTab'
 
@@ -110,6 +111,9 @@ function SettingsContent() {
               </Show>
               <Show when={activeTab() === 'seats'}>
                 <SeatsTab />
+              </Show>
+              <Show when={activeTab() === 'storage'}>
+                <StorageTab />
               </Show>
               <Show when={activeTab() === 'system'}>
                 <SystemTab />

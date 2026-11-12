@@ -270,4 +270,17 @@ impl Fetcher {
         Ok(compute_kline_indicators(code, bars))
     }
 
+    /// Fetch 5-day intraday minute trend.
+    pub async fn fetch_multi_day_trend(&self, code: &str) -> Result<MultiDayTrend, FetchError> {
+        let tencent_url = super::multi_trend::tencent_multi_trend_url(code);
+        if let Ok(bytes) = self.get_bytes(&tencent_url, None).await {
+            if let Ok(trend) = super::multi_trend::parse_tencent_multi_trend(code, &bytes) {
+                return Ok(trend);
+            }
+        }
+
+        let sina_url = super::multi_trend::sina_multi_trend_url(code);
+        let bytes = self.get_bytes(&sina_url, Some(sina::REFERER)).await?;
+        super::multi_trend::parse_sina_multi_trend(code, &bytes)
+    }
 }

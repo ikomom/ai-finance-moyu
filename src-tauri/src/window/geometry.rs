@@ -15,7 +15,7 @@ pub const SETTINGS: &str = "settings";
 /// Distance from screen edge to snap and enable dock collapse (in logical px).
 pub const DOCK_SNAP_THRESHOLD: f64 = 15.0;
 /// Visible sliver width/thickness when collapsed (in logical px).
-pub const DOCK_HANDLE_THICKNESS: f64 = 10.0;
+pub const DOCK_HANDLE_THICKNESS: f64 = 6.0;
 
 /// Natural size for a layout, used until the user resizes that layout.
 ///

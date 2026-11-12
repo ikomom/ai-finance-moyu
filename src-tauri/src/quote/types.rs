@@ -97,6 +97,23 @@ pub struct Trend {
     pub points: Vec<TrendPoint>,
 }
 
+/// Single trading day in a multi-day trend series (e.g. 5-day trend).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DayTrend {
+    /// Trading day `YYYYMMDD` or `YYYY-MM-DD`.
+    pub date: String,
+    pub pre_close: f64,
+    pub points: Vec<TrendPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultiDayTrend {
+    pub code: String,
+    pub days: Vec<DayTrend>,
+}
+
 /// Single trading day bar in a daily candlestick series.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
