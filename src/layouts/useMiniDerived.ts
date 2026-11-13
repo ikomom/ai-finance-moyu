@@ -27,6 +27,7 @@ export interface MiniDerivedArgs {
   snapshot: Accessor<Snapshot>
   activeMode: Accessor<MiniMode>
   subchartMode: Accessor<'vol' | 'macd'>
+  historyDrillDay?: Accessor<import('../types').DayTrend | null>
   hoveredPoint: Accessor<TrendPoint | null>
   hoveredPointExtra: Accessor<HoverExtra | null>
   hoveredAuctionPoint?: Accessor<AuctionPoint | null>
@@ -48,6 +49,7 @@ export function createMiniDerived(args: MiniDerivedArgs) {
   const s = args.snapshot
   const activeMode = args.activeMode
   const subchartMode = args.subchartMode
+  const historyDrillDay = args.historyDrillDay
   const hoveredPoint = args.hoveredPoint
   const hoveredPointExtra = args.hoveredPointExtra
   const hoveredAuctionPoint = args.hoveredAuctionPoint
@@ -98,6 +100,18 @@ export function createMiniDerived(args: MiniDerivedArgs) {
 
   // High / Low stats from trend points or K-line bar
   const stats = () => {
+    const drill = historyDrillDay?.()
+    if (drill) {
+      const pts = drill.points ?? []
+      if (pts.length > 0) {
+        let high = pts[0].price, low = pts[0].price
+        for (const p of pts) {
+          if (p.price > high) high = p.price
+          if (p.price > 0 && p.price < low) low = p.price
+        }
+        return { high, low }
+      }
+    }
     if (activeMode() === 'kline') {
       const hk = hoveredKBar()
       if (hk) return { high: hk.high, low: hk.low }
@@ -106,8 +120,7 @@ export function createMiniDerived(args: MiniDerivedArgs) {
     if (pts.length === 0) {
       const aucPts = auction()?.points ?? []
       if (aucPts.length > 0) {
-        let high = 0
-        let low = 0
+        let high = 0, low = 0
         for (const p of aucPts) {
           if (p.price > 0) {
             if (high === 0 || p.price > high) high = p.price
@@ -118,8 +131,7 @@ export function createMiniDerived(args: MiniDerivedArgs) {
       }
       return { high: q().high || q().price, low: q().low || q().price }
     }
-    let high = pts[0].price
-    let low = pts[0].price
+    let high = pts[0].price, low = pts[0].price
     for (const p of pts) {
       if (p.price > high) high = p.price
       if (p.price > 0 && p.price < low) low = p.price
@@ -129,23 +141,35 @@ export function createMiniDerived(args: MiniDerivedArgs) {
 
   // Dynamic price & real-time percent when hovering over historical points
   const activePrice = () => {
+    const drill = historyDrillDay?.()
+    if (drill) {
+      const hp = hoveredPoint()
+      if (hp && hp.price > 0) return hp.price
+      const pts = drill.points ?? []
+      const last = pts[pts.length - 1]
+      if (last && last.price > 0) return last.price
+    }
     if (activeMode() === 'kline') {
       return hoveredKBar()?.close ?? q().price
     }
     const ap = hoveredPointExtra()?.auctionPoint ?? hoveredAuctionPoint?.()
-    if (ap) {
-      return ap.price ?? q().price
-    }
+    if (ap) return ap.price ?? q().price
     return hoveredPoint()?.price ?? q().price
   }
 
   const activePct = () => {
+    const drill = historyDrillDay?.()
+    if (drill) {
+      const pc = drill.preClose > 0 ? drill.preClose : q().preClose
+      const hp = hoveredPoint()
+      if (hp && hp.price > 0 && pc > 0) return ((hp.price - pc) / pc) * 100
+      const pts = drill.points ?? []
+      const last = pts[pts.length - 1]
+      if (last && last.price > 0 && pc > 0) return ((last.price - pc) / pc) * 100
+    }
     if (activeMode() === 'kline') {
       const hk = hoveredKBar()
-      if (hk) {
-        return hoveredKExtra()?.chgPct ?? 0
-      }
-      return q().changePct
+      return hk ? (hoveredKExtra()?.chgPct ?? 0) : q().changePct
     }
     const ap = hoveredPointExtra()?.auctionPoint ?? hoveredAuctionPoint?.()
     if (ap && q().preClose > 0) {
@@ -163,6 +187,14 @@ export function createMiniDerived(args: MiniDerivedArgs) {
   }
 
   const hoverTime = () => {
+    const drill = historyDrillDay?.()
+    if (drill) {
+      const hp = hoveredPoint()
+      if (!hp) return null
+      const timeStr = fmtHHMM(hp.time)
+      const d = drill.date.length === 8 ? `${drill.date.slice(4, 6)}-${drill.date.slice(6, 8)}` : drill.date.slice(-5)
+      return `${d} ${timeStr}`
+    }
     if (activeMode() === 'kline') {
       const hk = hoveredKBar()
       if (!hk?.date) return null
@@ -176,9 +208,7 @@ export function createMiniDerived(args: MiniDerivedArgs) {
       return hk.date
     }
     const ap = hoveredPointExtra()?.auctionPoint ?? hoveredAuctionPoint?.()
-    if (ap) {
-      return ap.rawTime || fmtHHMM(ap.time)
-    }
+    if (ap) return ap.rawTime || fmtHHMM(ap.time)
     const hp = hoveredPoint()
     if (!hp) return null
     const timeStr = fmtHHMM(hp.time)
@@ -191,6 +221,26 @@ export function createMiniDerived(args: MiniDerivedArgs) {
   }
 
   const hoverExtra = () => {
+    const drill = historyDrillDay?.()
+    if (drill) {
+      const hpe = hoveredPointExtra()
+      if (hpe) {
+        if (subchartMode() === 'macd' && hpe.dif != null && hpe.macd != null) {
+          return `DIF ${hpe.dif.toFixed(2)} · MACD ${hpe.macd.toFixed(2)}`
+        }
+        let text = ''
+        if (hpe.minVol > 0) {
+          text = `量 ${fmtVol(hpe.minVol)}手`
+          if (hpe.amount && hpe.amount > 0) text += ` · 额 ${fmtAmount(hpe.amount)}`
+        }
+        if (hpe.tradeGroup) {
+          const verb = hpe.tradeGroup.type === 'B' ? '买' : hpe.tradeGroup.type === 'S' ? '卖' : '做T'
+          text += ` · ${verb} ${hpe.tradeGroup.trades.length}笔 (${hpe.tradeGroup.totalShares}股)`
+        }
+        if (text) return text
+      }
+      return null
+    }
     if (activeMode() === 'kline') {
       const hk = hoveredKBar()
       const ex = hoveredKExtra()

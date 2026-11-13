@@ -87,31 +87,20 @@ export function drawFiveDayTrend(
       ctx.fillRect(left, 0, dayWidth, volBottom)
     }
     if (i > 0) {
-      ctx.beginPath()
-      ctx.setLineDash([2, 2])
-      ctx.strokeStyle = theme.grid
-      ctx.moveTo(left, 0); ctx.lineTo(left, volBottom); ctx.stroke()
-      ctx.setLineDash([])
+      ctx.beginPath(); ctx.setLineDash([2, 2]); ctx.strokeStyle = theme.grid
+      ctx.moveTo(left, 0); ctx.lineTo(left, volBottom); ctx.stroke(); ctx.setLineDash([])
     }
     const d = days[i].date
     const label = d.length === 8 ? `${d.slice(4, 6)}-${d.slice(6, 8)}` : d.slice(-5)
-    ctx.font = theme.font
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'top'
+    ctx.font = theme.font; ctx.textAlign = 'center'; ctx.textBaseline = 'top'
     ctx.fillStyle = options.hoverDayIndex === i ? theme.lineColor : theme.axisText
     ctx.fillText(label, left + dayWidth / 2, volBottom + 2)
   }
 
   // Preclose baseline & Subchart top divider
-  ctx.beginPath()
-  ctx.setLineDash([3, 3])
-  ctx.strokeStyle = theme.grid
-  ctx.moveTo(0, midY); ctx.lineTo(w, midY); ctx.stroke()
-  ctx.setLineDash([])
-
-  ctx.beginPath()
-  ctx.strokeStyle = theme.grid
-  ctx.moveTo(0, volTop - 2); ctx.lineTo(w, volTop - 2); ctx.stroke()
+  ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.strokeStyle = theme.grid
+  ctx.moveTo(0, midY); ctx.lineTo(w, midY); ctx.stroke(); ctx.setLineDash([])
+  ctx.beginPath(); ctx.strokeStyle = theme.grid; ctx.moveTo(0, volTop - 2); ctx.lineTo(w, volTop - 2); ctx.stroke()
 
   // 3. Find max volume for subchart
   let maxVol = 1
@@ -211,18 +200,24 @@ export function drawFiveDayTrend(
     }
   }
 
-  // 5. Cost price horizontal line
+  // 5. Cost price step line per day
   if (options.costPrice && options.costPrice > 0) {
-    const pc = days[days.length - 1].preClose > 0 ? days[days.length - 1].preClose : options.costPrice
-    const costY = priceToY(options.costPrice, pc)
-    if (costY >= mainTop && costY <= mainBottom) {
-      ctx.beginPath()
-      ctx.setLineDash([3, 2])
-      ctx.strokeStyle = theme.costLine
-      ctx.lineWidth = 1
-      ctx.moveTo(0, costY); ctx.lineTo(w, costY); ctx.stroke()
-      ctx.setLineDash([])
+    ctx.setLineDash([3, 2]); ctx.strokeStyle = theme.costLine; ctx.lineWidth = 1
+    for (let i = 0; i < N; i++) {
+      const pc = days[i].preClose > 0 ? days[i].preClose : options.costPrice
+      const costY = priceToY(options.costPrice, pc)
+      if (costY >= mainTop && costY <= mainBottom) {
+        const x1 = i * dayWidth, x2 = (i + 1) * dayWidth
+        ctx.beginPath(); ctx.moveTo(x1, costY); ctx.lineTo(x2, costY); ctx.stroke()
+        if (i < N - 1) {
+          const nextY = priceToY(options.costPrice, days[i + 1].preClose > 0 ? days[i + 1].preClose : options.costPrice)
+          if (nextY >= mainTop && nextY <= mainBottom) {
+            ctx.beginPath(); ctx.moveTo(x2, costY); ctx.lineTo(x2, nextY); ctx.stroke()
+          }
+        }
+      }
     }
+    ctx.setLineDash([])
   }
 
   // 6. Crosshair & Hover details
@@ -277,16 +272,9 @@ export function drawFiveDayTrend(
       const timeStr = `${String(Math.floor(closestPt.time / 100)).padStart(2, '0')}:${String(closestPt.time % 100).padStart(2, '0')}`
 
       hoverInfo = {
-        dayIndex: dIdx,
-        day,
-        timeNum: closestPt.time,
-        timeStr,
-        price: closestPt.price,
-        avgPrice: closestPt.avgPrice,
-        changePct: chgPct,
-        volume: hoveredVol,
-        amount: hoveredAmt,
-        matchedTrade,
+        dayIndex: dIdx, day, timeNum: closestPt.time, timeStr,
+        price: closestPt.price, avgPrice: closestPt.avgPrice,
+        changePct: chgPct, volume: hoveredVol, amount: hoveredAmt, matchedTrade,
       }
     }
   }

@@ -162,6 +162,7 @@ fn test_t_plus_one_and_available_shares() {
         name: "浦发银行".into(),
         shares: 1000,
         cost_price: 10.0,
+        avg_buy_price: Some(10.0),
         updated_at: "2026-10-29 10:00:00".into(),
     };
     let today = "2026-10-29";
@@ -219,6 +220,42 @@ fn test_multi_broker_position_isolation() {
     assert_eq!(data.positions.iter().find(|p| p.broker_id == b1 && p.code == "sz002428").unwrap().shares, 200);
     assert!(!data.positions.iter().any(|p| p.broker_id == b2 && p.code == "sz002428"));
     assert!(execute_trade(&mut data, mock_order(&b2, "sz002428", TradeAction::Sell, 55.0, 100)).is_err());
+}
+
+#[test]
+fn test_partial_sell_no_double_counting_and_cross_cycle() {
+    let (mut data, b_id) = test_portfolio_with_broker();
+    // Buy 200 shares @ 10.0
+    execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Buy, 10.0, 200)).unwrap();
+    // Sell 100 shares @ 12.0
+    let res1 = execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Sell, 12.0, 100)).unwrap();
+    let pnl1 = match res1 {
+        OrderExecutionStatus::Filled { record } => record.realized_pnl.unwrap(),
+        _ => panic!("Expected filled"),
+    };
+    assert!((pnl1 - 200.0).abs() < 5.0);
+
+    // Sell remaining 100 shares @ 12.0
+    let res2 = execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Sell, 12.0, 100)).unwrap();
+    let pnl2 = match res2 {
+        OrderExecutionStatus::Filled { record } => record.realized_pnl.unwrap(),
+        _ => panic!("Expected filled"),
+    };
+    assert!((pnl2 - 200.0).abs() < 5.0);
+
+    // Total realized PnL across both sells must be around 400, NOT 600
+    assert!((pnl1 + pnl2 - 400.0).abs() < 10.0);
+
+    // Reopen position in a new cycle: buy 100 @ 10.0
+    execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Buy, 10.0, 100)).unwrap();
+    // Sell @ 10.0 (same price)
+    let res3 = execute_trade(&mut data, mock_order(&b_id, "sh600000", TradeAction::Sell, 10.0, 100)).unwrap();
+    let pnl3 = match res3 {
+        OrderExecutionStatus::Filled { record } => record.realized_pnl.unwrap(),
+        _ => panic!("Expected filled"),
+    };
+    // Should NOT realize past profit (pnl3 should be ~0.0, definitely not +400.0)
+    assert!(pnl3.abs() < 5.0);
 }
 
 

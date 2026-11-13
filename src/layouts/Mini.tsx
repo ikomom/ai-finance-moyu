@@ -57,10 +57,10 @@ export function Mini(props: { flash: boolean }) {
     return 'day'
   }
 
-  const [klineCache, setKlineCache] = createSignal<Record<string, KLineData>>({})
+  const [klineCache, setKlineCache] = createSignal<Record<string, KLineData | null>>({})
   const [klineLoading, setKlineLoading] = createSignal(false)
   const [klinePeriod, setKlinePeriod] = createSignal<KlinePeriod>(getSavedKlinePeriod())
-  const [multiTrendCache, setMultiTrendCache] = createSignal<Record<string, MultiDayTrend>>({})
+  const [multiTrendCache, setMultiTrendCache] = createSignal<Record<string, MultiDayTrend | null>>({})
   const [multiTrendLoading, setMultiTrendLoading] = createSignal(false)
   const [diskDatesCache, setDiskDatesCache] = createSignal<Record<string, string[]>>({})
   const { subchartMode, setSubchartMode: toggleSubchartMode } = useSubchartMode()
@@ -123,14 +123,12 @@ export function Mini(props: { flash: boolean }) {
     onClearHover: () => { setHoveredPoint(null); setHoveredPointExtra(null) },
   })
 
-  // Load disk archived dates on security switch
+  // Load disk archived dates on security switch with negative caching
   createEffect(() => {
     const code = quote()?.code
-    if (code && !diskDatesCache()[code]) {
+    if (code && !(code in diskDatesCache())) {
       void fetchAvailableHistoryDates(code).then((dates) => {
-        if (dates && dates.length > 0) {
-          setDiskDatesCache((prev) => ({ ...prev, [code]: dates }))
-        }
+        setDiskDatesCache((prev) => ({ ...prev, [code]: dates ?? [] }))
       })
     }
   })
@@ -139,11 +137,11 @@ export function Mini(props: { flash: boolean }) {
   createEffect(() => {
     const code = quote()?.code
     const mode = activeMode()
-    if ((mode === 'five_day' || mode === 'kline') && code && !multiTrendCache()[code] && !multiTrendLoading()) {
+    if ((mode === 'five_day' || mode === 'kline') && code && !(code in multiTrendCache()) && !multiTrendLoading()) {
       setMultiTrendLoading(true)
       fetchMultiDayTrend(code)
         .then((data) => {
-          if (data) setMultiTrendCache((prev) => ({ ...prev, [code]: data }))
+          setMultiTrendCache((prev) => ({ ...prev, [code]: data ?? null }))
         })
         .finally(() => setMultiTrendLoading(false))
     }
@@ -155,11 +153,11 @@ export function Mini(props: { flash: boolean }) {
     const mode = activeMode()
     const period = klinePeriod()
     const key = code ? `${code}:${period}` : ''
-    if (mode === 'kline' && code && key && !klineCache()[key] && !klineLoading()) {
+    if (mode === 'kline' && code && key && !(key in klineCache()) && !klineLoading()) {
       setKlineLoading(true)
       fetchKLine(code, period)
         .then((data) => {
-          if (data) setKlineCache((prev) => ({ ...prev, [key]: data }))
+          setKlineCache((prev) => ({ ...prev, [key]: data ?? null }))
         })
         .finally(() => setKlineLoading(false))
     }
@@ -180,7 +178,7 @@ export function Mini(props: { flash: boolean }) {
   })
 
   const handleWheel = (e: WheelEvent) => {
-    if (activeMode() === 'trend' && drill.historyDrillDay()) {
+    if (drill.historyDrillDay()) {
       e.preventDefault(); e.stopPropagation()
       drill.stepHistoryDay(e.deltaY > 0 ? 1 : -1)
       return

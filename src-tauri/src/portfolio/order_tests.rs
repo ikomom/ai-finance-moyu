@@ -77,6 +77,7 @@ fn test_sell_order_freezes_shares_against_overselling() {
         name: "浦发银行".into(),
         shares: 1000,
         cost_price: 10.0,
+        avg_buy_price: Some(10.0),
         updated_at: "2026-10-29 09:30:00".into(),
     };
     let pending_sell = vec![PendingOrder {
@@ -165,7 +166,7 @@ fn test_summary_frozen_cash_and_price_fallback() {
     let (mut data, b_id) = mock_test_broker();
     data.positions.push(PortfolioPosition {
         broker_id: b_id.clone(), code: "sh600000".into(), name: "浦发银行".into(),
-        shares: 1000, cost_price: 10.0, updated_at: "2026-10-30 09:30:00".into(),
+        shares: 1000, cost_price: 10.0, avg_buy_price: Some(10.0), updated_at: "2026-10-30 09:30:00".into(),
     });
     data.pending_orders.push(PendingOrder {
         id: "order_1".into(), broker_id: b_id.clone(), broker_name: "测试券商".into(),

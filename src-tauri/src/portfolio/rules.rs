@@ -173,7 +173,7 @@ pub fn validate_order_boundaries(
     Ok(())
 }
 
-/// Compute today's PnL for a single position view by decomposing overnight vs intraday shares.
+/// Compute today's PnL for a single position view by cash-flow and marked-to-market reconciliation.
 pub fn compute_position_today_pnl(
     pos: &PortfolioPosition,
     trades: &[TradeRecord],
@@ -183,7 +183,8 @@ pub fn compute_position_today_pnl(
 ) -> f64 {
     let mut today_buy_shares: u32 = 0;
     let mut today_buy_cost = 0.0;
-    let mut today_realized_pnl = 0.0;
+    let mut today_sell_shares: u32 = 0;
+    let mut today_sell_proceeds = 0.0;
 
     for t in trades {
         if t.broker_id == pos.broker_id
@@ -197,24 +198,18 @@ pub fn compute_position_today_pnl(
                     today_buy_cost += t.amount + t.fee;
                 }
                 TradeAction::Sell => {
-                    today_realized_pnl += t.realized_pnl.unwrap_or(0.0);
+                    today_sell_shares += t.shares;
+                    today_sell_proceeds += t.amount - t.fee;
                 }
             }
         }
     }
 
-    let held_from_today = pos.shares.min(today_buy_shares);
-    let held_overnight = pos.shares.saturating_sub(held_from_today);
+    let start_of_day_shares = (pos.shares + today_sell_shares).saturating_sub(today_buy_shares);
+    let start_value = (start_of_day_shares as f64) * pre_close;
+    let current_value = (pos.shares as f64) * current_price;
 
-    let overnight_pnl = (current_price - pre_close) * (held_overnight as f64);
-    let today_buys_pnl = if today_buy_shares > 0 && held_from_today > 0 {
-        let avg_cost = today_buy_cost / (today_buy_shares as f64);
-        (current_price - avg_cost) * (held_from_today as f64)
-    } else {
-        0.0
-    };
-
-    overnight_pnl + today_buys_pnl + today_realized_pnl
+    current_value + today_sell_proceeds - start_value - today_buy_cost
 }
 
 /// Validate whether an order can be cancelled according to A-share real trading rules.

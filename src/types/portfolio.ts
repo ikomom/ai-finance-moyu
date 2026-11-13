@@ -112,6 +112,7 @@ export interface PortfolioPosition {
   name: string
   shares: number
   costPrice: number
+  avgBuyPrice?: number | null
   updatedAt: string
 }
 
@@ -155,6 +156,7 @@ export interface PositionView {
   shares: number
   availableShares: number
   costPrice: number
+  avgBuyPrice?: number | null
   currentPrice: number
   marketValue: number
   floatingPnl: number

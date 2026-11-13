@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, type Accessor } from 'solid-js'
+import { createComputed, createEffect, createSignal, onCleanup, type Accessor } from 'solid-js'
 import type { DayTrend, MultiDayTrend } from '../types'
 import type { MiniMode } from './MiniBody'
 import { fetchHistoricalDayTrend } from '../tauri'
@@ -14,8 +14,13 @@ export function useHistoryDrill(params: {
   const [drillOrigin, setDrillOrigin] = createSignal<'five_day' | 'kline'>('five_day')
 
   // Clear drill-down on security switch
-  createEffect(() => {
-    if (params.quoteCode()) setHistoryDrillDay(null)
+  let prevCode: string | undefined = undefined
+  createComputed(() => {
+    const code = params.quoteCode()
+    if (prevCode && code && code !== prevCode) {
+      setHistoryDrillDay(null)
+    }
+    prevCode = code
   })
 
   const availableDates = () => {
@@ -77,7 +82,6 @@ export function useHistoryDrill(params: {
   const enterHistoryDrill = (day: DayTrend, origin: 'five_day' | 'kline' = 'five_day') => {
     setDrillOrigin(origin)
     setHistoryDrillDay(day)
-    params.setManualMode('trend')
   }
 
   // Escape key to exit drill

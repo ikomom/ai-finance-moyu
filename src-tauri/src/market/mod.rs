@@ -61,6 +61,17 @@ impl Session {
         matches!(self, Session::Morning | Session::Afternoon)
     }
 
+    /// Whether this session is before continuous morning trading opens (PreOpen, CallAuctionCancelable, CallAuctionLocked, PreTrade).
+    pub fn is_morning_pretrade(self) -> bool {
+        matches!(
+            self,
+            Session::PreOpen
+                | Session::CallAuctionCancelable
+                | Session::CallAuctionLocked
+                | Session::PreTrade
+        )
+    }
+
     /// Whether error-recovery polling is allowed to hit the network.
     ///
     /// The poller retries fast while a feed is broken, but a retry loop running

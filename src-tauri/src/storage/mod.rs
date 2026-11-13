@@ -171,6 +171,10 @@ pub fn migrate_data_dir(app: &AppHandle, target_dir_str: &str) -> Result<Migrate
         return Err("目标路径与当前数据目录相同，无需迁移".into());
     }
 
+    if target.starts_with(&current) {
+        return Err("目标路径不能位于当前数据目录的子目录内，以防止循环递归复制".into());
+    }
+
     // Attempt to create target dir if not exists
     if !target.exists() {
         fs::create_dir_all(&target)
@@ -200,6 +204,8 @@ pub fn migrate_data_dir(app: &AppHandle, target_dir_str: &str) -> Result<Migrate
         fs::write(&pointer_file, target.to_string_lossy().as_bytes())
             .map_err(|e| format!("写入数据目录引导指针失败: {e}"))?;
     }
+
+    crate::logger::update_log_dir(&target.join("logs"));
 
     log::info!(
         target: "SYSTEM",
@@ -232,7 +238,10 @@ pub fn open_data_folder(app: &AppHandle) -> Result<(), String> {
 pub fn select_folder() -> Result<Option<String>, String> {
     #[cfg(target_os = "windows")]
     {
-        let output = std::process::Command::new("powershell")
+        use std::os::windows::process::CommandExt;
+        let mut cmd = std::process::Command::new("powershell");
+        cmd.creation_flags(0x08000000);
+        let output = cmd
             .args([
                 "-NoProfile",
                 "-Command",

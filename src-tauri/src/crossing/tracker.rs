@@ -94,7 +94,7 @@ impl CrossingTracker {
         // --- 涨跌提醒: adaptive multi-tiered percent band with hysteresis and trajectory awareness ---
         if spec.alert_pct.is_some() {
             let tiers = crate::crossing::tiers::adaptive_threshold_tiers(&spec.code, spec.alert_pct);
-            self.prev_pcts.insert(spec.code.clone(), pct);
+            let prev_pct = self.prev_pcts.insert(spec.code.clone(), pct);
 
             let mut tier_events = Vec::new();
             for (idx, &threshold) in tiers.iter().enumerate() {
@@ -103,7 +103,7 @@ impl CrossingTracker {
                 let prev_band = self.pct_band.get(&tier_key).copied();
                 let new_band = match prev_band {
                     None => band_of(pct, threshold),
-                    Some(prev) => next_band(prev, pct, threshold),
+                    next => next_band(next.unwrap(), pct, threshold),
                 };
                 self.pct_band.insert(tier_key.clone(), new_band);
 
@@ -116,12 +116,17 @@ impl CrossingTracker {
                         };
                         let key = format!("{}:pct:{}:{:.1}", spec.code, dir_key, threshold);
                         if Self::check_cooldown(&mut self.last_fired, self.cooldown, &key, now) {
+                            let is_pullback = match new_band {
+                                Band::Above => prev_pct.map(|p| p > pct).unwrap_or(false),
+                                Band::Below => prev_pct.map(|p| p < pct).unwrap_or(false),
+                                _ => false,
+                            };
                             tier_events.push(CrossingEvent::AlertPct {
                                 code: spec.code.clone(),
                                 pct,
                                 side: new_band,
                                 threshold,
-                                is_pullback: false,
+                                is_pullback,
                                 tier,
                             });
                         }

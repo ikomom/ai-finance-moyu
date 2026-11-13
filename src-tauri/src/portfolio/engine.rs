@@ -68,20 +68,8 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
 
     // Limit order queuing check
     let is_pending = match order.action {
-        TradeAction::Buy => {
-            if let Some(ref asks) = order.asks {
-                asks.first().map(|a| a.0 > 0.0 && order.price < a.0).unwrap_or(false)
-            } else {
-                false
-            }
-        }
-        TradeAction::Sell => {
-            if let Some(ref bids) = order.bids {
-                bids.first().map(|b| b.0 > 0.0 && order.price > b.0).unwrap_or(false)
-            } else {
-                false
-            }
-        }
+        TradeAction::Buy => order.asks.as_ref().and_then(|a| a.first()).map(|a| a.0 > 0.0 && order.price < a.0).unwrap_or(false),
+        TradeAction::Sell => order.bids.as_ref().and_then(|b| b.first()).map(|b| b.0 > 0.0 && order.price > b.0).unwrap_or(false),
     };
 
     if is_pending {
@@ -164,8 +152,11 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                 let old_shares = pos.shares as f64;
                 let new_shares = pos.shares + order.shares;
                 let new_cost = (pos.cost_price * old_shares + gross_amount + fee) / (new_shares as f64);
+                let prev_buy = pos.avg_buy_price.unwrap_or(pos.cost_price);
+                let new_buy = (prev_buy * old_shares + gross_amount + fee) / (new_shares as f64);
                 pos.shares = new_shares;
                 pos.cost_price = (new_cost * 1000.0).round() / 1000.0;
+                pos.avg_buy_price = Some((new_buy * 1000.0).round() / 1000.0);
                 pos.updated_at = now.clone();
             } else {
                 let hist_pnl: f64 = data
@@ -178,12 +169,14 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                     })
                     .sum();
                 let init_cost = (((total_cost - hist_pnl) / (order.shares as f64)) * 1000.0).round() / 1000.0;
+                let init_buy = ((total_cost / (order.shares as f64)) * 1000.0).round() / 1000.0;
                 data.positions.push(PortfolioPosition {
                     broker_id: order.broker_id.clone(),
                     code: order.code.clone(),
                     name: stock_name.clone(),
                     shares: order.shares,
                     cost_price: init_cost,
+                    avg_buy_price: Some(init_buy),
                     updated_at: now.clone(),
                 });
             }
@@ -204,15 +197,7 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                 timestamp: now,
                 status: TradeRecordStatus::Filled,
             };
-            if is_inplace_fill {
-                if let Some(existing) = data.trades.iter_mut().find(|t| t.id == record_id) {
-                    *existing = record.clone();
-                } else {
-                    data.trades.insert(0, record.clone());
-                }
-            } else {
-                data.trades.insert(0, record.clone());
-            }
+            commit_trade(data, record.clone(), is_inplace_fill, &record_id);
             log::info!(
                 target: "TRADE",
                 "【成交】券商={}: {} ({}) 买入成交 ¥{:.2} x {}股，金额¥{:.2}，手续费¥{:.2}",
@@ -239,7 +224,9 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
             broker.available_cash += net_proceeds;
             broker.available_cash = (broker.available_cash * 100.0).round() / 100.0;
 
-            let cost_basis = pos.cost_price * (order.shares as f64);
+            // Use purchase cost basis to calculate realized PnL and avoid dilution distortion
+            let buy_price = pos.avg_buy_price.unwrap_or(pos.cost_price);
+            let cost_basis = buy_price * (order.shares as f64);
             let realized_pnl = net_proceeds - cost_basis;
             let realized_pct = if cost_basis > 0.0 { (realized_pnl / cost_basis) * 100.0 } else { 0.0 };
 
@@ -252,6 +239,7 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                 let pos_mut = &mut data.positions[pos_idx];
                 pos_mut.shares = remaining_shares;
                 pos_mut.cost_price = (new_cost * 1000.0).round() / 1000.0;
+                pos_mut.avg_buy_price = Some(buy_price);
                 pos_mut.updated_at = now.clone();
             }
 
@@ -271,15 +259,7 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
                 timestamp: now,
                 status: TradeRecordStatus::Filled,
             };
-            if is_inplace_fill {
-                if let Some(existing) = data.trades.iter_mut().find(|t| t.id == record_id) {
-                    *existing = record.clone();
-                } else {
-                    data.trades.insert(0, record.clone());
-                }
-            } else {
-                data.trades.insert(0, record.clone());
-            }
+            commit_trade(data, record.clone(), is_inplace_fill, &record_id);
             log::info!(
                 target: "TRADE",
                 "【成交】券商={}: {} ({}) 卖出成交 ¥{:.2} x {}股，金额¥{:.2}，手续费¥{:.2}，实现盈亏¥{:.2}",
@@ -289,4 +269,14 @@ pub fn execute_trade(data: &mut PortfolioData, order: TradeOrder) -> Result<Orde
             Ok(OrderExecutionStatus::Filled { record })
         }
     }
+}
+
+fn commit_trade(data: &mut PortfolioData, record: TradeRecord, is_inplace: bool, id: &str) {
+    if is_inplace {
+        if let Some(existing) = data.trades.iter_mut().find(|t| t.id == id) {
+            *existing = record;
+            return;
+        }
+    }
+    data.trades.insert(0, record);
 }

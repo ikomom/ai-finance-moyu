@@ -67,6 +67,7 @@ pub fn compute_portfolio_summary(
             shares: pos.shares,
             available_shares,
             cost_price: pos.cost_price,
+            avg_buy_price: pos.avg_buy_price,
             current_price,
             market_value: (market_val * 100.0).round() / 100.0,
             floating_pnl: (float_pnl * 100.0).round() / 100.0,
@@ -76,16 +77,28 @@ pub fn compute_portfolio_summary(
         });
     }
 
-    // Include today's realized PnL for stocks that have been fully sold out today
+    // Include today's PnL for stocks that have been fully sold out today
+    let mut cleared_stocks: HashMap<(String, String), (u32, f64, u32, f64)> = HashMap::new();
     for t in &portfolio.trades {
-        if t.status == TradeRecordStatus::Filled && t.action == TradeAction::Sell && t.timestamp.starts_with(&today_date) {
-            let has_open_pos = portfolio
-                .positions
-                .iter()
-                .any(|p| p.broker_id == t.broker_id && p.code == t.code);
-            if !has_open_pos {
-                today_pnl += t.realized_pnl.unwrap_or(0.0);
+        if t.status == TradeRecordStatus::Filled && t.timestamp.starts_with(&today_date) {
+            let has_open = portfolio.positions.iter().any(|p| p.broker_id == t.broker_id && p.code == t.code);
+            if !has_open {
+                let entry = cleared_stocks.entry((t.broker_id.clone(), t.code.clone())).or_insert((0, 0.0, 0, 0.0));
+                match t.action {
+                    TradeAction::Buy => { entry.0 += t.shares; entry.1 += t.amount + t.fee; }
+                    TradeAction::Sell => { entry.2 += t.shares; entry.3 += t.amount - t.fee; }
+                }
             }
+        }
+    }
+    for ((_b_id, code), (b_shares, b_cost, s_shares, s_proceeds)) in cleared_stocks {
+        if s_shares > 0 {
+            let quote = quotes.get(&code);
+            let pre_close = quote.and_then(|q| if q.pre_close > 0.0 { Some(q.pre_close) } else { None })
+                .unwrap_or_else(|| if b_shares > 0 { b_cost / (b_shares as f64) } else { s_proceeds / (s_shares as f64) });
+            let overnight_sold = s_shares.saturating_sub(b_shares);
+            let start_value = (overnight_sold as f64) * pre_close;
+            today_pnl += s_proceeds - start_value - b_cost;
         }
     }
 

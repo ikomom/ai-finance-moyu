@@ -17,13 +17,7 @@ impl AssetClass {
         let clean = code.trim().to_ascii_lowercase();
         let num_part = clean.trim_start_matches(|c: char| c.is_alphabetic());
 
-        if num_part.starts_with("51")
-            || num_part.starts_with("56")
-            || num_part.starts_with("58")
-            || num_part.starts_with("15")
-            || num_part.starts_with("16")
-            || num_part.starts_with("50")
-        {
+        if ["51", "56", "58", "15", "16", "50"].iter().any(|p| num_part.starts_with(p)) {
             AssetClass::Etf
         } else if num_part.starts_with("11") || num_part.starts_with("12") {
             AssetClass::ConvertibleBond
@@ -113,6 +107,8 @@ pub struct PortfolioPosition {
     pub name: String,
     pub shares: u32,
     pub cost_price: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avg_buy_price: Option<f64>,
     pub updated_at: String,
 }
 
@@ -256,6 +252,8 @@ pub struct PositionView {
     pub shares: u32,
     pub available_shares: u32,
     pub cost_price: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avg_buy_price: Option<f64>,
     pub current_price: f64,
     pub market_value: f64,
     pub floating_pnl: f64,

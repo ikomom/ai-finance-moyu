@@ -253,38 +253,26 @@ pub fn set_level(level_name: &str) {
 
 pub fn open_log_directory(app: &AppHandle) -> Result<(), String> {
     let dir = log_dir(app)?;
-    if !dir.exists() {
-        let _ = fs::create_dir_all(&dir);
-    }
-
+    if !dir.exists() { let _ = fs::create_dir_all(&dir); }
+    let path_str = dir.display().to_string();
     #[cfg(windows)]
-    {
-        let path_str = dir.display().to_string();
-        std::process::Command::new("explorer")
-            .arg(&path_str)
-            .spawn()
-            .map_err(|e| format!("打开日志目录失败: {e}"))?;
-    }
-
+    std::process::Command::new("explorer").arg(&path_str).spawn().map_err(|e| format!("打开日志目录失败: {e}"))?;
     #[cfg(target_os = "macos")]
-    {
-        let path_str = dir.display().to_string();
-        std::process::Command::new("open")
-            .arg(&path_str)
-            .spawn()
-            .map_err(|e| format!("打开日志目录失败: {e}"))?;
-    }
-
+    std::process::Command::new("open").arg(&path_str).spawn().map_err(|e| format!("打开日志目录失败: {e}"))?;
     #[cfg(all(not(windows), not(target_os = "macos")))]
-    {
-        let path_str = dir.display().to_string();
-        std::process::Command::new("xdg-open")
-            .arg(&path_str)
-            .spawn()
-            .map_err(|e| format!("打开日志目录失败: {e}"))?;
-    }
-
+    std::process::Command::new("xdg-open").arg(&path_str).spawn().map_err(|e| format!("打开日志目录失败: {e}"))?;
     Ok(())
+}
+
+pub fn update_log_dir(new_log_dir: &std::path::Path) {
+    if !new_log_dir.exists() {
+        let _ = fs::create_dir_all(new_log_dir);
+    }
+    let log_file = new_log_dir.join("app.log");
+    if let Ok(mut guard) = LOGGER.writer.lock() {
+        *guard = Some(LogWriter::new(log_file));
+    }
+    log::info!(target: "SYSTEM", "系统日志输出重定向至新目录: {}", new_log_dir.display());
 }
 
 #[cfg(test)]

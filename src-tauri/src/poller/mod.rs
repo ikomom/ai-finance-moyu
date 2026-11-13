@@ -59,7 +59,7 @@ pub async fn run(app: AppHandle) {
                 } else {
                     log::info!(target: "SESSION", "初始识别A股交易时段: {:?}", session);
                 }
-                if session == market::Session::PreOpen || session == market::Session::CallAuctionCancelable {
+                if session.is_morning_pretrade() {
                     state.tracker.lock().unwrap_or_else(|e| e.into_inner()).reset_intraday();
                     let today_str = now.format("%Y%m%d").to_string();
                     let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());

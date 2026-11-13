@@ -70,13 +70,7 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
                 let now = crate::market::beijing_now();
                 let today_str = now.format("%Y%m%d").to_string();
                 let session = crate::market::session_at(now);
-                let is_morning_pretrade = matches!(
-                    session,
-                    crate::market::Session::PreOpen
-                        | crate::market::Session::CallAuctionCancelable
-                        | crate::market::Session::CallAuctionLocked
-                        | crate::market::Session::PreTrade
-                );
+                let is_morning_pretrade = session.is_morning_pretrade();
                 let quote_date = {
                     let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
                     quotes.get(&code).map(|q| q.date.clone()).unwrap_or_default()

@@ -5,10 +5,15 @@
 }
 
 .storage-card {
-  background: var(--card-bg, #1a1e29);
+  background: var(--surface-card-bg, rgba(255, 255, 255, 0.05));
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
   border-radius: 8px;
   padding: 16px;
+}
+
+:root[data-theme="light"] .storage-card {
+  background: var(--surface-card-bg, #ffffff);
+  border-color: var(--border-color, rgba(0, 0, 0, 0.1));
 }
 
 .storage-card-header {
@@ -21,7 +26,7 @@
 .storage-card-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-color, #f3f4f6);
+  color: var(--text-primary, #f3f4f6);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -39,15 +44,20 @@
 }
 
 :root[data-theme="light"] .storage-path-box {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
 .storage-path-text {
   flex: 1;
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 12px;
-  color: var(--text-color, #e5e7eb);
+  color: var(--text-primary, #e5e7eb);
   word-break: break-all;
+}
+
+:root[data-theme="light"] .storage-path-text {
+  color: var(--text-primary, #111827);
 }
 
 .storage-badge {
@@ -59,7 +69,7 @@
 
 .storage-badge.default {
   background: rgba(156, 163, 175, 0.15);
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary, #9ca3af);
 }
 
 .storage-badge.custom {
@@ -81,14 +91,14 @@
   border-radius: 6px;
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
   background: var(--input-bg, rgba(0, 0, 0, 0.2));
-  color: var(--text-color, #f3f4f6);
+  color: var(--text-primary, #f3f4f6);
   font-size: 12px;
 }
 
 :root[data-theme="light"] .storage-input-row input {
   background: #fff;
   border-color: rgba(0, 0, 0, 0.15);
-  color: #111;
+  color: var(--text-primary, #111827);
 }
 
 .storage-cache-list {
@@ -109,6 +119,7 @@
 
 :root[data-theme="light"] .storage-cache-item {
   background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .storage-cache-info {
@@ -120,12 +131,12 @@
 .storage-cache-name {
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-color, #f3f4f6);
+  color: var(--text-primary, #f3f4f6);
 }
 
 .storage-cache-desc {
   font-size: 11px;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary, #9ca3af);
 }
 
 .storage-cache-actions {
@@ -138,7 +149,7 @@
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-color, #e5e7eb);
+  color: var(--text-primary, #e5e7eb);
 }
 
 .storage-summary-bar {
@@ -152,12 +163,12 @@
 
 .storage-summary-text {
   font-size: 12px;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary, #9ca3af);
 }
 
 .storage-summary-total {
   font-weight: 700;
-  color: var(--text-color, #f3f4f6);
+  color: var(--text-primary, #f3f4f6);
   font-family: ui-monospace, Menlo, Consolas, monospace;
   margin-left: 4px;
 }
@@ -165,7 +176,7 @@
 .storage-hint-box {
   margin-top: 8px;
   font-size: 11px;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary, #9ca3af);
   display: flex;
   align-items: center;
   gap: 4px;

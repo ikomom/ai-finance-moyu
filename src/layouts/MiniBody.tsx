@@ -85,29 +85,13 @@ export function MiniBody(props: MiniBodyProps) {
 
   const { cost, shares, pnl, clearedPnl, trend, auction, stats, activePrice, activePct, hoverTime, hoverExtra } =
     createMiniDerived({
-      quote: q,
-      item,
-      snapshot: s,
-      activeMode,
-      subchartMode,
-      hoveredPoint,
-      hoveredPointExtra,
-      hoveredAuctionPoint,
-      hoveredKBar,
-      hoveredKExtra,
+      quote: q, item, snapshot: s, activeMode, subchartMode, historyDrillDay: props.historyDrillDay,
+      hoveredPoint, hoveredPointExtra, hoveredAuctionPoint, hoveredKBar, hoveredKExtra,
     })
 
-  const isAuctionSession = () =>
-    ['CallAuctionCancelable', 'CallAuctionLocked', 'PreTrade'].includes(s().status?.session ?? '')
-
-  const currentTrades = () => {
-    if (!s().config.enablePortfolio || isIndex()) return []
-    const code = q().code
-    return (s().trades ?? []).filter((t) => t.code === code)
-  }
-
-  const showOrderBook = () =>
-    !!(s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline' && activeMode() !== 'five_day' && !props.historyDrillDay?.())
+  const isAuctionSession = () => ['CallAuctionCancelable', 'CallAuctionLocked', 'PreTrade'].includes(s().status?.session ?? '')
+  const currentTrades = () => (!s().config.enablePortfolio || isIndex()) ? [] : (s().trades ?? []).filter((t) => t.code === q().code)
+  const showOrderBook = () => !!(s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline' && activeMode() !== 'five_day' && !props.historyDrillDay?.())
 
   return (
     <>
@@ -123,7 +107,7 @@ export function MiniBody(props: MiniBodyProps) {
         low={stats().low}
         badge={
           <Show
-            when={activeMode() === 'trend' && props.historyDrillDay?.()}
+            when={props.historyDrillDay?.()}
             fallback={
               <>
                 <Show when={activeMode() === 'kline'}>
@@ -201,10 +185,10 @@ export function MiniBody(props: MiniBodyProps) {
       <div class="mini-chart-section" classList={{ 'with-order-book': showOrderBook() }}>
         <div class="mini-chart-left">
           <Show
-            when={activeMode() === 'kline'}
+            when={activeMode() === 'kline' && !props.historyDrillDay?.()}
             fallback={
               <Show
-                when={activeMode() === 'five_day'}
+                when={activeMode() === 'five_day' && !props.historyDrillDay?.()}
                 fallback={
                   <Chart
                     trend={props.historyDrillDay?.() ? { code: q().code, date: props.historyDrillDay()!.date, preClose: props.historyDrillDay()!.preClose, points: props.historyDrillDay()!.points } : trend()}
