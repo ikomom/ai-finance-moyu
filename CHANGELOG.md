@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-13
+
 ### 🐛 缺陷修复与看盘体验优化
 - **金融模拟账户多笔与分批交易盈亏核算对齐**：
   - 修复多批次减仓与做 T 场景下单笔实现盈亏与当日盈亏重复计算的问题，基于真实加权买入成本基准进行清算核算，确保各笔盈亏累加与账户现金流完全吻合；
