@@ -59,8 +59,17 @@ pub async fn run(app: AppHandle) {
                 } else {
                     log::info!(target: "SESSION", "初始识别A股交易时段: {:?}", session);
                 }
-                if session == market::Session::PreOpen {
+                if session == market::Session::PreOpen || session == market::Session::CallAuctionCancelable {
                     state.tracker.lock().unwrap_or_else(|e| e.into_inner()).reset_intraday();
+                    let today_str = now.format("%Y%m%d").to_string();
+                    let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
+                    for t in trends.values_mut() {
+                        if t.date < today_str {
+                            t.points.clear();
+                            t.date = today_str.clone();
+                        }
+                    }
+                    state.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clear();
                 }
                 last_session = Some(session);
             }

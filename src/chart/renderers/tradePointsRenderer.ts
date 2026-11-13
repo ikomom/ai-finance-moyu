@@ -36,12 +36,12 @@ export function groupIntradayTrades(
   if (!trades || trades.length === 0) return []
   const effDate = targetDate
     ? targetDate.includes('-') ? targetDate : `${targetDate.slice(0, 4)}-${targetDate.slice(4, 6)}-${targetDate.slice(6, 8)}`
-    : undefined
+    : new Date().toISOString().slice(0, 10)
 
   const matched = trades.filter((t) => {
     if (t.status && t.status !== 'Filled') return false
     if (!t.timestamp) return false
-    return effDate ? t.timestamp.slice(0, 10) === effDate : true
+    return t.timestamp.slice(0, 10) === effDate
   })
   if (matched.length === 0) return []
 

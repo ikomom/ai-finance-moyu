@@ -85,7 +85,15 @@ export function createMiniDerived(args: MiniDerivedArgs) {
     if (pos && pos.shares > 0) return null
     return getClearedPnl(q().code, s().trades)
   }
-  const trend = () => s().trends[q().code]
+  const trend = () => {
+    const t = s().trends[q().code]
+    if (!t) return undefined
+    const qDate = q().date
+    if (qDate && t.date && t.date < qDate) {
+      return { ...t, points: [] }
+    }
+    return t
+  }
   const auction = () => s().auctions?.[q().code]
 
   // High / Low stats from trend points or K-line bar
@@ -95,7 +103,21 @@ export function createMiniDerived(args: MiniDerivedArgs) {
       if (hk) return { high: hk.high, low: hk.low }
     }
     const pts = trend()?.points ?? []
-    if (pts.length === 0) return { high: q().high || q().price, low: q().low || q().price }
+    if (pts.length === 0) {
+      const aucPts = auction()?.points ?? []
+      if (aucPts.length > 0) {
+        let high = 0
+        let low = 0
+        for (const p of aucPts) {
+          if (p.price > 0) {
+            if (high === 0 || p.price > high) high = p.price
+            if (low === 0 || p.price < low) low = p.price
+          }
+        }
+        if (high > 0 && low > 0) return { high, low }
+      }
+      return { high: q().high || q().price, low: q().low || q().price }
+    }
     let high = pts[0].price
     let low = pts[0].price
     for (const p of pts) {

@@ -103,6 +103,13 @@ export function buildUnifiedChartData(
   const volumeItems: UnifiedVolumeItem[] = []
   const preClose = opts.preClose || opts.trend?.preClose || 0
 
+  const isStaleTrend = Boolean(
+    opts.auction?.date &&
+    opts.trend?.date &&
+    opts.trend.date < opts.auction.date
+  )
+  const trendPts = isStaleTrend ? [] : (opts.trend?.points ?? [])
+
   // 1. Morning Call Auction Points (09:15 - 09:25) — only in full spectrum mode
   const auctionPts = opts.auction?.points ?? []
   if (useFullSpectrum && !isGlobal && auctionPts.length > 0) {
@@ -131,7 +138,7 @@ export function buildUnifiedChartData(
 
     // Smooth horizontal anchor across the 09:25 - 09:30 pre-trade silence period
     const lastAuction = auctionPts[auctionPts.length - 1]
-    const continuousPts = opts.trend?.points ?? []
+    const continuousPts = trendPts
     if (lastAuction.price > 0 && continuousPts.length > 0) {
       pricePoints.push({
         slot: PRETRADE_SLOT_END, // 15
@@ -143,7 +150,6 @@ export function buildUnifiedChartData(
   }
 
   // 2. Continuous Intraday Trend Points (09:30 - 14:57)
-  const trendPts = opts.trend?.points ?? []
   const count = trendPts.length
   for (let i = 0; i < count; i++) {
     const tp = trendPts[i]

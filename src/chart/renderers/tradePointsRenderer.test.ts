@@ -116,4 +116,10 @@ describe('tradePointsRenderer: groupIntradayTrades', () => {
     expect(groups.length).toBe(1)
     expect(groups[0].type).toBe('T')
   })
+
+  it('strictly excludes historical trades from prior days when targetDate does not match', () => {
+    // If today is 2026-11-13 and trades are from 2026-11-03
+    const groups = groupIntradayTrades(dummyTrades, '2026-11-13', false)
+    expect(groups.length).toBe(0)
+  })
 })

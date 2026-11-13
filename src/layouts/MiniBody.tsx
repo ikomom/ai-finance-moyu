@@ -213,8 +213,8 @@ export function MiniBody(props: MiniBodyProps) {
                     costPrice={cost()}
                     priceLines={item()?.priceLines ?? []}
                     lastPrice={props.historyDrillDay?.() ? (props.historyDrillDay()!.points.slice(-1)[0]?.price ?? q().price) : q().price}
-                    orbHigh={props.historyDrillDay?.() ? undefined : s().trendSignals?.[q().code]?.orbHigh}
-                    orbLow={props.historyDrillDay?.() ? undefined : s().trendSignals?.[q().code]?.orbLow}
+                    orbHigh={props.historyDrillDay?.() || isAuctionSession() ? undefined : s().trendSignals?.[q().code]?.orbHigh}
+                    orbLow={props.historyDrillDay?.() || isAuctionSession() ? undefined : s().trendSignals?.[q().code]?.orbLow}
                     subchartMode={subchartMode()}
                     macdParams={indicatorParams().macd}
                     trades={currentTrades()}

@@ -36,7 +36,12 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const volH = Math.max(12, plotH - priceH - volGap)
   const subPlotH = Math.max(8, volH - 2)
 
-  const points = opts.trend?.points ?? []
+  const isStaleTrend = Boolean(
+    opts.auction?.date &&
+    opts.trend?.date &&
+    opts.trend.date < opts.auction.date
+  )
+  const points = isStaleTrend ? [] : (opts.trend?.points ?? [])
   const preClose = opts.preClose || opts.trend?.preClose || 0
   const isGlobal = opts.isGlobal ?? false
   const useFullSpectrum = isFullSpectrumActive(opts)
@@ -258,10 +263,13 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
 
   // --- Trade Markers (B / S / T) ------------------------------------------
   if (opts.trades && opts.trades.length > 0) {
+    const chartDate = isStaleTrend
+      ? opts.auction?.date
+      : (opts.trend?.date || opts.auction?.date)
     drawTradePoints({
       ctx,
       trades: opts.trades,
-      tradeDate: opts.auction?.date,
+      tradeDate: chartDate,
       xOf,
       yOf,
       plotL,
