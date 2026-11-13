@@ -5,7 +5,7 @@ import { fetchHistoricalDayTrend } from '../tauri'
 
 export function useHistoryDrill(params: {
   quoteCode: Accessor<string | undefined>
-  multiTrendCache: Accessor<Record<string, MultiDayTrend>>
+  multiTrendCache: Accessor<Record<string, MultiDayTrend | null | undefined>>
   allDrillableDates?: Accessor<string[]>
   setManualMode: (mode: MiniMode) => void
   onClearHover: () => void

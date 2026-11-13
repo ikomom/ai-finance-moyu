@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "preflight": "npm run build && npm test && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
     "tauri": "tauri",
     "clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "release": "node scripts/release.js"

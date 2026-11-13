@@ -93,7 +93,8 @@ export function Mini(props: { flash: boolean }) {
   const kline = () => {
     const c = quote()?.code
     const k = c ? `${c}:${klinePeriod()}` : undefined
-    return k ? klineCache()[k] : undefined
+    const d = k ? klineCache()[k] : undefined
+    return d ?? undefined
   }
 
   const isIndex = () => isIndexCode(quote()?.code ?? '')
@@ -237,7 +238,8 @@ export function Mini(props: { flash: boolean }) {
             onSelectPeriod={handleSelectPeriod}
             multiDayTrend={() => {
               const c = q().code
-              return c ? multiTrendCache()[c] : undefined
+              const d = c ? multiTrendCache()[c] : undefined
+              return d ?? undefined
             }}
             drillableDates={allDrillableDates}
             historyDrillDay={drill.historyDrillDay}

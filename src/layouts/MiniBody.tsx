@@ -65,11 +65,11 @@ export interface MiniHoverState {
 
 export interface MiniBodyProps {
   quote: Accessor<Quote>; item: Accessor<WatchItem | undefined>; snapshot: Accessor<Snapshot>
-  activeMode: Accessor<MiniMode>; isIndex: Accessor<boolean>; kline: Accessor<KLineData | undefined>
+  activeMode: Accessor<MiniMode>; isIndex: Accessor<boolean>; kline: Accessor<KLineData | null | undefined>
   indicatorParams: Accessor<MiniIndicatorParams>; subchartMode: Accessor<'vol' | 'macd'>
   onToggleSubchart: () => void; onSelectMode: (mode: MiniMode) => void
   klinePeriod?: Accessor<KlinePeriod>; onSelectPeriod?: (period: KlinePeriod) => void
-  multiDayTrend?: Accessor<MultiDayTrend | undefined>; historyDrillDay?: Accessor<DayTrend | null>
+  multiDayTrend?: Accessor<MultiDayTrend | null | undefined>; historyDrillDay?: Accessor<DayTrend | null>
   drillOrigin?: Accessor<'five_day' | 'kline'>; hasPrevHistoryDay?: Accessor<boolean>; hasNextHistoryDay?: Accessor<boolean>
   drillableDates?: Accessor<string[]>
   onPrevHistoryDay?: () => void; onNextHistoryDay?: () => void

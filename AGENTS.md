@@ -119,6 +119,15 @@
 - **日常修复一律不动版本号**：修复缺陷、重构、加固安全等改动，保持当前版本号不变，禁止自作主张做 patch/minor/major 升级。
 - **CHANGELOG 使用 `Unreleased` 段落**：未发版的改动统一记在 `## [Unreleased]` 下；正式发版时才把该段改名为具体版本号并补日期，由维护者执行。
 - **发版是独立动作**：改版本号 + 补日期 + 打 tag + 构建发布产物属于同一次发版操作，不得分散在普通提交里。
+- **发版前全量质检验收红线（Pre-Release Quality Gate Invariant）**：
+  - 在任何正式发版、改版本号与打 Tag 之前，**必须在本地完整跑通与 GitHub Actions 完全对齐的全量质检门禁**：
+    1. `npm run build`（包含 `tsc` 前端强类型类型推导检查与 Vite 生产打包）；
+    2. `npm test`（前端全量单元测试通过）；
+    3. `cargo check --manifest-path src-tauri/Cargo.toml --all-targets`；
+    4. `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`（零告警零容忍）；
+    5. `cargo test --manifest-path src-tauri/Cargo.toml --all-targets`（后端全量测试通过）；
+    6. `node scripts/extract-changelog.js <version>`（发布说明提取验证）；
+  - 严禁跳过或仅做部分测试即执行打 Tag 和推流，杜绝将编译报错遗漏至远端 CI / Release 工作流。
 - **CHANGELOG 面向用户原则（User-Facing Release Notes Invariant）**：
   - `CHANGELOG.md` 严格面向**终端用户与实际交易者**，所有条目必须使用面向业务价值、操作体验和功能感知的通俗语言（如“修复开盘前误触发昨日残留炸板提醒”、“全面提升办公浅色模式下各界面的视觉对比度”）；
   - **严禁在 CHANGELOG 中罗列底层开发实现细节**：绝对禁止出现代码函数名、方法名、类名、私有指令、CSS 选择器或具体代码文件路径；程序实现细节在代码中自闭环，文档仅保留通用工程守则。

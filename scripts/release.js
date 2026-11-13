@@ -105,9 +105,15 @@ async function main() {
     log.info('Building frontend and type-checking (npm run build)...');
     run('npm run build');
 
-    log.info('Running Rust backend unit tests (cargo test --lib)...');
-    run('cargo test --manifest-path src-tauri/Cargo.toml --lib');
-    log.success('Frontend build and backend tests passed with 0 errors.');
+    log.info('Running frontend unit tests (npm test)...');
+    run('npm test');
+
+    log.info('Running Clippy lint check (cargo clippy)...');
+    run('cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings');
+
+    log.info('Running Rust backend unit tests (cargo test)...');
+    run('cargo test --manifest-path src-tauri/Cargo.toml --all-targets');
+    log.success('Frontend build/tests and backend clippy/tests all passed with 0 errors.');
   }
 
   // 3. Determine versions
