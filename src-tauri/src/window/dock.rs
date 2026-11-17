@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager};
 use crate::config::Layout;
 use crate::poller;
 use crate::state::{AppState, DockEdge};
-use super::geometry::{size_for, suppress_move, suppress_resize, DISPLAY, DOCK_HANDLE_THICKNESS};
+use super::geometry::{dock_collapsed_geometry, size_for, suppress_move, suppress_resize, DISPLAY};
 use super::platform_win32::disable_maximize;
 
 pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), String> {
@@ -77,27 +77,13 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
             }
         }
 
-        let (cw, ch, cx, cy) = match current_dock.edge {
-            DockEdge::Right => (
-                DOCK_HANDLE_THICKNESS,
-                h,
-                mpos.x + msize.width - DOCK_HANDLE_THICKNESS,
-                normal_y,
-            ),
-            DockEdge::Left => (
-                DOCK_HANDLE_THICKNESS,
-                h,
-                mpos.x,
-                normal_y,
-            ),
-            DockEdge::Top => (
-                w,
-                DOCK_HANDLE_THICKNESS,
-                normal_x,
-                mpos.y,
-            ),
-            DockEdge::None => (w, h, normal_x, normal_y),
-        };
+        let (cw, ch, cx, cy) = dock_collapsed_geometry(
+            current_dock.edge,
+            (w, h),
+            (normal_x, normal_y),
+            (mpos.x, mpos.y),
+            (msize.width, msize.height),
+        );
 
         // Disable resize tracking so Windows doesn't clamp width to SM_CXMINTRACK (136px)
         let _ = win.set_resizable(false);

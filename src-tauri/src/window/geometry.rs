@@ -16,6 +16,46 @@ pub const SETTINGS: &str = "settings";
 pub const DOCK_SNAP_THRESHOLD: f64 = 15.0;
 /// Visible sliver width/thickness when collapsed (in logical px).
 pub const DOCK_HANDLE_THICKNESS: f64 = 6.0;
+/// Visible handle length along the edge when collapsed (in logical px).
+pub const DOCK_HANDLE_LENGTH: f64 = 64.0;
+
+/// Compute the collapsed handle geometry (width, height, x, y) centered along the docked edge.
+pub fn dock_collapsed_geometry(
+    edge: DockEdge,
+    win_size: (f64, f64),
+    win_pos: (f64, f64),
+    mpos: (f64, f64),
+    msize: (f64, f64),
+) -> (f64, f64, f64, f64) {
+    let (w, h) = win_size;
+    let (x, y) = win_pos;
+    let (mpos_x, mpos_y) = mpos;
+    let (msize_w, msize_h) = msize;
+    let handle_len = DOCK_HANDLE_LENGTH.min(if edge == DockEdge::Top { w } else { h });
+    match edge {
+        DockEdge::Right => {
+            let cy = (y + (h - handle_len) / 2.0)
+                .clamp(mpos_y, (mpos_y + msize_h - handle_len).max(mpos_y));
+            (
+                DOCK_HANDLE_THICKNESS,
+                handle_len,
+                mpos_x + msize_w - DOCK_HANDLE_THICKNESS,
+                cy,
+            )
+        }
+        DockEdge::Left => {
+            let cy = (y + (h - handle_len) / 2.0)
+                .clamp(mpos_y, (mpos_y + msize_h - handle_len).max(mpos_y));
+            (DOCK_HANDLE_THICKNESS, handle_len, mpos_x, cy)
+        }
+        DockEdge::Top => {
+            let cx = (x + (w - handle_len) / 2.0)
+                .clamp(mpos_x, (mpos_x + msize_w - handle_len).max(mpos_x));
+            (handle_len, DOCK_HANDLE_THICKNESS, cx, mpos_y)
+        }
+        DockEdge::None => (w, h, x, y),
+    }
+}
 
 /// Natural size for a layout, used until the user resizes that layout.
 ///
@@ -101,17 +141,13 @@ pub fn place_window(app: &AppHandle, layout: Layout, rows: usize) {
         }
 
         if collapsed && edge != DockEdge::None {
-            let (cw, ch, cx, cy) = match edge {
-                DockEdge::Right => (
-                    DOCK_HANDLE_THICKNESS,
-                    h,
-                    mpos.x + msize.width - DOCK_HANDLE_THICKNESS,
-                    y,
-                ),
-                DockEdge::Left => (DOCK_HANDLE_THICKNESS, h, mpos.x, y),
-                DockEdge::Top => (w, DOCK_HANDLE_THICKNESS, x, mpos.y),
-                DockEdge::None => (w, h, x, y),
-            };
+            let (cw, ch, cx, cy) = dock_collapsed_geometry(
+                edge,
+                (w, h),
+                (x, y),
+                (mpos.x, mpos.y),
+                (msize.width, msize.height),
+            );
             let _ = win.set_resizable(false);
             let _ = win.set_size(tauri::LogicalSize::new(cw, ch));
             let _ = win.set_position(tauri::LogicalPosition::new(cx, cy));
@@ -137,5 +173,73 @@ pub fn fit_window_now(app: &AppHandle) {
     };
     suppress_resize(app, Duration::from_millis(700));
     place_window(app, layout, rows);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dock_collapsed_geometry_right_and_left() {
+        let (cw, ch, cx, cy) = dock_collapsed_geometry(
+            DockEdge::Right,
+            (320.0, 400.0),
+            (1600.0, 100.0),
+            (0.0, 0.0),
+            (1920.0, 1080.0),
+        );
+        assert_eq!(cw, 6.0);
+        assert_eq!(ch, 64.0);
+        assert_eq!(cx, 1914.0);
+        assert_eq!(cy, 100.0 + (400.0 - 64.0) / 2.0);
+
+        let (cw, ch, cx, cy) = dock_collapsed_geometry(
+            DockEdge::Left,
+            (320.0, 400.0),
+            (0.0, 100.0),
+            (0.0, 0.0),
+            (1920.0, 1080.0),
+        );
+        assert_eq!(cw, 6.0);
+        assert_eq!(ch, 64.0);
+        assert_eq!(cx, 0.0);
+        assert_eq!(cy, 268.0);
+    }
+
+    #[test]
+    fn test_dock_collapsed_geometry_top_and_clamping() {
+        let (cw, ch, cx, cy) = dock_collapsed_geometry(
+            DockEdge::Top,
+            (320.0, 400.0),
+            (200.0, 0.0),
+            (0.0, 0.0),
+            (1920.0, 1080.0),
+        );
+        assert_eq!(cw, 64.0);
+        assert_eq!(ch, 6.0);
+        assert_eq!(cx, 200.0 + (320.0 - 64.0) / 2.0);
+        assert_eq!(cy, 0.0);
+
+        // Near bottom clamp: cy shouldn't exceed mpos_y + msize_h - handle_len
+        let (_, _, _, cy) = dock_collapsed_geometry(
+            DockEdge::Right,
+            (320.0, 400.0),
+            (1600.0, 1000.0),
+            (0.0, 0.0),
+            (1920.0, 1080.0),
+        );
+        assert_eq!(cy, 1080.0 - 64.0);
+
+        // Small window (e.g. Bar h=32px) clamps handle length to window height
+        let (cw, ch, _, _) = dock_collapsed_geometry(
+            DockEdge::Right,
+            (300.0, 32.0),
+            (1620.0, 200.0),
+            (0.0, 0.0),
+            (1920.0, 1080.0),
+        );
+        assert_eq!(cw, 6.0);
+        assert_eq!(ch, 32.0);
+    }
 }
 
