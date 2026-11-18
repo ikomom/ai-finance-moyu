@@ -56,6 +56,8 @@ export function getChartTheme() {
   }
 }
 
+export type ChartTheme = ReturnType<typeof getChartTheme>
+
 export const GRID = 'rgba(255, 255, 255, 0.07)'
 export const AXIS_TEXT = 'rgba(255, 255, 255, 0.42)'
 export const PRE_CLOSE_LINE = 'rgba(255, 255, 255, 0.28)'

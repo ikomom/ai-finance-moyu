@@ -9,6 +9,8 @@ import { drawMacdSubchart } from './macdRenderer'
 import { drawMinuteVolumeSubchart } from './volumeRenderer'
 import { drawTrendPrice } from './trendRenderer'
 import { drawTradePoints } from './tradePointsRenderer'
+import { computeVolumeProfile } from '../volumeProfile'
+import { drawVolumeProfile } from './trendVolumeProfile'
 
 export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const dpi = setupCanvasDpi(canvas)
@@ -102,6 +104,24 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     yPre,
   })
 
+  // --- Volume Profile (筹码分布峰与 POC 主力线) ----------------------------
+  if (opts.showVolumeProfile && points.length >= 2) {
+    const profile = computeVolumeProfile(points)
+    if (profile) {
+      drawVolumeProfile({
+        ctx,
+        profile,
+        plotL,
+        plotW,
+        plotT,
+        priceH,
+        yOf,
+        theme,
+        currentPrice: opts.lastPrice,
+      })
+    }
+  }
+
   // --- subchart: switchable VOL vs MACD ------------------------------------
   const subMode = opts.subchartMode ?? 'vol'
 
@@ -189,15 +209,9 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   }
 
   // Draw cost & price levels
-  const costLabel = (() => {
-    if (!opts.costPrice || opts.costPrice <= 0) return undefined
-    if (opts.lastPrice && opts.lastPrice > 0) {
-      const pct = ((opts.lastPrice - opts.costPrice) / opts.costPrice) * 100
-      const sign = pct >= 0 ? '+' : ''
-      return `成本 ${opts.costPrice.toFixed(2)} (${sign}${pct.toFixed(2)}%)`
-    }
-    return `成本 ${opts.costPrice.toFixed(2)}`
-  })()
+  const costLabel = !opts.costPrice || opts.costPrice <= 0 ? undefined : (opts.lastPrice && opts.lastPrice > 0
+    ? `成本 ${opts.costPrice.toFixed(2)} (${opts.lastPrice >= opts.costPrice ? '+' : ''}${(((opts.lastPrice - opts.costPrice) / opts.costPrice) * 100).toFixed(2)}%)`
+    : `成本 ${opts.costPrice.toFixed(2)}`)
 
   drawHorizontalLevel(ctx, {
     price: opts.costPrice && opts.costPrice > 0 ? opts.costPrice : null,

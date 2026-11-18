@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import {
   computeMinuteMacd,
   drawTrend,
@@ -9,6 +9,7 @@ import {
   slotOfFullTrend,
   type DrawOptions,
 } from '../chart'
+import { computeVolumeProfile, findProfileBinAtPrice, type ProfileBin } from '../chart/volumeProfile'
 import type { AuctionPoint, TrendPoint } from '../types'
 import type { TradeMarkerGroup } from '../chart/renderers/tradePointsRenderer'
 
@@ -22,6 +23,7 @@ export interface HoverExtra {
   date?: string
   preClose?: number
   tradeGroup?: TradeMarkerGroup
+  profileBin?: ProfileBin | null
 }
 
 export interface ChartProps extends DrawOptions {
@@ -33,6 +35,12 @@ export function Chart(props: ChartProps) {
   let wrap!: HTMLDivElement
   let lastBox = ''
   const [hoverSlot, setHoverSlot] = createSignal<number | null>(null)
+
+  const volumeProfile = createMemo(() =>
+    props.showVolumeProfile && props.trend?.points?.length
+      ? computeVolumeProfile(props.trend.points)
+      : null
+  )
 
   const draw = () =>
     drawTrend(canvas, {
@@ -50,6 +58,7 @@ export function Chart(props: ChartProps) {
       macdParams: props.macdParams,
       isGlobal: props.isGlobal,
       trades: props.trades,
+      showVolumeProfile: props.showVolumeProfile,
     })
 
   onMount(() => {
@@ -162,9 +171,11 @@ export function Chart(props: ChartProps) {
     const minAmt = prev ? Math.max(0, pt.cumAmount - prev.cumAmount) : pt.cumAmount
     const macds = computeMinuteMacd(points, props.macdParams)
     const m = macds[closestIdx]
+    const vp = volumeProfile()
+    const pBin = vp ? findProfileBinAtPrice(vp, pt.price) : null
     return {
       point: pt,
-      extra: { minVol, amount: minAmt, dif: m?.dif, dea: m?.dea, macd: m?.macd },
+      extra: { minVol, amount: minAmt, dif: m?.dif, dea: m?.dea, macd: m?.macd, profileBin: pBin },
     }
   }
 

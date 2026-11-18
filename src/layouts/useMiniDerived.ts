@@ -283,6 +283,9 @@ export function createMiniDerived(args: MiniDerivedArgs) {
         const verb = tg.type === 'B' ? '买' : tg.type === 'S' ? '卖' : '做T'
         text += ` · ${verb} ${tg.trades.length}笔 (${tg.totalShares}股)`
       }
+      if (hpe.profileBin) {
+        text += (text ? ' · ' : '') + `筹码 ${fmtVol(hpe.profileBin.volume)}手 (${hpe.profileBin.percent.toFixed(1)}%)`
+      }
       if (text) return text
     }
     return null

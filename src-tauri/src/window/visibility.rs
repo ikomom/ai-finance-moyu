@@ -71,7 +71,26 @@ pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
     if let Some(win) = app.get_webview_window(DISPLAY) {
         let _ = win.unminimize();
         let _ = win.show();
-        super::platform_win32::force_foreground(&win);
+        #[cfg(windows)]
+        {
+            use super::platform_win32::WindowHwnd;
+            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+            };
+            if let Some(raw) = win.raw_hwnd() {
+                unsafe {
+                    SetWindowPos(
+                        raw,
+                        HWND_TOPMOST,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                    );
+                }
+            }
+        }
     }
 
     let _ = app.emit("navigate_stock", serde_json::json!({
