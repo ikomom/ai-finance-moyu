@@ -9,6 +9,14 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
 import { inTauri } from './tauri'
+import { ALL_GROUP_ID, DEFAULT_GROUP_ID, filterWatchlistByGroup } from './services/watchlistGroups'
+import {
+  navigateBack,
+  navigateForward,
+  recordExplicitJump,
+  recordLayoutChange as recordHistoryLayoutChange,
+  type ViewState,
+} from './services/viewHistory'
 import type { Layout, Snapshot } from './types'
 
 export interface ToastAlert {
@@ -31,69 +39,79 @@ const [newVersionAvailable, setNewVersionAvailable] = createSignal<string | null
 /** Force mini layout to switch subchart mode on navigation */
 const [miniModeOverride, setMiniModeOverride] = createSignal<'trend' | 'kline' | 'auction' | null>(null)
 
-// Navigation history stack for layout transitions (e.g. List <-> Mini via mouse shoulder buttons)
-const layoutBackStack: Layout[] = []
-const layoutForwardStack: Layout[] = []
-let lastRecordedLayout: Layout | null = null
-let isNavigatingHistory = false
+function getCurrentViewState(): ViewState | null {
+  const s = snapshot()
+  if (!s) return null
+  const watchlist = s.config.watchlist
+  const activeGroupId = s.config.activeGroupId ?? ALL_GROUP_ID
+  const filtered = filterWatchlistByGroup(watchlist, activeGroupId)
+  const currentCode = filtered[selectedIndex()]?.code
+  return {
+    layout: s.config.layout,
+    code: currentCode,
+    groupId: activeGroupId,
+  }
+}
+
+function applyViewState(target: ViewState): void {
+  const s = snapshot()
+  if (!s) return
+  const watchlist = s.config.watchlist
+
+  const effectiveGroupId = target.groupId ?? s.config.activeGroupId ?? ALL_GROUP_ID
+  if (s.config.activeGroupId !== effectiveGroupId) {
+    void invoke('set_active_watch_group', { id: effectiveGroupId }).catch(() => {})
+  }
+
+  if (target.code) {
+    const filtered = filterWatchlistByGroup(watchlist, effectiveGroupId)
+    const idx = filtered.findIndex((w) => w.code.toLowerCase() === target.code!.toLowerCase())
+    if (idx !== -1) {
+      setSelected(idx)
+    }
+  }
+
+  if (target.mode) {
+    setMiniModeOverride(target.mode)
+  }
+
+  if (target.layout !== s.config.layout) {
+    setSnapshot((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          layout: target.layout,
+          activeGroupId: effectiveGroupId,
+        },
+      }
+    })
+    void invoke('set_layout', { layout: target.layout })
+  } else {
+    setSnapshot((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          activeGroupId: effectiveGroupId,
+        },
+      }
+    })
+  }
+}
 
 export function recordLayoutChange(newLayout: Layout): void {
-  if (lastRecordedLayout === null) {
-    lastRecordedLayout = newLayout
-    return
-  }
-  if (lastRecordedLayout === newLayout) {
-    return
-  }
-  if (isNavigatingHistory) {
-    lastRecordedLayout = newLayout
-    isNavigatingHistory = false
-    return
-  }
-  layoutBackStack.push(lastRecordedLayout)
-  if (layoutBackStack.length > 20) {
-    layoutBackStack.shift()
-  }
-  layoutForwardStack.length = 0
-  lastRecordedLayout = newLayout
+  recordHistoryLayoutChange(newLayout, getCurrentViewState() ?? undefined)
 }
 
 export function navigateLayoutBack(): void {
-  const current = snapshot()?.config.layout
-  if (!current) return
-
-  if (layoutBackStack.length > 0) {
-    const prev = layoutBackStack.pop()!
-    layoutForwardStack.push(current)
-    if (layoutForwardStack.length > 20) {
-      layoutForwardStack.shift()
-    }
-    isNavigatingHistory = true
-    void invoke('set_layout', { layout: prev })
-  } else if (current !== 'list') {
-    // Fallback: If history stack is empty and current layout is not list, back defaults to list
-    layoutForwardStack.push(current)
-    if (layoutForwardStack.length > 20) {
-      layoutForwardStack.shift()
-    }
-    isNavigatingHistory = true
-    void invoke('set_layout', { layout: 'list' })
-  }
+  navigateBack({ getCurrentState: getCurrentViewState, applyState: applyViewState })
 }
 
 export function navigateLayoutForward(): void {
-  const current = snapshot()?.config.layout
-  if (!current) return
-
-  if (layoutForwardStack.length > 0) {
-    const next = layoutForwardStack.pop()!
-    layoutBackStack.push(current)
-    if (layoutBackStack.length > 20) {
-      layoutBackStack.shift()
-    }
-    isNavigatingHistory = true
-    void invoke('set_layout', { layout: next })
-  }
+  navigateForward({ getCurrentState: getCurrentViewState, applyState: applyViewState })
 }
 
 export {
@@ -132,11 +150,46 @@ export function navigateToStock(code: string, mode: 'trend' | 'kline' | 'auction
   const s = snapshot()
   if (!s) return
   const watchlist = s.config.watchlist
-  const idx = watchlist.findIndex((w) => w.code.toLowerCase() === code.toLowerCase())
+  const targetItem = watchlist.find((w) => w.code.toLowerCase() === code.toLowerCase())
+  if (!targetItem) return
+
+  const activeGroupId = s.config.activeGroupId ?? ALL_GROUP_ID
+  let effectiveGroupId = activeGroupId
+  if (activeGroupId !== ALL_GROUP_ID && (targetItem.group ?? DEFAULT_GROUP_ID) !== activeGroupId) {
+    effectiveGroupId = ALL_GROUP_ID
+    void invoke('set_active_watch_group', { id: ALL_GROUP_ID }).catch(() => {})
+  }
+
+  const currentState = getCurrentViewState()
+  if (currentState) {
+    recordExplicitJump(currentState, {
+      layout: 'mini',
+      code: targetItem.code,
+      mode,
+      groupId: effectiveGroupId,
+    })
+  }
+
+  const filtered = filterWatchlistByGroup(watchlist, effectiveGroupId)
+  const idx = filtered.findIndex((w) => w.code.toLowerCase() === code.toLowerCase())
   if (idx !== -1) {
     setSelected(idx)
   }
   setMiniModeOverride(mode)
+
+  setSnapshot((prev) => {
+    if (!prev) return prev
+    return {
+      ...prev,
+      dock: prev.dock ? { ...prev.dock, collapsed: false } : prev.dock,
+      config: {
+        ...prev.config,
+        layout: 'mini',
+        activeGroupId: effectiveGroupId,
+      },
+    }
+  })
+
   if (s.dock?.collapsed) {
     void invoke('set_dock_collapsed', { collapsed: false })
   }

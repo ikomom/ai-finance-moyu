@@ -14,7 +14,7 @@ import {
   filterQuotesByGroup,
   filterWatchlistByGroup,
 } from '../services/watchlistGroups'
-import { selectedIndex, setSelected, snapshot } from '../store'
+import { navigateToStock, selectedIndex, setSelected, snapshot } from '../store'
 import {
   fmtMoney,
   fmtPct,
@@ -60,8 +60,13 @@ export function List(props: { flash: boolean }) {
   const handleRowDblClick = (e: MouseEvent, index: number) => {
     e.preventDefault()
     e.stopPropagation()
-    setSelected(index)
-    void invoke('set_layout', { layout: 'mini' })
+    const targetCode = filteredQuotes()[index]?.code
+    if (targetCode) {
+      navigateToStock(targetCode, 'trend')
+    } else {
+      setSelected(index)
+      void invoke('set_layout', { layout: 'mini' })
+    }
   }
 
   return (

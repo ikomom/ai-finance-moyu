@@ -57,8 +57,6 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
 /// Uncollapses the dock, switches layout to Mini if not already in Mini, reveals and focuses the window,
 /// and emits `navigate_stock` event to frontend.
 pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
-    let _ = set_dock_collapsed_inner(app, false);
-
     let current_layout = {
         let state = app.state::<AppState>();
         let l = state.config.lock().unwrap_or_else(|e| e.into_inner()).layout;
@@ -66,12 +64,14 @@ pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
     };
     if current_layout != Layout::Mini {
         apply_layout(app, Layout::Mini);
+    } else {
+        let _ = set_dock_collapsed_inner(app, false);
     }
 
     if let Some(win) = app.get_webview_window(DISPLAY) {
         let _ = win.unminimize();
         let _ = win.show();
-        let _ = win.set_focus();
+        super::platform_win32::force_foreground(&win);
     }
 
     let _ = app.emit("navigate_stock", serde_json::json!({

@@ -67,7 +67,11 @@ pub(super) fn spawn_system_notification(app: &AppHandle, notif: &AlertNotificati
         if let Ok(handle) = n.show() {
             let _ = handle.wait_for_response(move |resp: &notify_rust::NotificationResponse| {
                 if resp.is_default_action() || matches!(resp, notify_rust::NotificationResponse::Action(_)) {
-                    crate::navigate_to_stock_mini(&app_handle, &code);
+                    let code = code.clone();
+                    let handle = app_handle.clone();
+                    let _ = app_handle.run_on_main_thread(move || {
+                        crate::navigate_to_stock_mini(&handle, &code);
+                    });
                 }
             });
         }

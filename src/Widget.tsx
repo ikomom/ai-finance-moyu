@@ -30,6 +30,7 @@ export function Widget() {
   const [error, setError] = createSignal<string | null>(null)
   const [flash, setFlash] = createSignal(false)
   let leaveTimer: number | null = null
+  let mouseEntered = false
 
   const clearLeaveTimer = () => {
     if (leaveTimer !== null) { window.clearTimeout(leaveTimer); leaveTimer = null }
@@ -40,12 +41,17 @@ export function Widget() {
   const visibilityMode = () => snapshot()?.config.visibilityMode ?? 'always'
 
   createEffect(() => {
+    if (isCollapsed()) mouseEntered = false
+  })
+
+  createEffect(() => {
     const theme = snapshot()?.config.theme ?? 'dark'
     document.documentElement.setAttribute('data-theme', theme)
   })
 
   const handleMouseEnter = () => {
     clearLeaveTimer()
+    mouseEntered = true
     const mode = visibilityMode()
     const edge = dockEdge()
     if (edge === 'none') return
@@ -57,15 +63,14 @@ export function Widget() {
 
   const handleMouseLeave = (e: MouseEvent) => {
     clearLeaveTimer()
-    // Do not collapse if mouse button is held down (dragging or resizing)
-    if (e.buttons > 0) return
-    if (isContextMenuOpen()) return
+    if (e.buttons > 0 || isContextMenuOpen()) return
 
     const mode = visibilityMode()
     const edge = dockEdge()
     if (edge === 'none') return
 
     if (mode === 'hover' && !isCollapsed()) {
+      if (!mouseEntered) return
       leaveTimer = window.setTimeout(() => {
         void invoke('set_dock_collapsed', { collapsed: true })
       }, 350)
@@ -219,16 +224,8 @@ export function Widget() {
         <div
           class={`dock-handle dock-${dockEdge()}`}
           title={visibilityMode() === 'dblclick' ? '双击展开' : '移入展开'}
-          onClick={(e) => {
-            e.stopPropagation()
-            clearLeaveTimer()
-            void invoke('set_dock_collapsed', { collapsed: false })
-          }}
-          onDblClick={(e) => {
-            e.stopPropagation()
-            clearLeaveTimer()
-            void invoke('set_dock_collapsed', { collapsed: false })
-          }}
+          onClick={(e) => { e.stopPropagation(); clearLeaveTimer(); void invoke('set_dock_collapsed', { collapsed: false }) }}
+          onDblClick={(e) => { e.stopPropagation(); clearLeaveTimer(); void invoke('set_dock_collapsed', { collapsed: false }) }}
         />
       </Show>
 
