@@ -23,17 +23,6 @@ export interface FooterControlsProps {
   showAuction?: boolean
   klinePeriod?: KlinePeriod
   onSelectPeriod?: (period: KlinePeriod) => void
-  showVolumeProfile?: boolean
-  onToggleVolumeProfile?: (on: boolean) => void
-}
-
-export const STORAGE_KEY_VOLUME_PROFILE = 'show_volume_profile'
-export const getSavedVolumeProfile = (): boolean => {
-  try {
-    const val = localStorage.getItem(STORAGE_KEY_VOLUME_PROFILE)
-    return val === 'true'
-  } catch {}
-  return false
 }
 
 export const STORAGE_KEY_TREND_SUBMODE = 'trend_view_submode'
@@ -107,25 +96,6 @@ export function FooterControls(props: FooterControlsProps) {
             title="切换副图：MACD指标"
           >
             MACD
-          </button>
-        </div>
-      </Show>
-
-      {/* 筹码分布 (Volume Profile) 切换胶囊: 仅在分时走势下可用 */}
-      <Show when={(props.viewMode === 'trend' || props.viewMode === 'five_day' || props.viewMode === 'auction') && props.onToggleVolumeProfile}>
-        <div class="mode-pill-group">
-          <button
-            type="button"
-            class="mode-pill"
-            classList={{ active: props.showVolumeProfile }}
-            onClick={() => {
-              const next = !props.showVolumeProfile
-              try { localStorage.setItem(STORAGE_KEY_VOLUME_PROFILE, String(next)) } catch {}
-              props.onToggleVolumeProfile!(next)
-            }}
-            title={props.showVolumeProfile ? '日内筹码分布：已开启 (展示POC主力成本线 & 筹码峰)' : '日内筹码分布：已关闭 (点击开启)'}
-          >
-            筹码
           </button>
         </div>
       </Show>

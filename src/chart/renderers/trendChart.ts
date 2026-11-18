@@ -9,8 +9,6 @@ import { drawMacdSubchart } from './macdRenderer'
 import { drawMinuteVolumeSubchart } from './volumeRenderer'
 import { drawTrendPrice } from './trendRenderer'
 import { drawTradePoints } from './tradePointsRenderer'
-import { computeVolumeProfile } from '../volumeProfile'
-import { drawVolumeProfile } from './trendVolumeProfile'
 
 export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
   const dpi = setupCanvasDpi(canvas)
@@ -103,24 +101,6 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     yOf,
     yPre,
   })
-
-  // --- Volume Profile (筹码分布峰与 POC 主力线) ----------------------------
-  if (opts.showVolumeProfile && points.length >= 2) {
-    const profile = computeVolumeProfile(points)
-    if (profile) {
-      drawVolumeProfile({
-        ctx,
-        profile,
-        plotL,
-        plotW,
-        plotT,
-        priceH,
-        yOf,
-        theme,
-        currentPrice: opts.lastPrice,
-      })
-    }
-  }
 
   // --- subchart: switchable VOL vs MACD ------------------------------------
   const subMode = opts.subchartMode ?? 'vol'

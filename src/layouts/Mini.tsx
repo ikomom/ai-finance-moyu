@@ -2,7 +2,7 @@ import { createEffect, createSignal, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import './Mini.css'
 
-import { getSavedTrendSubmode, getSavedVolumeProfile, STORAGE_KEY_TREND_SUBMODE } from '../components/FooterControls'
+import { getSavedTrendSubmode, STORAGE_KEY_TREND_SUBMODE } from '../components/FooterControls'
 import { Grip } from '../components/Grip'
 import { MiniBody, type MiniMode } from './MiniBody'
 import { MiniEmpty } from './MiniEmpty'
@@ -38,7 +38,6 @@ export function Mini(props: { flash: boolean }) {
   const [manualMode, setManualMode] = createSignal<MiniMode | null>(
     getSavedTrendSubmode() === 'five_day' ? 'five_day' : null
   )
-  const [showVolumeProfile, setShowVolumeProfile] = createSignal<boolean>(getSavedVolumeProfile())
 
   createEffect(() => {
     const override = miniModeOverride()
@@ -251,8 +250,6 @@ export function Mini(props: { flash: boolean }) {
             onNextHistoryDay={() => drill.stepHistoryDay(1)}
             onSelectDay={(day, origin = 'five_day') => drill.enterHistoryDrill(day, origin)}
             onExitHistoryDrill={drill.exitHistoryDrill}
-            showVolumeProfile={showVolumeProfile}
-            onToggleVolumeProfile={setShowVolumeProfile}
             hover={{
               point: hoveredPoint,
               setPoint: setHoveredPoint,

@@ -74,8 +74,6 @@ export interface MiniBodyProps {
   drillableDates?: Accessor<string[]>
   onPrevHistoryDay?: () => void; onNextHistoryDay?: () => void
   onSelectDay?: (day: DayTrend, origin?: 'five_day' | 'kline') => void; onExitHistoryDrill?: () => void
-  showVolumeProfile?: Accessor<boolean>
-  onToggleVolumeProfile?: (on: boolean) => void
   hover: MiniHoverState
 }
 
@@ -204,7 +202,6 @@ export function MiniBody(props: MiniBodyProps) {
                     subchartMode={subchartMode()}
                     macdParams={indicatorParams().macd}
                     trades={currentTrades()}
-                    showVolumeProfile={props.showVolumeProfile?.()}
                     onHover={(point, extra) => { setHoveredPoint(point); setHoveredPointExtra(extra ? { ...extra, date: props.historyDrillDay?.()?.date, preClose: props.historyDrillDay?.()?.preClose } : null) }}
                   />
                 }
@@ -275,8 +272,6 @@ export function MiniBody(props: MiniBodyProps) {
           showSubchart={true}
           klinePeriod={props.klinePeriod?.()}
           onSelectPeriod={props.onSelectPeriod}
-          showVolumeProfile={props.showVolumeProfile?.()}
-          onToggleVolumeProfile={props.onToggleVolumeProfile}
         />
       </div>
     </>

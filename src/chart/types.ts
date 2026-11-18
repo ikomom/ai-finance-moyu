@@ -17,7 +17,6 @@ export interface DrawOptions {
   macdParams?: [number, number, number]
   isGlobal?: boolean
   trades?: TradeRecord[]
-  showVolumeProfile?: boolean
 }
 
 export interface LevelOptions {
