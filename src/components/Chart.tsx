@@ -42,6 +42,7 @@ export function Chart(props: ChartProps) {
       costPrice: props.costPrice,
       priceLines: props.priceLines,
       lastPrice: props.lastPrice,
+      isHistorical: props.isHistorical,
       compact: props.compact,
       hoverSlot: hoverSlot(),
       orbHigh: props.orbHigh,

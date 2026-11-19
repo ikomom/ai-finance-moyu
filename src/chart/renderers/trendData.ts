@@ -52,6 +52,11 @@ export function computeUnifiedMaxDev(
     }
   }
 
+  // Include real-time lastPrice in deviation bounds
+  if (opts.lastPrice && opts.lastPrice > 0 && preClose > 0) {
+    maxDev = Math.max(maxDev, Math.abs(opts.lastPrice - preClose))
+  }
+
   // Include call auction points in deviation bounds
   if (opts.auction?.points) {
     for (const p of opts.auction.points) {
@@ -174,6 +179,47 @@ export function buildUnifiedChartData(
       vol,
       isUp,
     })
+  }
+
+  // 2.5 Real-time live tick synchronization:
+  // If opts.lastPrice is provided (and not in historical drill), synchronize the latest price point
+  // so rapid market moves (like 涨停炸板 / 急速拉升 / 跳水) immediately reflect on the line and dot!
+  if (opts.lastPrice && opts.lastPrice > 0 && !opts.isHistorical && !isGlobal) {
+    const now = new Date()
+    const bjH = (now.getUTCHours() + 8) % 24
+    const bjM = now.getUTCMinutes()
+    const currentHhmm = bjH * 100 + bjM
+    const isLiveHours =
+      (currentHhmm >= 930 && currentHhmm <= 1130) || (currentHhmm >= 1300 && currentHhmm <= 1500)
+    if (isLiveHours) {
+      const liveSlot = useFullSpectrum ? slotOfFullTrend(currentHhmm) : slotOf(currentHhmm)
+      const lastContinuous = pricePoints.filter((p) => !p.isAuction).pop()
+      if (lastContinuous) {
+        if (liveSlot > lastContinuous.slot) {
+          pricePoints.push({
+            slot: liveSlot,
+            price: opts.lastPrice,
+            avgPrice: lastContinuous.avgPrice,
+            isAuction: false,
+          })
+          volumeItems.push({
+            x: xOf(liveSlot),
+            slot: liveSlot,
+            isAuction: false,
+            vol: 0,
+            isUp: opts.lastPrice >= lastContinuous.price,
+          })
+        } else {
+          lastContinuous.price = opts.lastPrice
+        }
+      } else if (pricePoints.length === 0) {
+        pricePoints.push({
+          slot: liveSlot,
+          price: opts.lastPrice,
+          isAuction: false,
+        })
+      }
+    }
   }
 
   // 3. Closing Call Auction Points (14:57 - 15:00)

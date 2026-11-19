@@ -9,6 +9,7 @@ export interface DrawOptions {
   priceLines?: PriceLine[]
   /** Latest price, marked with a dot at the end of the series. */
   lastPrice?: number
+  isHistorical?: boolean
   compact?: boolean
   hoverSlot?: number | null
   orbHigh?: number | null

@@ -69,12 +69,19 @@ export function drawTrendPrice(
     ctx.stroke(avgPath)
   }
 
-  // 最新价格圆点
+  // 最新价格圆点及动态光晕 (Real-time live tick halo)
   const lastY = yOf(lastPt.price)
+  ctx.save()
   ctx.fillStyle = priceColor
+  ctx.globalAlpha = 0.25
+  ctx.beginPath()
+  ctx.arc(lastX, lastY, 4.5, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1
   ctx.beginPath()
   ctx.arc(lastX, lastY, 2, 0, Math.PI * 2)
   ctx.fill()
+  ctx.restore()
 
   return { lastX, lastY, priceColor }
 }

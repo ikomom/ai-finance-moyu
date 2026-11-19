@@ -3,6 +3,7 @@
 //! Split from `poller.rs` to stay inside the 300-line budget (AGENTS.md §11).
 
 
+use chrono::Timelike;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::AppState;
@@ -142,6 +143,49 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
         let mut store = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
         for q in quotes.iter() {
             store.insert(q.code.clone(), q.clone());
+        }
+
+        // Synchronize live tick price into intraday trends in real time so that rapid moves (e.g. 炸板) immediately reflect
+        if is_continuous {
+            let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
+            let current_hhmm = (now.hour() * 100 + now.minute()) as u32;
+            for q in &quotes {
+                if q.price <= 0.0 {
+                    continue;
+                }
+                if let Some(t) = trends.get_mut(&q.code) {
+                    let last_info = t.points.last().map(|p| (p.time, p.cum_amount, p.avg_price));
+                    match last_info {
+                        Some((time, cum_amount, avg_price)) if current_hhmm > time && current_hhmm <= 1500 => {
+                            t.points.push(crate::quote::TrendPoint {
+                                time: current_hhmm,
+                                price: q.price,
+                                cum_volume: q.volume,
+                                cum_amount,
+                                avg_price: if avg_price > 0.0 { avg_price } else { q.price },
+                            });
+                        }
+                        Some((time, _, _)) if current_hhmm == time => {
+                            if let Some(last_p) = t.points.last_mut() {
+                                last_p.price = q.price;
+                                if q.volume > 0.0 {
+                                    last_p.cum_volume = q.volume;
+                                }
+                            }
+                        }
+                        None if (930..=1500).contains(&current_hhmm) => {
+                            t.points.push(crate::quote::TrendPoint {
+                                time: current_hhmm,
+                                price: q.price,
+                                cum_volume: q.volume,
+                                cum_amount: 0.0,
+                                avg_price: q.price,
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+            }
         }
 
         // Snapshot what the cache needs and persist it *after* the block, so no
