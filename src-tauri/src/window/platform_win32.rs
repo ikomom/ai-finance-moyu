@@ -44,6 +44,31 @@ pub fn disable_maximize(win: &impl WindowHwnd) {
 #[cfg(not(windows))]
 pub fn disable_maximize<T>(_win: &T) {}
 
+/// Set window position and size simultaneously in a single atomic Win32 call.
+/// Prevents layout tearing/jitter when the window changes dimensions while docked.
+#[cfg(windows)]
+pub fn set_window_bounds(win: &tauri::WebviewWindow, x: f64, y: f64, w: f64, h: f64, scale: f64) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+    if let Some(raw) = win.raw_hwnd() {
+        let px = (x * scale).round() as i32;
+        let py = (y * scale).round() as i32;
+        let pw = (w * scale).round() as i32;
+        let ph = (h * scale).round() as i32;
+        unsafe {
+            SetWindowPos(raw, 0 as _, px, py, pw, ph, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        return;
+    }
+    let _ = win.set_size(tauri::LogicalSize::new(w, h));
+    let _ = win.set_position(tauri::LogicalPosition::new(x, y));
+}
+
+#[cfg(not(windows))]
+pub fn set_window_bounds(win: &tauri::WebviewWindow, x: f64, y: f64, w: f64, h: f64, _scale: f64) {
+    let _ = win.set_size(tauri::LogicalSize::new(w, h));
+    let _ = win.set_position(tauri::LogicalPosition::new(x, y));
+}
+
 /// Take the window out of the Alt+Tab list.
 ///
 /// Tauri's `skipTaskbar` drops the taskbar button but leaves the Alt+Tab entry,

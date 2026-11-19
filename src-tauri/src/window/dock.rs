@@ -7,7 +7,7 @@ use crate::config::Layout;
 use crate::poller;
 use crate::state::{AppState, DockEdge};
 use super::geometry::{dock_collapsed_geometry, size_for, suppress_move, suppress_resize, DISPLAY};
-use super::platform_win32::disable_maximize;
+use super::platform_win32::{disable_maximize, set_window_bounds};
 
 pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), String> {
     let Some(win) = app.get_webview_window(DISPLAY) else {
@@ -87,10 +87,7 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
 
         // Disable resize tracking so Windows doesn't clamp width to SM_CXMINTRACK (136px)
         let _ = win.set_resizable(false);
-        // Shrink size FIRST, then adjust position: guarantees window never spills
-        // across monitor boundaries onto adjacent screens at any point!
-        let _ = win.set_size(tauri::LogicalSize::new(cw, ch));
-        let _ = win.set_position(tauri::LogicalPosition::new(cx, cy));
+        set_window_bounds(&win, cx, cy, cw, ch, scale);
 
         {
             let mut dock = state.dock_state.lock().unwrap_or_else(|e| e.into_inner());
@@ -104,10 +101,8 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
             DockEdge::None => (normal_x, normal_y),
         };
 
-        // When expanding: move position towards interior FIRST, then expand size,
-        // again ensuring coordinates stay strictly within current monitor bounds.
-        let _ = win.set_position(tauri::LogicalPosition::new(expanded_x, expanded_y));
-        let _ = win.set_size(tauri::LogicalSize::new(w, h));
+        // Atomically set expanded position and size to avoid boundary clipping/jitter
+        set_window_bounds(&win, expanded_x, expanded_y, w, h, scale);
         let _ = win.set_resizable(true);
         disable_maximize(&win);
 

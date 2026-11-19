@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager};
 use crate::config::{Layout, LayoutSizes};
 use crate::state::{AppState, DockEdge};
 pub use super::move_resize::{suppress_move, suppress_resize};
-use super::platform_win32::disable_maximize;
+use super::platform_win32::{disable_maximize, set_window_bounds};
 
 /// Label of the floating display window, and of the settings window.
 pub const DISPLAY: &str = "main";
@@ -102,6 +102,9 @@ pub fn place_window(app: &AppHandle, layout: Layout, rows: usize) {
         return;
     };
 
+    suppress_move(app, Duration::from_millis(700));
+    suppress_resize(app, Duration::from_millis(700));
+
     let (w, h, mut x, mut y, edge, collapsed) = {
         let state = app.state::<AppState>();
         let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
@@ -115,10 +118,11 @@ pub fn place_window(app: &AppHandle, layout: Layout, rows: usize) {
         .ok()
         .flatten()
         .or_else(|| win.primary_monitor().ok().flatten());
+    let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
     if let Some(mon) = monitor {
-        let scale = mon.scale_factor();
-        let mpos = mon.position().to_logical::<f64>(scale);
-        let msize = mon.size().to_logical::<f64>(scale);
+        let mscale = mon.scale_factor();
+        let mpos = mon.position().to_logical::<f64>(mscale);
+        let msize = mon.size().to_logical::<f64>(mscale);
         match edge {
             DockEdge::Right => {
                 x = mpos.x + msize.width - w;
@@ -149,16 +153,12 @@ pub fn place_window(app: &AppHandle, layout: Layout, rows: usize) {
                 (msize.width, msize.height),
             );
             let _ = win.set_resizable(false);
-            let _ = win.set_size(tauri::LogicalSize::new(cw, ch));
-            let _ = win.set_position(tauri::LogicalPosition::new(cx, cy));
+            set_window_bounds(&win, cx, cy, cw, ch, scale);
             return;
         }
     }
 
-    // Size first, then position: the clamp above already accounts for the new
-    // size, and this order avoids a frame at the wrong shape.
-    let _ = win.set_size(tauri::LogicalSize::new(w, h));
-    let _ = win.set_position(tauri::LogicalPosition::new(x, y));
+    set_window_bounds(&win, x, y, w, h, scale);
     let _ = win.set_resizable(true);
     disable_maximize(&win);
 }

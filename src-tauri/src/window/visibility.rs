@@ -21,8 +21,11 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
     log::info!(target: "USER", "切换布局模式至 {:?}", layout);
     let _ = config::save(app, &snapshot);
 
-    // 1. Uncollapse dock with the NEW layout dimensions
-    let _ = set_dock_collapsed_inner(app, false);
+    // 1. Ensure dock is uncollapsed in state so place_window applies the full target layout
+    {
+        let state = app.state::<AppState>();
+        state.dock_state.lock().unwrap_or_else(|e| e.into_inner()).collapsed = false;
+    }
 
     // 2. If the window was hidden (e.g. by boss key) or minimized, reveal and show it immediately!
     if let Some(win) = app.get_webview_window(DISPLAY) {

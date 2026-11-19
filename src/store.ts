@@ -76,17 +76,6 @@ function applyViewState(target: ViewState): void {
   }
 
   if (target.layout !== s.config.layout) {
-    setSnapshot((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        config: {
-          ...prev.config,
-          layout: target.layout,
-          activeGroupId: effectiveGroupId,
-        },
-      }
-    })
     void invoke('set_layout', { layout: target.layout })
   } else {
     setSnapshot((prev) => {
@@ -177,25 +166,23 @@ export function navigateToStock(code: string, mode: 'trend' | 'kline' | 'auction
   }
   setMiniModeOverride(mode)
 
-  setSnapshot((prev) => {
-    if (!prev) return prev
-    return {
-      ...prev,
-      dock: prev.dock ? { ...prev.dock, collapsed: false } : prev.dock,
-      config: {
-        ...prev.config,
-        layout: 'mini',
-        activeGroupId: effectiveGroupId,
-      },
-    }
-  })
-
-  if (s.dock?.collapsed) {
-    void invoke('set_dock_collapsed', { collapsed: false })
-  }
   if (s.config.layout !== 'mini') {
     recordLayoutChange('mini')
     void invoke('set_layout', { layout: 'mini' })
+  } else {
+    setSnapshot((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          activeGroupId: effectiveGroupId,
+        },
+      }
+    })
+    if (s.dock?.collapsed) {
+      void invoke('set_dock_collapsed', { collapsed: false })
+    }
   }
 }
 
