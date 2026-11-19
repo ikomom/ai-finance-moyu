@@ -85,32 +85,18 @@ pub fn parse_quote_line(line: &str) -> Option<Quote> {
 
     let mut bids = Vec::with_capacity(5);
     if f.len() > 19 {
-        let b_tuples = [
-            (num(f[11]), num(f[10]) / 100.0),
-            (num(f[13]), num(f[12]) / 100.0),
-            (num(f[15]), num(f[14]) / 100.0),
-            (num(f[17]), num(f[16]) / 100.0),
-            (num(f[19]), num(f[18]) / 100.0),
-        ];
-        for b in b_tuples {
-            if b.0 > 0.0 || b.1 > 0.0 {
-                bids.push(b);
+        for i in (0..5).map(|k| (num(f[11 + k * 2]), num(f[10 + k * 2]) / 100.0)) {
+            if i.0 > 0.0 || i.1 > 0.0 {
+                bids.push(i);
             }
         }
     }
 
     let mut asks = Vec::with_capacity(5);
     if f.len() > 29 {
-        let a_tuples = [
-            (num(f[21]), num(f[20]) / 100.0),
-            (num(f[23]), num(f[22]) / 100.0),
-            (num(f[25]), num(f[24]) / 100.0),
-            (num(f[27]), num(f[26]) / 100.0),
-            (num(f[29]), num(f[28]) / 100.0),
-        ];
-        for a in a_tuples {
-            if a.0 > 0.0 || a.1 > 0.0 {
-                asks.push(a);
+        for i in (0..5).map(|k| (num(f[21 + k * 2]), num(f[20 + k * 2]) / 100.0)) {
+            if i.0 > 0.0 || i.1 > 0.0 {
+                asks.push(i);
             }
         }
     }
@@ -122,10 +108,21 @@ pub fn parse_quote_line(line: &str) -> Option<Quote> {
     } else {
         0.0
     };
-
-    let outer_vol = 0.0;
-    let inner_vol = 0.0;
-    let active_buy_ratio = 0.5;
+    let weibi = if sum_bid + sum_ask > 0.0 {
+        Some(((sum_bid - sum_ask) / (sum_bid + sum_ask) * 10000.0).round() / 100.0)
+    } else {
+        None
+    };
+    let weicha = if sum_bid + sum_ask > 0.0 { Some(sum_bid - sum_ask) } else { None };
+    let amount = if f.len() > 9 { num_opt(f[9]) } else { None };
+    let high = num(f[4]);
+    let low = num(f[5]);
+    let amplitude = if high > 0.0 && low > 0.0 && pre_close > 0.0 {
+        Some(((high - low) / pre_close * 10000.0).round() / 100.0)
+    } else {
+        None
+    };
+    let avg_price = if volume > 0.0 { amount.map(|a| a / (volume * 100.0)) } else { None };
 
     Some(Quote {
         code,
@@ -133,8 +130,8 @@ pub fn parse_quote_line(line: &str) -> Option<Quote> {
         price,
         pre_close,
         open: num(f[1]),
-        high: num(f[4]),
-        low: num(f[5]),
+        high,
+        low,
         volume,
         change,
         change_pct,
@@ -143,10 +140,21 @@ pub fn parse_quote_line(line: &str) -> Option<Quote> {
         time: f[31].trim().to_string(),
         bids,
         asks,
-        outer_vol,
-        inner_vol,
+        outer_vol: 0.0,
+        inner_vol: 0.0,
         bid_ask_imbalance,
-        active_buy_ratio,
+        active_buy_ratio: 0.5,
+        turnover_rate: None,
+        amount,
+        amplitude,
+        circulating_market_cap: None,
+        total_market_cap: None,
+        volume_ratio: None,
+        weibi,
+        weicha,
+        limit_up: None,
+        limit_down: None,
+        avg_price,
     })
 }
 

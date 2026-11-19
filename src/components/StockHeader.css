@@ -1,4 +1,10 @@
 /* StockHeader - Meta line, large price, badges and hover tags */
+.stock-header-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
 .mini-meta {
   position: relative;
   display: flex;

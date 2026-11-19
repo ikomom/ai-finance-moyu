@@ -50,6 +50,12 @@
         assert_eq!(p.asks[0], (9.59, 12062.0));
         assert!((p.bid_ask_imbalance - (-0.5226)).abs() < 0.001);
         assert!((p.active_buy_ratio - 0.5413).abs() < 0.001);
+        assert_eq!(p.turnover_rate, Some(0.11));
+        assert_eq!(p.amount, Some(353160000.0));
+        assert_eq!(p.amplitude, Some(1.90));
+        assert_eq!(p.circulating_market_cap, Some(3190.70));
+        assert_eq!(p.volume_ratio, Some(1.37));
+        assert_eq!(p.avg_price, Some(9.52));
     }
 
     #[test]

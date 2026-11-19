@@ -39,6 +39,39 @@ pub struct Quote {
     /// 主动买盘占比 `[0.0, 1.0]` (外盘 / (外盘 + 内盘))
     #[serde(default = "default_half")]
     pub active_buy_ratio: f64,
+    /// 换手率 (%)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turnover_rate: Option<f64>,
+    /// 成交金额 (元)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f64>,
+    /// 日内振幅 (%)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amplitude: Option<f64>,
+    /// 流通市值 (亿元)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub circulating_market_cap: Option<f64>,
+    /// 总市值 (亿元)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_market_cap: Option<f64>,
+    /// 量比
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume_ratio: Option<f64>,
+    /// 委比 (%)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weibi: Option<f64>,
+    /// 委差 (手)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weicha: Option<f64>,
+    /// 涨停价
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_up: Option<f64>,
+    /// 跌停价
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_down: Option<f64>,
+    /// 分时加权均价
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avg_price: Option<f64>,
 }
 
 fn default_half() -> f64 {
@@ -66,6 +99,17 @@ impl Default for Quote {
             inner_vol: 0.0,
             bid_ask_imbalance: 0.0,
             active_buy_ratio: 0.5,
+            turnover_rate: None,
+            amount: None,
+            amplitude: None,
+            circulating_market_cap: None,
+            total_market_cap: None,
+            volume_ratio: None,
+            weibi: None,
+            weicha: None,
+            limit_up: None,
+            limit_down: None,
+            avg_price: None,
         }
     }
 }
@@ -212,6 +256,11 @@ pub fn decode_gb18030(bytes: &[u8]) -> String {
 /// Lenient float parse — feeds occasionally emit `-` or blank for a field.
 pub fn num(s: &str) -> f64 {
     s.trim().parse::<f64>().unwrap_or(0.0)
+}
+
+/// Optional float parse returning None on blank or parse error.
+pub fn num_opt(s: &str) -> Option<f64> {
+    s.trim().parse::<f64>().ok()
 }
 
 /// Build a point, deriving 均价 from the cumulative totals.

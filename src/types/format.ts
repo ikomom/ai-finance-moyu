@@ -112,6 +112,13 @@ export function fmtAmount(v?: number | null): string {
   return `${Math.round(abs)}元`
 }
 
+/** Format market cap in 亿元. */
+export function fmtMarketCap(v?: number | null): string {
+  if (v == null || isNaN(v) || v <= 0) return '--'
+  if (v >= 10000) return `${(v / 10000).toFixed(2)}万亿`
+  return `${v.toFixed(2)}亿`
+}
+
 /** Check if symbol represents an index (no individual call auction or VWAP) */
 export function isIndexCode(code: string): boolean {
   return code.startsWith('sh000') || code.startsWith('sz399') || code.startsWith('bj899')

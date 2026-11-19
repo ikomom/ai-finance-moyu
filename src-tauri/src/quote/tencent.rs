@@ -112,6 +112,22 @@ pub fn parse_quote_line(line: &str) -> Option<Quote> {
         0.5
     };
 
+    let amount = if f.len() > 37 { num_opt(f[37]).map(|v| v * 10_000.0) } else { None };
+    let turnover_rate = if f.len() > 38 { num_opt(f[38]) } else { None };
+    let amplitude = if f.len() > 43 { num_opt(f[43]) } else { None };
+    let circulating_market_cap = if f.len() > 44 { num_opt(f[44]) } else { None };
+    let total_market_cap = if f.len() > 45 { num_opt(f[45]) } else { None };
+    let limit_up = if f.len() > 47 { num_opt(f[47]) } else { None };
+    let limit_down = if f.len() > 48 { num_opt(f[48]) } else { None };
+    let volume_ratio = if f.len() > 49 { num_opt(f[49]) } else { None };
+    let weicha = if sum_bid + sum_ask > 0.0 { Some(sum_bid - sum_ask) } else { None };
+    let avg_price = if f.len() > 51 && num(f[51]) > 0.0 { num_opt(f[51]) } else { None };
+    let weibi = if sum_bid + sum_ask > 0.0 {
+        Some(((sum_bid - sum_ask) / (sum_bid + sum_ask) * 10000.0).round() / 100.0)
+    } else {
+        None
+    };
+
     Some(Quote {
         code,
         name: f[1].trim().to_string(),
@@ -132,6 +148,17 @@ pub fn parse_quote_line(line: &str) -> Option<Quote> {
         inner_vol,
         bid_ask_imbalance,
         active_buy_ratio,
+        turnover_rate,
+        amount,
+        amplitude,
+        circulating_market_cap,
+        total_market_cap,
+        volume_ratio,
+        weibi,
+        weicha,
+        limit_up,
+        limit_down,
+        avg_price,
     })
 }
 

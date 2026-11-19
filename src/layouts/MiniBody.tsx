@@ -105,6 +105,7 @@ export function MiniBody(props: MiniBodyProps) {
         activePct={activePct()}
         high={stats().high}
         low={stats().low}
+        quote={q()}
         badge={
           <Show
             when={props.historyDrillDay?.()}

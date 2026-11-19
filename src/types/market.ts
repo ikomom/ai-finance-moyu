@@ -25,6 +25,17 @@ export interface Quote {
   innerVol?: number
   bidAskImbalance?: number
   activeBuyRatio?: number
+  turnoverRate?: number
+  amount?: number
+  amplitude?: number
+  circulatingMarketCap?: number
+  totalMarketCap?: number
+  volumeRatio?: number
+  weibi?: number
+  weicha?: number
+  limitUp?: number
+  limitDown?: number
+  avgPrice?: number
 }
 
 export interface TrendPoint {

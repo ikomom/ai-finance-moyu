@@ -1,0 +1,289 @@
+/* Micro Tape Popover CSS - AGENTS.md §15 Theme Adaptability */
+.micro-tape-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 296px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--surface-popover-bg, rgba(22, 27, 34, 0.95));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.16));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-popover, 0 8px 24px rgba(0, 0, 0, 0.35));
+  z-index: 100;
+  pointer-events: auto;
+  text-align: left;
+  user-select: none;
+  animation: tapeFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.micro-tape-popover.pinned {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--color-primary, #3b82f6);
+}
+
+/* Invisible bridge preventing gap flicker on hover transition */
+.micro-tape-popover::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: transparent;
+}
+
+@keyframes tapeFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 1. Header Bar */
+.tape-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.tape-title-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tape-badge-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-color, #e6edf3);
+  letter-spacing: -0.2px;
+}
+
+.tape-stock-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted, #8b949e);
+}
+
+.tape-stock-code {
+  font-size: 10px;
+  color: var(--text-dim, #6e7681);
+}
+
+.tape-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tape-pin-btn {
+  font-size: 10px;
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-xs, 3px);
+  color: var(--text-muted, #8b949e);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tape-pin-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-color, #e6edf3);
+}
+
+.tape-pin-btn.active {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+}
+
+.tape-close-btn {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim, #6e7681);
+  cursor: pointer;
+  border-radius: var(--radius-xs, 3px);
+}
+
+.tape-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color, #e6edf3);
+}
+
+/* 2. Grid Rows */
+.tape-grid-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.tape-grid-row.highlight-row {
+  background: var(--surface-card-subtle, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-sm, 5px);
+  padding: 4px 2px;
+}
+
+.tape-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 2px;
+}
+
+.tape-cell.col-span-2 {
+  grid-column: span 2;
+}
+
+.tape-label {
+  font-size: 9.5px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.2;
+  margin-bottom: 1.5px;
+}
+
+.tape-val {
+  font-size: 11px;
+  color: var(--text-color, #e6edf3);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.tape-val.text-hot {
+  color: var(--color-warning-light, #fbbf24);
+  font-weight: 700;
+}
+
+.tape-val.text-warm {
+  color: var(--color-up-subtle, #f87171);
+}
+
+/* 3. Energy Bar */
+.tape-energy-section {
+  margin-top: 4px;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  background: var(--surface-card-subtle, rgba(255, 255, 255, 0.02));
+  border-radius: var(--radius-sm, 4px);
+}
+
+.tape-energy-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9.5px;
+  margin-bottom: 3px;
+}
+
+.tape-mid-label {
+  font-size: 9px;
+  color: var(--text-dim, #6e7681);
+}
+
+.tape-side.up {
+  color: var(--color-up, #ef4444);
+  font-weight: 600;
+}
+
+.tape-side.down {
+  color: var(--color-down, #10b981);
+  font-weight: 600;
+}
+
+.tape-energy-bar {
+  display: flex;
+  height: 4.5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tape-bar-segment.buy {
+  background: var(--color-up, #ef4444);
+  transition: width 0.3s ease;
+}
+
+.tape-bar-segment.sell {
+  background: var(--color-down, #10b981);
+  transition: width 0.3s ease;
+}
+
+/* 4. Footer Hint */
+.tape-footer-hint {
+  font-size: 9px;
+  color: var(--text-dim, #6e7681);
+  text-align: center;
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
+/* Light Theme Overrides (AGENTS.md §15) */
+:root[data-theme="light"] .micro-tape-popover {
+  background: var(--surface-popover-bg, rgba(255, 255, 255, 0.98));
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+:root[data-theme="light"] .tape-header { border-bottom-color: rgba(0, 0, 0, 0.06); }
+:root[data-theme="light"] .tape-grid-row.highlight-row {
+  background: rgba(0, 0, 0, 0.025);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+:root[data-theme="light"] .tape-pin-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:root[data-theme="light"] .tape-pin-btn:hover { background: rgba(0, 0, 0, 0.08); }
+:root[data-theme="light"] .tape-pin-btn.active {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #2563eb;
+}
+:root[data-theme="light"] .tape-side.up { color: #dc2626; }
+:root[data-theme="light"] .tape-side.down { color: #16a34a; }
+
+/* Header Trigger Button */
+.tape-trigger-btn {
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs, 3px);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.12));
+  color: var(--text-muted, #8b949e);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.tape-trigger-btn:hover,
+.tape-trigger-btn.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #60a5fa;
+}
+:root[data-theme="light"] .tape-trigger-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #4b5563;
+}
+:root[data-theme="light"] .tape-trigger-btn:hover,
+:root[data-theme="light"] .tape-trigger-btn.active {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #2563eb;
+}
