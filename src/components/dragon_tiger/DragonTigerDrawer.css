@@ -153,41 +153,115 @@
   border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
-.lhb-stat-grid {
+/* 多空对抗三大看板 */
+.lhb-duel-banner {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  padding: 4px 2px 2px;
 }
 
-.lhb-stat-box {
+.lhb-duel-stat {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* basis: auto —— 按内容宽度分配，三列不再强行等分；
-     收盘价（价格+涨跌幅）天然比「-1959万」长，等分会把它挤断 */
-  flex: 1 1 auto;
-  min-width: 0;
+}
+.lhb-duel-stat.center {
+  align-items: center;
+}
+.lhb-duel-stat.right {
+  align-items: flex-end;
 }
 
-.lhb-stat-lbl {
+.lhb-duel-lbl {
   font-size: 9.5px;
-  color: #64748b;
+  color: var(--text-muted, #94a3b8);
   white-space: nowrap;
 }
 
-.lhb-stat-val {
-  font-size: 12.5px;
+.lhb-duel-val {
+  font-size: 13.5px;
+  font-weight: 800;
+  font-family: monospace;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.lhb-duel-val.buy { color: var(--color-up, #eb4d4b); }
+.lhb-duel-val.sell { color: var(--color-down, #2ecc71); }
+.lhb-duel-val.net-up { color: var(--color-up, #eb4d4b); }
+.lhb-duel-val.net-down { color: var(--color-down, #2ecc71); }
+.lhb-duel-val.net-flat { color: var(--color-flat, #94a3b8); }
+
+/* 多空对抗红绿能量比例条 */
+.lhb-energy-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lhb-energy-bar {
+  position: relative;
+  height: 5px;
+  width: 100%;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  overflow: hidden;
+}
+
+.lhb-energy-segment {
+  height: 100%;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lhb-energy-segment.buy {
+  background: var(--color-up, #eb4d4b);
+}
+.lhb-energy-segment.sell {
+  background: var(--color-down, #2ecc71);
+}
+
+.lhb-energy-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-family: monospace;
+  font-weight: 600;
+}
+.lhb-energy-labels .buy-lbl {
+  color: var(--color-up, #eb4d4b);
+}
+.lhb-energy-labels .sell-lbl {
+  color: var(--color-down, #2ecc71);
+}
+
+/* 次要指标行：机构净参与 & 当日收盘 */
+.lhb-stat-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.lhb-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9.5px;
+}
+.lhb-sub-item.right {
+  justify-content: flex-end;
+}
+
+.lhb-stat-val-sm {
+  font-size: 11px;
   font-weight: 700;
   font-family: monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.lhb-stat-val.up { color: #f43f5e; }
-.lhb-stat-val.down { color: #10b981; }
-.lhb-stat-val.flat { color: #94a3b8; }
+.lhb-stat-val-sm.up { color: var(--color-up, #eb4d4b); }
+.lhb-stat-val-sm.down { color: var(--color-down, #2ecc71); }
+.lhb-stat-val-sm.flat { color: var(--color-flat, #94a3b8); }
 
-/* 涨跌幅跟在收盘价后面，降一档字号做次级信息，同时省出宽度 */
 .lhb-stat-pct {
   margin-left: 4px;
   font-size: 10.5px;
@@ -201,14 +275,21 @@
   color: #cbd5e1;
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 4px;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 0 2px;
 }
-.lhb-section-header.buy {
-  color: #fb7185;
+.lhb-section-header.buy .lhb-section-title {
+  color: var(--color-up-subtle, #fb7185);
 }
-.lhb-section-header.sell {
-  color: #34d399;
+.lhb-section-header.sell .lhb-section-title {
+  color: var(--color-down-subtle, #34d399);
+}
+.lhb-section-col-labels {
+  font-size: 9.5px;
+  color: var(--text-muted, #94a3b8);
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .lhb-seat-list {
@@ -219,6 +300,8 @@
 
 /* 席位行：自适应宽敞，营业部名字充分展开 */
 .lhb-seat-row {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -228,6 +311,24 @@
   font-size: 11px;
   cursor: default;
   transition: background 0.12s ease;
+}
+
+/* 资金体量背景比例条（参考同花顺设计） */
+.lhb-seat-bar-bg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  pointer-events: none;
+  border-radius: 4px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.14;
+}
+.lhb-seat-bar-bg.buy {
+  background: var(--color-up, #eb4d4b);
+}
+.lhb-seat-bar-bg.sell {
+  background: var(--color-down, #2ecc71);
 }
 .lhb-seat-row.is-clickable {
   cursor: pointer;
@@ -273,6 +374,8 @@
 }
 
 .lhb-seat-left {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -324,6 +427,8 @@
 }
 
 .lhb-seat-right-group {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

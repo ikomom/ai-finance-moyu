@@ -123,3 +123,84 @@ describe('DragonTigerBadge', () => {
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('SeatRow & LhbSummaryCard', () => {
+  it('renders SeatRow with both primary and secondary amounts and proportion bar', async () => {
+    const { SeatRow } = await import('./SeatRow')
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+
+    const mockSeat = {
+      branch_name: '深股通专用',
+      trader_label: '北向外资',
+      buy_amount: 250_000_000,
+      sell_amount: 103_500_000,
+      net_amount: 146_500_000,
+    }
+
+    render(
+      () => (
+        <SeatRow
+          idx={0}
+          seat={mockSeat}
+          isBuy={true}
+          maxAmt={250_000_000}
+          hoveredPairId={null}
+          onHover={() => {}}
+          onClick={() => {}}
+        />
+      ),
+      container
+    )
+
+    expect(container.textContent).toContain('深股通专用')
+    expect(container.textContent).toContain('2.50亿')
+    expect(container.textContent).toContain('1.03亿')
+    expect(container.querySelector('.lhb-seat-bar-bg.buy')).not.toBeNull()
+  })
+
+  it('renders LhbSummaryCard with duel metrics and energy bar', async () => {
+    const { LhbSummaryCard } = await import('./LhbSummaryCard')
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+
+    const mockDt = {
+      code: '002242',
+      name: '九阳股份',
+      trade_date: '2026-11-19',
+      reason: '日振幅达15%',
+      close_price: 28.37,
+      change_pct: -9.99,
+      net_total: -232_700_000,
+      institution_buy: 111_800_000,
+      institution_sell: 0,
+      institution_net: 111_800_000,
+      top_buyers: [
+        {
+          branch_name: '深股通专用',
+          trader_label: '北向外资',
+          buy_amount: 250_000_000,
+          sell_amount: 103_500_000,
+          net_amount: 146_500_000,
+        },
+      ],
+      top_sellers: [
+        {
+          branch_name: '东吴证券苏州石路',
+          trader_label: '96余哥',
+          buy_amount: 351_600,
+          sell_amount: 263_800_000,
+          net_amount: -263_448_400,
+        },
+      ],
+    }
+
+    render(() => <LhbSummaryCard data={mockDt} />, container)
+
+    expect(container.textContent).toContain('总买(前五)')
+    expect(container.textContent).toContain('2.50亿')
+    expect(container.textContent).toContain('总卖(前五)')
+    expect(container.textContent).toContain('2.64亿')
+    expect(container.querySelector('.lhb-energy-bar')).not.toBeNull()
+  })
+})
