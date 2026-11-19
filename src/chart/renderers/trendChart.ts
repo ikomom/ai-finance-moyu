@@ -129,6 +129,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       items: volumeItems,
       barWidth: barW,
       activeIdx: activeVolIdx,
+      scaleMode: opts.volumeScaleMode ?? 'linear',
     })
   } else {
     let activeContinuousIdx: number | null = null

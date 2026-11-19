@@ -63,7 +63,20 @@
         assert_eq!(c.watchlist.len(), 1);
         assert_eq!(c.layout, Layout::Mini);
         assert_eq!(c.alert_pct, 3.0);
+        assert_eq!(c.volume_scale_mode, VolumeScaleMode::Linear);
         assert!(c.watchlist[0].price_lines.is_empty());
+    }
+
+    #[test]
+    fn volume_scale_mode_roundtrips() {
+        let with_sqrt = r#"{"volumeScaleMode":"sqrt","watchlist":[{"code":"sh600000"}]}"#;
+        let loaded_sqrt: Config = serde_json::from_str(with_sqrt).unwrap();
+        assert_eq!(loaded_sqrt.volume_scale_mode, VolumeScaleMode::Sqrt);
+
+        let json = serde_json::to_string(&loaded_sqrt).unwrap();
+        assert!(json.contains(r#""volumeScaleMode":"sqrt""#));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.volume_scale_mode, VolumeScaleMode::Sqrt);
     }
 
     /// A config written before `hotkeys` existed still loads, and picks up the

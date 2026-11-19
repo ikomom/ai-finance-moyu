@@ -204,6 +204,7 @@ export function MiniBody(props: MiniBodyProps) {
                     subchartMode={subchartMode()}
                     macdParams={indicatorParams().macd}
                     trades={currentTrades()}
+                    volumeScaleMode={s().config.volumeScaleMode}
                     onHover={(point, extra) => { setHoveredPoint(point); setHoveredPointExtra(extra ? { ...extra, date: props.historyDrillDay?.()?.date, preClose: props.historyDrillDay?.()?.preClose } : null) }}
                   />
                 }

@@ -26,6 +26,7 @@ export interface DrawMinuteVolumeOptions {
   items: UnifiedVolumeItem[]
   barWidth: number
   activeIdx?: number | null
+  scaleMode?: 'linear' | 'sqrt'
 }
 
 export function drawMinuteVolumeSubchart(opts: DrawMinuteVolumeOptions): void {
@@ -33,6 +34,7 @@ export function drawMinuteVolumeSubchart(opts: DrawMinuteVolumeOptions): void {
   const count = items.length
   if (count === 0) return
 
+  const isSqrt = opts.scaleMode === 'sqrt'
   const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
   const colorUp = isLight ? '#dc2626' : 'rgba(239, 68, 68, 0.88)'
   const colorDown = isLight ? '#16a34a' : 'rgba(34, 197, 94, 0.88)'
@@ -52,14 +54,23 @@ export function drawMinuteVolumeSubchart(opts: DrawMinuteVolumeOptions): void {
 
   // Fallback to all items if no continuous points exist yet
   let effectiveCeiling = continuousMax
-  if (continuousVols.length >= 8) {
-    continuousVols.sort((a, b) => a - b)
-    const p90 = continuousVols[Math.floor(continuousVols.length * 0.90)]
-    // Outlier dampening: cap at 2.2x of 90th percentile if spike exceeds it
-    effectiveCeiling = continuousMax > p90 * 2.2 ? p90 * 2.0 : continuousMax
-  } else if (continuousMax <= 0) {
-    for (let i = 0; i < count; i++) {
-      if (items[i].vol > effectiveCeiling) effectiveCeiling = items[i].vol
+  if (isSqrt) {
+    if (continuousVols.length >= 8) {
+      continuousVols.sort((a, b) => a - b)
+      const p90 = continuousVols[Math.floor(continuousVols.length * 0.90)]
+      // Outlier dampening: cap at 2.2x of 90th percentile if spike exceeds it
+      effectiveCeiling = continuousMax > p90 * 2.2 ? p90 * 2.0 : continuousMax
+    } else if (continuousMax <= 0) {
+      for (let i = 0; i < count; i++) {
+        if (items[i].vol > effectiveCeiling) effectiveCeiling = items[i].vol
+      }
+    }
+  } else {
+    // 真实比例线性模式 (对齐同花顺)：严格以日内最高量为顶格基准
+    if (continuousMax <= 0) {
+      for (let i = 0; i < count; i++) {
+        if (items[i].vol > effectiveCeiling) effectiveCeiling = items[i].vol
+      }
     }
   }
 
@@ -75,10 +86,22 @@ export function drawMinuteVolumeSubchart(opts: DrawMinuteVolumeOptions): void {
     const x0 = cx - w / 2
 
     if (it.isAuction) {
-      // 竞价双层量柱: 下层匹配量 + 上层未匹配单，最高顶格 subPlotH
+      // 竞价双层量柱:
+      // 下层匹配量 + 上层未匹配单。对齐同花顺：卖压单从顶部垂下 (inverted ceiling bar)，买盘冲刺向上堆叠
       const matched = it.matchedVol ?? it.vol
       const unmatched = it.unmatchedVol ?? 0
-      const matchedH = matched > 0 ? Math.min(subPlotH, (Math.sqrt(matched) / sqrtCeiling) * subPlotH) : 0
+      const matchedH =
+        matched > 0
+          ? Math.min(
+              subPlotH,
+              Math.max(
+                1,
+                isSqrt
+                  ? (Math.sqrt(matched) / sqrtCeiling) * subPlotH
+                  : (matched / effectiveCeiling) * subPlotH
+              )
+            )
+          : 0
 
       if (matchedH > 0) {
         ctx.fillStyle = colorAuctionMatched
@@ -86,26 +109,52 @@ export function drawMinuteVolumeSubchart(opts: DrawMinuteVolumeOptions): void {
       }
 
       if (unmatched > 0) {
-        const totalH = Math.min(subPlotH, (Math.sqrt(matched + unmatched) / sqrtCeiling) * subPlotH)
-        const unmatchedH = Math.max(1, totalH - matchedH)
-        const unmatchedY = volT + volH - totalH
-        const color =
-          it.unmatchedSide === 'buy'
-            ? colorUp
-            : it.unmatchedSide === 'sell'
-              ? colorDown
-              : colorAuctionMatched
-        ctx.fillStyle = color
-        ctx.fillRect(x0, unmatchedY, w, unmatchedH)
+        if (it.unmatchedSide === 'sell') {
+          // 未匹配卖单 (卖盘压制): 挂在副图顶部垂下 (同花顺同款绿色下垂刺)
+          const sellH = Math.min(
+            subPlotH,
+            Math.max(
+              1,
+              isSqrt
+                ? (Math.sqrt(unmatched) / sqrtCeiling) * subPlotH
+                : (unmatched / effectiveCeiling) * subPlotH
+            )
+          )
+          ctx.fillStyle = colorDown
+          ctx.fillRect(x0, volT, w, sellH)
+        } else {
+          // 未匹配买单: 匹配量之上向上堆叠 (红色买盘冲刺)
+          const totalH = Math.min(
+            subPlotH,
+            Math.max(
+              1,
+              isSqrt
+                ? (Math.sqrt(matched + unmatched) / sqrtCeiling) * subPlotH
+                : ((matched + unmatched) / effectiveCeiling) * subPlotH
+            )
+          )
+          const buyH = Math.max(1, totalH - matchedH)
+          const buyY = volT + volH - totalH
+          ctx.fillStyle = it.unmatchedSide === 'buy' ? colorUp : colorAuctionMatched
+          ctx.fillRect(x0, buyY, w, buyH)
+        }
       }
     } else {
-      // 连续交易常规单层柱: 红涨绿跌，确保最小可见高度 2px，充分吃满副图
-      const barH = Math.min(subPlotH, Math.max(2, (Math.sqrt(it.vol) / sqrtCeiling) * subPlotH))
+      // 连续交易常规单层柱: 红涨绿跌，确保最小可见高度 1px
+      const barH = Math.min(
+        subPlotH,
+        Math.max(
+          1,
+          isSqrt
+            ? (Math.sqrt(it.vol) / sqrtCeiling) * subPlotH
+            : (it.vol / effectiveCeiling) * subPlotH
+        )
+      )
       ctx.fillStyle = it.isUp ? colorUp : colorDown
       ctx.fillRect(x0, volT + volH - barH, w, barH)
 
-      // Spike cap marker if exceeding ceiling
-      if (it.vol > effectiveCeiling * 1.05) {
+      // Spike cap marker if exceeding ceiling in sqrt dampening mode
+      if (isSqrt && it.vol > effectiveCeiling * 1.05) {
         ctx.fillStyle = isLight ? '#0f172a' : '#ffffff'
         ctx.fillRect(x0, volT + volH - subPlotH, w, 1)
       }

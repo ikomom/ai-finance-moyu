@@ -161,6 +161,7 @@ export function StockTrendView(props: StockTrendViewProps) {
               trend={trend() ?? undefined}
               preClose={preClose()}
               lastPrice={lastPoint()?.price}
+              volumeScaleMode={snapshot()?.config.volumeScaleMode}
               onHover={(point) => setHovered(point)}
             />
           </div>

@@ -216,6 +216,8 @@ export interface TrendSignal {
 
 export type ThemePreset = 'dark' | 'light' | 'transparent' | 'ocean' | 'cyberpunk'
 
+export type VolumeScaleMode = 'linear' | 'sqrt'
+
 export interface ThemeOption {
   value: ThemePreset
   name: string
@@ -254,6 +256,7 @@ export interface Config {
   indicatorConfig?: IndicatorConfig
   aiDecision?: AiDecisionConfig
   enablePortfolio?: boolean
+  volumeScaleMode?: VolumeScaleMode
   groups?: WatchGroup[]
   activeGroupId?: string | null
   customSeats?: Array<{

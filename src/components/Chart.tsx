@@ -51,6 +51,7 @@ export function Chart(props: ChartProps) {
       macdParams: props.macdParams,
       isGlobal: props.isGlobal,
       trades: props.trades,
+      volumeScaleMode: props.volumeScaleMode,
     })
 
   onMount(() => {

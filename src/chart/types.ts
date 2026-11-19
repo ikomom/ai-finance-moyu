@@ -18,6 +18,7 @@ export interface DrawOptions {
   macdParams?: [number, number, number]
   isGlobal?: boolean
   trades?: TradeRecord[]
+  volumeScaleMode?: 'linear' | 'sqrt'
 }
 
 export interface LevelOptions {

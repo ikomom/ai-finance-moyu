@@ -10,6 +10,7 @@ mod groups;
 mod layout;
 pub mod migrate;
 mod prefs;
+mod sanitize;
 mod store;
 mod types;
 

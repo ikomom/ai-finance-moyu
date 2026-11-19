@@ -141,6 +141,7 @@ export function GlobalDetail(props: GlobalDetailProps) {
                       subchartMode={subchartMode()}
                       compact={false}
                       isGlobal={true}
+                      volumeScaleMode={props.snapshot().config.volumeScaleMode}
                       onHover={(point, extra) => props.onHoverPoint(point, extra ?? null)}
                     />
                   </Show>

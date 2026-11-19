@@ -92,3 +92,15 @@ impl Default for IndicatorConfig {
         }
     }
 }
+
+/// Scaling mode for intraday minute volume bars.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VolumeScaleMode {
+    /// Realistic linear scaling based on intraday peak volume (default, aligned with Tonghuashun).
+    #[default]
+    Linear,
+    /// Square-root non-linear amplification (enhanced for stealth / mini window view).
+    Sqrt,
+}
+

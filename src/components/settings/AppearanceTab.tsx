@@ -200,6 +200,51 @@ export function AppearanceTab() {
           </div>
         </div>
       </div>
+
+      {/* 5. 分时量柱缩放风格 */}
+      <div class="card">
+        <div class="card-title-row">
+          <h2>
+            <span class="title-icon">📊</span>
+            <span>分时量柱缩放风格</span>
+          </h2>
+          <span class="card-badge">行情软件对齐</span>
+        </div>
+        <p class="hint">
+          选择分时副图成交量柱的纵坐标映射算法。切换后保存即刻全窗口自适应生效。
+        </p>
+        <div class="grid-options col-2">
+          <div
+            class="opt-card"
+            classList={{ active: (form.volumeScaleMode ?? 'linear') === 'linear' }}
+            onClick={() => setForm('volumeScaleMode', 'linear')}
+          >
+            <div class="opt-head">
+              <span class="opt-icon">📈</span>
+              <span class="opt-badge">同花顺同款 (默认)</span>
+            </div>
+            <span class="opt-name">真实比例 (线性映射)</span>
+            <span class="opt-desc">
+              严格按日内最高成交量 1:1 真实缩放，竞价卖压单自顶部垂落。真实还原主力爆量突刺与地量沉寂。
+            </span>
+          </div>
+
+          <div
+            class="opt-card"
+            classList={{ active: form.volumeScaleMode === 'sqrt' }}
+            onClick={() => setForm('volumeScaleMode', 'sqrt')}
+          >
+            <div class="opt-head">
+              <span class="opt-icon">🔍</span>
+              <span class="opt-badge">防窥微缩增强</span>
+            </div>
+            <span class="opt-name">微型放大 (平方根增强)</span>
+            <span class="opt-desc">
+              非线性平抑单笔极端巨量，放大微小成交量波段。适合极小悬浮窗与紧凑防窥视窗。
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
