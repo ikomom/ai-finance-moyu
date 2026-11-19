@@ -17,8 +17,22 @@ pub fn match_famous_trader(branch_name: &str) -> Option<&'static str> {
     if name.contains("西安朱雀大街") {
         return Some("方新侠");
     }
-    if name.contains("上海江苏路") || name.contains("杭州延安路") || name.contains("上海毛家弄") {
+    if name.contains("上海江苏路")
+        || name.contains("长宁区江苏路")
+        || (name.contains("江苏路") && (name.contains("国泰") || name.contains("海通")))
+        || name.contains("杭州延安路")
+        || name.contains("上海毛家弄")
+    {
         return Some("章盟主");
+    }
+    if name.contains("苏州石路") || name.contains("苏州相城大道") {
+        return Some("96余哥");
+    }
+    if name.contains("东莞证券") && (name.contains("南京分公司") || name.contains("南京")) {
+        return Some("小方神");
+    }
+    if name.contains("瑞平路") || name.contains("徐汇区瑞平路") {
+        return Some("92科比");
     }
     if name.contains("北京呼家楼") || name.contains("北京东城分公司") {
         return Some("呼家楼");
@@ -76,8 +90,24 @@ pub fn resolve_branch_pattern(input: &str) -> Vec<String> {
         ],
         "章盟主" => vec![
             "国泰君安证券股份有限公司上海江苏路证券营业部".into(),
+            "国泰海通证券股份有限公司长宁区江苏路证券营业部".into(),
+            "长宁区江苏路".into(),
             "国泰君安证券股份有限公司杭州延安路证券营业部".into(),
             "海通证券股份有限公司上海毛家弄证券营业部".into(),
+        ],
+        "96余哥" => vec![
+            "东吴证券股份有限公司苏州石路证券营业部".into(),
+            "东吴证券股份有限公司苏州相城大道证券营业部".into(),
+            "苏州石路".into(),
+        ],
+        "小方神" => vec![
+            "东莞证券股份有限公司南京分公司".into(),
+            "东莞证券南京分公司".into(),
+        ],
+        "92科比" => vec![
+            "华鑫证券有限责任公司上海徐汇区瑞平路证券营业部".into(),
+            "上海徐汇区瑞平路".into(),
+            "徐汇区瑞平路".into(),
         ],
         "呼家楼" => vec![
             "中信建投证券股份有限公司北京东城分公司".into(),

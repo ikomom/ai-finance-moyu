@@ -68,7 +68,11 @@ export function resolveSeatLabel(
 
   // 3. Fall back to default dictionary
   for (const item of FAMOUS_BRANCH_LIST) {
-    if (clean.includes(item.branchName) || item.branchName.includes(clean)) {
+    if (
+      clean.includes(item.branchName) ||
+      item.branchName.includes(clean) ||
+      item.keywords.some((k) => k.length >= 4 && clean.includes(k))
+    ) {
       if (item.traderLabel) {
         const cat: SeatCategory =
           item.traderLabel === '机构专用'
@@ -109,6 +113,31 @@ export const FAMOUS_BRANCH_LIST: BranchDictItem[] = [
     branchName: '国泰君安证券股份有限公司上海江苏路证券营业部',
     traderLabel: '章盟主',
     keywords: ['章盟主', '江苏路', '上海江苏路', 'zmz'],
+  },
+  {
+    branchName: '国泰海通证券股份有限公司长宁区江苏路证券营业部',
+    traderLabel: '章盟主',
+    keywords: ['章盟主', '长宁区江苏路', '国泰海通江苏路', 'zmz'],
+  },
+  {
+    branchName: '东吴证券股份有限公司苏州石路证券营业部',
+    traderLabel: '96余哥',
+    keywords: ['96余哥', '余哥', '苏州石路', '东吴证券苏州石路', 'yg'],
+  },
+  {
+    branchName: '东吴证券股份有限公司苏州相城大道证券营业部',
+    traderLabel: '96余哥',
+    keywords: ['96余哥', '余哥', '苏州相城大道', '相城大道', 'yg'],
+  },
+  {
+    branchName: '东莞证券股份有限公司南京分公司',
+    traderLabel: '小方神',
+    keywords: ['小方神', '东莞证券南京分公司', '东莞证券南京', 'xfs'],
+  },
+  {
+    branchName: '华鑫证券有限责任公司上海徐汇区瑞平路证券营业部',
+    traderLabel: '92科比',
+    keywords: ['92科比', '科比', '上海徐汇区瑞平路', '徐汇区瑞平路', '92kb'],
   },
   {
     branchName: '海通证券股份有限公司上海毛家弄证券营业部',

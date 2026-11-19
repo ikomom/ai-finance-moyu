@@ -29,6 +29,26 @@ fn test_match_famous_trader() {
         Some("六一路")
     );
     assert_eq!(
+        match_famous_trader("国泰海通证券长宁区江苏路"),
+        Some("章盟主")
+    );
+    assert_eq!(
+        match_famous_trader("东吴证券股份有限公司苏州石路证券营业部"),
+        Some("96余哥")
+    );
+    assert_eq!(
+        match_famous_trader("东吴证券苏州石路"),
+        Some("96余哥")
+    );
+    assert_eq!(
+        match_famous_trader("东莞证券股份有限公司南京分公司"),
+        Some("小方神")
+    );
+    assert_eq!(
+        match_famous_trader("华鑫证券上海徐汇区瑞平路"),
+        Some("92科比")
+    );
+    assert_eq!(
         match_famous_trader("普通无名营业部"),
         None
     );

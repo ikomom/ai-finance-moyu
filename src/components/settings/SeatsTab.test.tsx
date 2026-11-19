@@ -16,6 +16,22 @@ describe('SeatsTab & resolveSeatLabel', () => {
     expect(inst).not.toBeNull()
     expect(inst?.label).toBe('机构专用')
     expect(inst?.category).toBe('institution')
+
+    const yg = resolveSeatLabel('东吴证券股份有限公司苏州石路证券营业部')
+    expect(yg?.label).toBe('96余哥')
+    expect(yg?.category).toBe('trader')
+
+    const ygShort = resolveSeatLabel('东吴证券苏州石路')
+    expect(ygShort?.label).toBe('96余哥')
+
+    const xfs = resolveSeatLabel('东莞证券股份有限公司南京分公司')
+    expect(xfs?.label).toBe('小方神')
+
+    const kb = resolveSeatLabel('华鑫证券上海徐汇区瑞平路')
+    expect(kb?.label).toBe('92科比')
+
+    const zmzMerge = resolveSeatLabel('国泰海通证券长宁区江苏路')
+    expect(zmzMerge?.label).toBe('章盟主')
   })
 
   it('searches branch dictionary by pinyin and keyword', () => {
