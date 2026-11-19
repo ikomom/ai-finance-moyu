@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-19
+
 ### 🚀 龙虎榜与主力席位雷达增强
 - **龙虎榜买卖双向排版升级与多空对抗能量条**：
   - 深度对齐主流金融行情终端专业形态，买方席位同步呈现「买入主额 + 卖出副额」，卖方席位同步呈现「卖出主额 + 买入副额」；
