@@ -194,4 +194,25 @@ describe('drawKline', () => {
       })
     ).not.toThrow()
   })
+
+  it('accurately resolves bar color for flat limit-down and limit-up bars (A-share rules)', async () => {
+    const { isBarUp } = await import('./klinePaintTypes')
+
+    // 1. Normal up and down
+    const upBar: KLineBar = { date: '2026-11-17', open: 9.11, close: 9.80, high: 9.80, low: 9.11, volume: 100 }
+    expect(isBarUp(upBar)).toBe(true)
+
+    const downBar: KLineBar = { date: '2026-11-17', open: 9.80, close: 9.11, high: 9.80, low: 9.11, volume: 100 }
+    expect(isBarUp(downBar)).toBe(false)
+
+    // 2. Limit-down flat bar (like 慈文传媒: open=7.38, close=7.38, yesterday close=8.20)
+    const prevBar: KLineBar = { date: '2026-11-18', open: 8.20, close: 8.20, high: 8.66, low: 8.20, volume: 500 }
+    const ciwenLimitDown: KLineBar = { date: '2026-11-19', open: 7.38, close: 7.38, high: 7.43, low: 7.38, volume: 100 }
+    expect(isBarUp(ciwenLimitDown, prevBar)).toBe(false)
+
+    // 3. Limit-up flat bar (open=11.00, close=11.00, yesterday close=10.00)
+    const prevUp: KLineBar = { date: '2026-11-18', open: 9.50, close: 10.00, high: 10.00, low: 9.50, volume: 500 }
+    const limitUpBar: KLineBar = { date: '2026-11-19', open: 11.00, close: 11.00, high: 11.00, low: 11.00, volume: 100 }
+    expect(isBarUp(limitUpBar, prevUp)).toBe(true)
+  })
 })

@@ -1,7 +1,7 @@
 //! Volume / MACD subchart stage of the K-line renderer.
 
 import { COLOR_MA10, COLOR_MA5 } from '../chart'
-import type { KlinePaint } from './klinePaintTypes'
+import { isBarUp, type KlinePaint } from './klinePaintTypes'
 
 export function paintSubchart(c: KlinePaint): void {
   const { ctx, props, xOfIdx, yOfVol, volT, volH, subPlotH, plotL, plotW, slice, allBars, startIdx } = c
@@ -17,7 +17,9 @@ export function paintSubchart(c: KlinePaint): void {
         const cx = xOfIdx(i)
         const vy = yOfVol(b.volume)
         const vh = Math.max(1, volT + volH - vy)
-        const isUp = b.close >= b.open
+        const globalIdx = startIdx + i
+        const prevBar = globalIdx > 0 ? allBars[globalIdx - 1] : undefined
+        const isUp = isBarUp(b, prevBar)
 
         ctx.fillStyle = isUp ? 'rgba(239, 68, 68, 0.85)' : 'rgba(34, 197, 94, 0.85)'
         ctx.fillRect(Math.round(cx - barW / 2), Math.round(vy), Math.round(barW), Math.round(vh))

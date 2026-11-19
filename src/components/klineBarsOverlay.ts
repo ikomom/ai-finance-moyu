@@ -2,7 +2,7 @@
 
 import { COLOR_MA10, COLOR_MA20, COLOR_MA5, diagnoseMacd, FONT } from '../chart'
 import { DOWN, fmtPrice, fmtVol, UP } from '../types'
-import type { KlinePaint } from './klinePaintTypes'
+import { isBarUp, type KlinePaint } from './klinePaintTypes'
 import { paintKlineTradeMarkers } from './klineTradeMarkers'
 
 export function paintBarsAndOverlay(c: KlinePaint): void {
@@ -13,7 +13,9 @@ export function paintBarsAndOverlay(c: KlinePaint): void {
     for (let i = 0; i < slice.length; i++) {
       const b = slice[i]
       const cx = xOfIdx(i)
-      const isUp = b.close >= b.open
+      const globalIdx = startIdx + i
+      const prevBar = globalIdx > 0 ? allBars[globalIdx - 1] : undefined
+      const isUp = isBarUp(b, prevBar)
       const color = isUp ? UP : DOWN
 
       ctx.strokeStyle = color
@@ -145,7 +147,7 @@ export function paintBarsAndOverlay(c: KlinePaint): void {
     const subLy = volT + 1
 
     if (subMode === 'vol') {
-      ctx.fillStyle = activeBar.close >= activeBar.open ? UP : DOWN
+      ctx.fillStyle = isBarUp(activeBar, prevActiveBar) ? UP : DOWN
       const vTxt = `VOL:${fmtVol(activeBar.volume)}`
       ctx.fillText(vTxt, subLx, subLy)
       subLx += ctx.measureText(vTxt).width + 6
@@ -225,7 +227,9 @@ export function paintBarsAndOverlay(c: KlinePaint): void {
       ctx.restore()
 
       // Right axis price badge
-      ctx.fillStyle = hBar.close >= hBar.open ? UP : DOWN
+      const hGlobalIdx = startIdx + hIdx
+      const hPrev = hGlobalIdx > 0 ? allBars[hGlobalIdx - 1] : undefined
+      ctx.fillStyle = isBarUp(hBar, hPrev) ? UP : DOWN
       const priceBadge = fmtPrice(hBar.close)
       const badgeW = ctx.measureText(priceBadge).width + 6
       ctx.fillRect(plotL + plotW + 2, hy - 6, badgeW, 12)

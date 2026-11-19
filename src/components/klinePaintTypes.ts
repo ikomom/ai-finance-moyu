@@ -31,3 +31,22 @@ export interface KlinePaint {
   hoveredIndex: () => number | null
 }
 
+/**
+ * Determine whether a K-line bar is bullish (up/red) or bearish (down/green) in Chinese A-share rules:
+ * - close > open: Red (阳线)
+ * - close < open: Green (阴线)
+ * - close === open (平开平收、一字板、十字星):
+ *   Determined by comparison with previous bar's close:
+ *   - close >= prev.close: Red (一字涨停、平盘收涨)
+ *   - close < prev.close: Green (一字跌停、平盘收跌，如慈文传媒跌停)
+ */
+export function isBarUp(bar: KLineBar, prevBar?: KLineBar | null): boolean {
+  if (bar.close > bar.open) return true
+  if (bar.close < bar.open) return false
+  if (prevBar && prevBar.close > 0) {
+    return bar.close >= prevBar.close
+  }
+  return true
+}
+
+
