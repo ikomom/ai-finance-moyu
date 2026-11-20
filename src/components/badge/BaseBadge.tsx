@@ -30,7 +30,10 @@ export function BaseBadge(props: BaseBadgeProps) {
         class={`stock-badge ${props.tone}`}
         title={props.title}
       >
-        {props.label}
+        <Show when={props.shortLabel} fallback={props.label}>
+          <span class="badge-full">{props.label}</span>
+          <span class="badge-short">{props.shortLabel}</span>
+        </Show>
       </span>
 
       <Show when={hovered() && (props.showDetails ?? true) && !props.compact}>

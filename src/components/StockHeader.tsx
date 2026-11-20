@@ -115,24 +115,18 @@ export function StockHeader(props: StockHeaderProps) {
         </div>
         <div class="meta-right">
           <Show when={props.high != null && props.low != null}>
-            <div class="stats-text">
-              <span>高 <b class="up">{fmtPrice(props.high!, 2)}</b></span>
-              <span>低 <b class="down">{fmtPrice(props.low!, 2)}</b></span>
-            </div>
-          </Show>
-          <Show when={props.quote}>
-            <button
-              type="button"
-              class="tape-trigger-btn"
-              classList={{ active: isPinned() || showTape() }}
-              title="核心盘口：换手/量比/成交额/市值 (点击锁定，悬停预览)"
+            <div
+              class="stats-text"
+              classList={{ pinned: isPinned() }}
+              title="日内极值 (悬停预览核心盘口，点击锁定)"
               onClick={(e) => {
                 e.stopPropagation()
                 togglePin()
               }}
             >
-              盘口
-            </button>
+              <span>高 <b class="up">{fmtPrice(props.high!, 2)}</b></span>
+              <span>低 <b class="down">{fmtPrice(props.low!, 2)}</b></span>
+            </div>
           </Show>
         </div>
       </div>

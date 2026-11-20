@@ -23,3 +23,15 @@
   border-color: rgba(234, 179, 8, 0.6);
   transform: translateY(-0.5px);
 }
+
+:root[data-theme="light"] .lhb-badge.is-lhb {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+}
+
+:root[data-theme="light"] .lhb-badge.is-lhb:hover {
+  background: rgba(217, 119, 6, 0.18);
+  border-color: rgba(217, 119, 6, 0.6);
+}
+

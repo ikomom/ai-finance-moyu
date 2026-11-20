@@ -85,9 +85,20 @@ export function StockBadge(props: StockBadgeProps) {
     return diag().badgeLabel
   }
 
+  const shortText = () => {
+    if (isAiActive()) {
+      const clean = aiResult()!.actionLabel.replace(/[【】]/g, '')
+      const shortAct = clean.slice(0, 2)
+      const prefix = diag().compactLabel.split('(')[0] || diag().compactLabel
+      return `${prefix}(${shortAct})`
+    }
+    return diag().compactLabel
+  }
+
   return (
     <BaseBadge
       label={badgeText()}
+      shortLabel={props.compact ? undefined : shortText()}
       tone={tone()}
       compact={props.compact}
       showDetails={props.showDetails}

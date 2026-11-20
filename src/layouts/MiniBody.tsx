@@ -125,6 +125,8 @@ export function MiniBody(props: MiniBodyProps) {
                   }>
                     <AuctionBadge auction={auction()} quote={q()} />
                   </Show>
+                </Show>
+                <Show when={!isIndex()}>
                   <DragonTigerBadge code={q().code} onClick={() => { void emit('open-dragon-tiger-drawer', { code: q().code }) }} />
                 </Show>
               </>

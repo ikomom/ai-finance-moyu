@@ -8,6 +8,7 @@ export type BadgeTone = 'bull' | 'bear' | 'warn' | 'neutral'
 
 export interface BaseBadgeProps {
   label: string
+  shortLabel?: string
   tone: BadgeTone
   title?: string
   compact?: boolean
