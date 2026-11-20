@@ -109,18 +109,36 @@
     }
 
     #[test]
-    fn index_symbols_produce_no_anomaly_alerts() {
+    fn index_symbols_produce_milestone_and_no_stock_anomalies() {
         let mut t = CrossingTracker::without_cooldown();
         let s = WatchSpec { code: "sh000001".into(), alert_pct: None, price_lines: vec![] };
         let cfg = crate::config::AnomalyAlertConfig::default();
         let t0 = Instant::now();
 
-        let q0 = mock_quote("sh000001", 3300.0, 0.0, 10000.0);
+        let q0 = mock_quote("sh000001", 3350.0, 0.0, 10000.0);
         assert!(t.update_quote_at(&s, &q0, &cfg, t0).is_empty());
 
-        let q1 = mock_quote("sh000001", 3400.0, 3.03, 20000.0);
+        let q1 = mock_quote("sh000001", 3402.0, 1.55, 20000.0);
         let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(10));
-        assert!(evs.is_empty(), "Index quotes must never produce anomaly popups");
+        assert_eq!(evs.len(), 1);
+        assert!(matches!(
+            evs[0],
+            CrossingEvent::IndexMilestone { milestone: 3400.0, is_breakout: true, .. }
+        ));
+        assert!(!evs.iter().any(|e| matches!(e, CrossingEvent::RapidChange { .. })));
+        assert!(!evs.iter().any(|e| matches!(e, CrossingEvent::VolumeBurst { .. })));
+        assert!(!evs.iter().any(|e| matches!(e, CrossingEvent::LimitBoard { .. })));
+        assert!(!evs.iter().any(|e| matches!(e, CrossingEvent::IntradayExtreme { .. })));
+
+        // If index_milestones is disabled, index produces no events
+        let mut t2 = CrossingTracker::without_cooldown();
+        let disabled_cfg = crate::config::AnomalyAlertConfig {
+            index_milestones: false,
+            ..cfg
+        };
+        t2.update_quote_at(&s, &q0, &disabled_cfg, t0);
+        let evs2 = t2.update_quote_at(&s, &q1, &disabled_cfg, t0 + Duration::from_secs(10));
+        assert!(evs2.is_empty(), "When index_milestones is disabled, index produces no alerts");
     }
 
     #[test]

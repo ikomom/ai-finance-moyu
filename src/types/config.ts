@@ -274,4 +274,5 @@ export interface AnomalyAlertConfig {
   intradayExtremes: boolean
   volumeBurst: boolean
   limitBoard: boolean
+  indexMilestones?: boolean
 }

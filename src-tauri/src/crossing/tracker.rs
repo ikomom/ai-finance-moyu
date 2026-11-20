@@ -20,6 +20,7 @@ pub struct CrossingTracker {
     cooldown: Duration,
     intraday_states: HashMap<String, SecurityIntradayState>,
     prev_pcts: HashMap<String, f64>,
+    prev_prices: HashMap<String, f64>,
 }
 
 impl Default for CrossingTracker {
@@ -48,6 +49,7 @@ impl CrossingTracker {
             cooldown,
             intraday_states: HashMap::new(),
             prev_pcts: HashMap::new(),
+            prev_prices: HashMap::new(),
         }
     }
 
@@ -206,7 +208,23 @@ impl CrossingTracker {
             if quote.price <= 0.0 {
                 return Vec::new();
             }
-            return self.update_at(spec, quote.price, quote.change_pct, now);
+            let mut events = self.update_at(spec, quote.price, quote.change_pct, now);
+            let prev_p = self.prev_prices.insert(spec.code.clone(), quote.price);
+            if anomaly_cfg.index_milestones {
+                let last_fired = &mut self.last_fired;
+                let cooldown = self.cooldown;
+                if let Some(ev) = super::milestone::evaluate_milestone(
+                    &spec.code,
+                    quote.price,
+                    quote.change_pct,
+                    prev_p,
+                    now,
+                    |k| Self::check_cooldown(last_fired, cooldown, k, now),
+                ) {
+                    events.push(ev);
+                }
+            }
+            return events;
         }
 
         let mut events = self.update_at(spec, quote.price, quote.change_pct, now);
@@ -262,6 +280,7 @@ impl CrossingTracker {
                 && !k.contains(":seal_loosening")
                 && !k.contains(":rapid_")
                 && !k.contains(":extreme_")
+                && !k.contains(":milestone:")
         });
     }
 
@@ -274,6 +293,7 @@ impl CrossingTracker {
                 .unwrap_or_else(|| keep.contains(k))
         });
         self.prev_pcts.retain(|k, _| keep.contains(k));
+        self.prev_prices.retain(|k, _| keep.contains(k));
         self.line_above.retain(|k, _| keep.contains(k));
         self.desktop_notif_fired.retain(|k, _| keep.contains(k));
         self.intraday_states.retain(|k, _| keep.contains(k));

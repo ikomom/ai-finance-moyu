@@ -58,6 +58,8 @@ pub struct AnomalyAlertConfig {
     pub volume_burst: bool,
     /// 接近涨跌停与涨停炸板
     pub limit_board: bool,
+    /// 指数心理整数关口突破/跌破 (整百/整五百大关)
+    pub index_milestones: bool,
 }
 
 impl Default for AnomalyAlertConfig {
@@ -67,6 +69,7 @@ impl Default for AnomalyAlertConfig {
             intraday_extremes: true,
             volume_burst: true,
             limit_board: true,
+            index_milestones: true,
         }
     }
 }

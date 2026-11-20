@@ -65,6 +65,13 @@ impl CrossingEvent {
                     LimitBoardKind::BrokenLimitDown => "🚀跌停翘板".to_string(),
                 }
             }
+            CrossingEvent::IndexMilestone { milestone, is_breakout, .. } => {
+                if *is_breakout {
+                    format!("🚀突破{milestone:.0}点")
+                } else {
+                    format!("📉跌破{milestone:.0}点")
+                }
+            }
         }
     }
 
@@ -153,6 +160,13 @@ impl CrossingEvent {
                         format!("{name} 🔒 封死跌停！封单 {seal_hands:.0} 手，现价 {price:.2} ({change_pct:+.2}%)")
                     }
                     LimitBoardKind::BrokenLimitDown => format!("{name} 🚀 跌停翘板！开板回升至 {change_pct:+.2}%，现价 {price:.2}"),
+                }
+            }
+            CrossingEvent::IndexMilestone { milestone, is_breakout, price, change_pct, .. } => {
+                if *is_breakout {
+                    format!("{name} 🚀 强势突破 {milestone:.0} 点大关！现报 {price:.2} ({change_pct:+.2}%)")
+                } else {
+                    format!("{name} 📉 跌破 {milestone:.0} 点整数关口！现报 {price:.2} ({change_pct:+.2}%)")
                 }
             }
         }

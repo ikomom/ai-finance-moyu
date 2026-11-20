@@ -221,18 +221,21 @@
         let s = WatchSpec {
             code: "sh000001".into(),
             alert_pct: None,
-            price_lines: vec![line(3300.0, LineDirection::Above)],
+            price_lines: vec![line(3280.0, LineDirection::Above)],
         };
-        let cfg = crate::config::AnomalyAlertConfig::default();
+        let cfg = crate::config::AnomalyAlertConfig {
+            index_milestones: false,
+            ..Default::default()
+        };
         let t0 = Instant::now();
 
         let q0 = mock_quote("sh000001", 3250.0, 0.0, 10000.0);
         assert!(t.update_quote_at(&s, &q0, &cfg, t0).is_empty());
 
-        let q1 = mock_quote("sh000001", 3310.0, 1.8, 20000.0);
+        let q1 = mock_quote("sh000001", 3290.0, 1.2, 20000.0);
         let evs = t.update_quote_at(&s, &q1, &cfg, t0 + Duration::from_secs(10));
         assert_eq!(evs.len(), 1);
-        assert!(matches!(evs[0], CrossingEvent::PriceLine { price: 3310.0, .. }));
+        assert!(matches!(evs[0], CrossingEvent::PriceLine { price: 3290.0, .. }));
     }
 
     fn mock_quote(code: &str, price: f64, pct: f64, volume: f64) -> crate::quote::Quote {

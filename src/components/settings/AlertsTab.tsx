@@ -124,6 +124,16 @@ export function AlertsTab() {
             <span class="switch-slider" />
             <span>🔴 涨跌停全周期监控（逼近/封板/封单松动预警/开板炸板/跌停翘板）</span>
           </label>
+          <label class="switch-label">
+            <input
+              type="checkbox"
+              class="switch-input"
+              checked={form.anomalyAlerts?.indexMilestones ?? true}
+              onChange={(e) => setForm('anomalyAlerts', 'indexMilestones', e.currentTarget.checked)}
+            />
+            <span class="switch-slider" />
+            <span>🏛️ 指数关键整数关口提醒（自选指数突破/跌破整百、整千点大关，如 3300、3400 点）</span>
+          </label>
         </div>
       </div>
 

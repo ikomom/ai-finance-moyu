@@ -159,6 +159,15 @@ pub enum CrossingEvent {
     /// 接近涨跌停或涨停炸板
     #[serde(rename_all = "camelCase")]
     LimitBoard { code: String, board_kind: LimitBoardKind, price: f64, change_pct: f64 },
+    /// 指数心理整数关口突破或跌破
+    #[serde(rename_all = "camelCase")]
+    IndexMilestone {
+        code: String,
+        milestone: f64,
+        is_breakout: bool,
+        price: f64,
+        change_pct: f64,
+    },
 }
 
 impl CrossingEvent {
@@ -170,6 +179,7 @@ impl CrossingEvent {
             CrossingEvent::IntradayExtreme { code, .. } => code,
             CrossingEvent::VolumeBurst { code, .. } => code,
             CrossingEvent::LimitBoard { code, .. } => code,
+            CrossingEvent::IndexMilestone { code, .. } => code,
         }
     }
 
@@ -181,6 +191,7 @@ impl CrossingEvent {
             CrossingEvent::VolumeBurst { price, .. } => Some(*price),
             CrossingEvent::LimitBoard { price, .. } => Some(*price),
             CrossingEvent::PriceLine { price, .. } => Some(*price),
+            CrossingEvent::IndexMilestone { price, .. } => Some(*price),
             CrossingEvent::AlertPct { .. } => None,
         }
     }

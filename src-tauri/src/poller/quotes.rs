@@ -71,6 +71,7 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
             intraday_extremes: false,
             volume_burst: false,
             limit_board: false,
+            index_milestones: false,
         };
         let anomaly_cfg = if is_continuous {
             &cfg.anomaly_alerts
