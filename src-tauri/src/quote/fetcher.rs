@@ -140,6 +140,11 @@ impl Fetcher {
         code: &str,
         pre_close: f64,
     ) -> Result<Trend, FetchError> {
+        if crate::market::is_index(code) {
+            if let Some(trend) = super::ths::fetch_index_trend(&self.client, code, pre_close).await {
+                return Ok(trend);
+            }
+        }
         match self.fetch_trend_direct(source, code, pre_close).await {
             Ok(trend) => Ok(trend),
             Err(primary_err) => {

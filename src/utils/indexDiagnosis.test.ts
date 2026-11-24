@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { diagnoseIndex } from './indexDiagnosis'
-import type { MarketOverview, Quote } from '../types'
+import type { MarketIndex, MarketOverview, Quote } from '../types'
 
 function mockQuote(code: string, changePct: number): Quote {
   return {
@@ -47,8 +47,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('DIVERGE_INDEX_PUMP')
-    expect(res.badgeLabel).toContain('🚨拉权护盘')
-    expect(res.compactLabel).toBe('拉大票')
+    expect(res.badgeLabel).toBe('🚨 权重护盘')
+    expect(res.compactLabel).toBe('护盘')
     expect(res.tone).toBe('warn')
     expect(res.guidance).toBe('【谨防诱多】')
     expect(res.summary).toContain('二八失血严重')
@@ -60,8 +60,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('DIVERGE_BREADTH_PUMP')
-    expect(res.badgeLabel).toContain('💎题材活跃')
-    expect(res.compactLabel).toBe('做个股')
+    expect(res.badgeLabel).toBe('💎 题材活跃')
+    expect(res.compactLabel).toBe('活跃')
     expect(res.tone).toBe('bull')
     expect(res.guidance).toBe('【轻指数重个股】')
   })
@@ -72,8 +72,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('VOLUME_SHORT_PUMP')
-    expect(res.badgeLabel).toContain('⚠️缩量冲高')
-    expect(res.compactLabel).toBe('缩量拉')
+    expect(res.badgeLabel).toBe('⚠️ 缩量冲高')
+    expect(res.compactLabel).toBe('冲高')
     expect(res.tone).toBe('warn')
     expect(res.guidance).toBe('【切忌追高】')
   })
@@ -84,7 +84,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('BULL_SURGE')
-    expect(res.badgeLabel).toContain('🔥放量共振')
+    expect(res.badgeLabel).toBe('🔥 放量共振')
+    expect(res.compactLabel).toBe('共振')
     expect(res.tone).toBe('bull')
     expect(res.guidance).toBe('【顺势看多】')
   })
@@ -95,8 +96,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('PANIC_DUMP')
-    expect(res.badgeLabel).toContain('❄️放量恐慌')
-    expect(res.compactLabel).toContain('砸盘')
+    expect(res.badgeLabel).toBe('❄️ 恐慌杀跌')
+    expect(res.compactLabel).toBe('恐慌')
     expect(res.tone).toBe('bear')
     expect(res.guidance).toBe('【多看少动】')
   })
@@ -107,9 +108,28 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('DIVERGE_INDEX_PUMP')
-    expect(res.badgeLabel).toContain('🚨拉权护盘')
-    expect(res.compactLabel).toBe('拉大票')
+    expect(res.badgeLabel).toBe('🚨 权重护盘')
+    expect(res.compactLabel).toBe('护盘')
     expect(res.tone).toBe('warn')
+  })
+
+  it('rejects DIVERGE_INDEX_PUMP when ChiNext/Shenzhen or top sectors are surging (e.g. 4000+ up)', () => {
+    const q = mockQuote('sh000001', 0.15)
+    const ov = mockOverview(4200, 900, 200, -1.0, -10000000000, [
+      { name: '数字媒体', changePct: 9.2 },
+      { name: '影视院线', changePct: 6.9 },
+    ])
+    ov.indices = [
+      { code: '000001', name: '上证指数', price: 3538, change: 5, changePct: 0.15, turnover: 7000, upCount: 4200, downCount: 900, flatCount: 200 },
+      { code: '399001', name: '深证成指', price: 11000, change: 200, changePct: 1.93, turnover: 8000, upCount: 0, downCount: 0, flatCount: 0 },
+      { code: '399006', name: '创业板指', price: 2300, change: 70, changePct: 3.08, turnover: 3000, upCount: 0, downCount: 0, flatCount: 0 },
+    ]
+    const res = diagnoseIndex(q, ov)
+    expect(res.code).not.toBe('DIVERGE_INDEX_PUMP')
+    expect(res.code).toBe('DIVERGE_BREADTH_PUMP')
+    expect(res.badgeLabel).toBe('💎 题材活跃')
+    expect(res.compactLabel).toBe('活跃')
+    expect(res.tone).toBe('bull')
   })
 
   it('detects HEAVY_DROP when index drops significantly without surge (e.g. -1.71%)', () => {
@@ -118,8 +138,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('HEAVY_DROP')
-    expect(res.badgeLabel).toContain('⚡破位重挫')
-    expect(res.compactLabel).toBe('重挫破位')
+    expect(res.badgeLabel).toBe('⚡ 破位重挫')
+    expect(res.compactLabel).toBe('破位')
     expect(res.tone).toBe('bear')
   })
 
@@ -129,8 +149,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('BLEEDING_DRIFT')
-    expect(res.badgeLabel).toContain('📉弱势阴跌')
-    expect(res.compactLabel).toBe('弱势阴跌')
+    expect(res.badgeLabel).toBe('📉 弱势阴跌')
+    expect(res.compactLabel).toBe('阴跌')
     expect(res.tone).toBe('bear')
     expect(res.guidance).toBe('【防守控仓】')
   })
@@ -141,7 +161,8 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     const res = diagnoseIndex(q, ov)
 
     expect(res.code).toBe('CONSOLIDATION')
-    expect(res.badgeLabel).toContain('⚖️多空对峙')
+    expect(res.badgeLabel).toBe('⚖️ 多空对峙')
+    expect(res.compactLabel).toBe('对峙')
     expect(res.tone).toBe('neutral')
     expect(res.guidance).toBe('【观望蓄势】')
   })
@@ -199,5 +220,63 @@ describe('IndexDiagnosis engine (diagnoseIndex)', () => {
     // 精炼量能标签，提供详细 hover 浮窗数据
     expect(res.turnoverDeltaText).toBe('缩量 1.26万亿')
     expect(res.turnoverDeltaDetail).toBe('较昨日缩量 1.26万亿 (-81.9%)')
+  })
+
+  it('correctly calculates yellow-white line spread and classifies scissor divergence states', () => {
+    const makeIdx = (code: string, changePct: number, unweightedChangePct?: number, yellowLineSpread?: number): MarketIndex => ({
+      code,
+      name: '上证指数',
+      price: 3500,
+      change: 10,
+      changePct,
+      turnover: 100000000000,
+      upCount: 1000,
+      downCount: 500,
+      flatCount: 100,
+      unweightedChangePct,
+      yellowLineSpread,
+    })
+
+    // 1. 黄上白下 (中小盘领涨，差值 > 0.3%)
+    const q1 = mockQuote('sh000001', 0.2)
+    const ov1 = mockOverview(3200, 1500, 200)
+    ov1.indices = [makeIdx('000001', 0.2, 1.8, 1.6)]
+    const res1 = diagnoseIndex(q1, ov1)
+    expect(res1.yellowWhiteState).toBe('yellow_lead')
+    expect(res1.yellowWhiteLabel).toBe('黄上白下 (+1.6%)')
+    expect(res1.yellowWhiteSpread).toBe(1.6)
+    expect(res1.yellowWhiteDetail).toContain('中小盘题材走势强于大盘蓝筹')
+
+    // 2. 白上黄下 (权重拉抬失血，差值 < -0.3%)
+    const q2 = mockQuote('sh000001', 1.5)
+    const ov2 = mockOverview(1200, 3600, 200)
+    ov2.indices = [makeIdx('000001', 1.5, -0.5, -2.0)]
+    const res2 = diagnoseIndex(q2, ov2)
+    expect(res2.yellowWhiteState).toBe('white_lead')
+    expect(res2.yellowWhiteLabel).toBe('白上黄下 (-2.0%)')
+    expect(res2.yellowWhiteSpread).toBe(-2.0)
+    expect(res2.yellowWhiteDetail).toContain('权重蓝筹护盘拉抬')
+
+    // 3. 双线共振 (|差值| <= 0.3%)
+    const q3 = mockQuote('sh000001', 1.0)
+    const ov3 = mockOverview(2800, 1800, 200)
+    ov3.indices = [makeIdx('000001', 1.0, 1.1, 0.1)]
+    const res3 = diagnoseIndex(q3, ov3)
+    expect(res3.yellowWhiteState).toBe('resonance')
+    expect(res3.yellowWhiteLabel).toBe('双线共振 (+0.1%)')
+    expect(res3.yellowWhiteSpread).toBe(0.1)
+
+    // 4. 创业板指独立等权与成交额 (399006 杜绝与白线重合)
+    const q4 = mockQuote('sz399006', 3.08)
+    const ov4 = mockOverview(4860, 310, 180)
+    ov4.indices = [
+      makeIdx('000001', 0.15, 2.45, 2.30),
+      makeIdx('399006', 3.08, 4.23, 1.15),
+    ]
+    const res4 = diagnoseIndex(q4, ov4)
+    expect(res4.yellowWhiteState).toBe('yellow_lead')
+    expect(res4.yellowWhiteLabel).toBe('黄上白下 (+1.1%)')
+    expect(res4.yellowWhiteSpread).toBe(1.15)
+    expect(res4.currentIndexTurnoverText).toBe('1000亿')
   })
 })

@@ -2,7 +2,7 @@
 .stock-badge-wrap {
   display: inline-flex;
   align-items: center;
-  z-index: 20;
+  z-index: 30;
   position: relative;
 }
 
@@ -57,7 +57,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  width: 304px;
+  width: 312px;
   box-sizing: border-box;
   padding: 7px 9px;
   background: var(--surface-popover-bg);
@@ -65,9 +65,10 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
-  z-index: 100;
+  z-index: 120;
   pointer-events: auto;
   text-align: left;
+  white-space: normal;
   max-height: calc(100vh - 45px);
   overflow-y: auto;
   scrollbar-width: none;
@@ -197,7 +198,176 @@
   color: rgba(255, 255, 255, 0.25);
 }
 
-/* 4. Offline & Footer */
+/* 4. AI Opinion Card Flow - Minimalist Raycast/Linear Design */
+.stock-popover-insight {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
+  margin-bottom: 5px;
+  white-space: normal;
+}
+
+.insight-label {
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.insight-content {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.stock-popover-level {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3.5px 7px;
+  margin-bottom: 4px;
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: var(--radius-xs);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.level-label {
+  color: var(--text-muted);
+  font-size: 8.5px;
+  flex-shrink: 0;
+}
+
+.level-val {
+  font-size: 9px;
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.level-val.bull { color: var(--color-up-subtle); }
+.level-val.bear { color: var(--color-down-subtle); }
+.level-val.warn { color: var(--color-warning-light); }
+.level-val.neutral { color: var(--text-secondary); }
+
+/* Divider between spatial levels and feature tag pool */
+.stock-popover-divider {
+  height: 1px;
+  background: var(--surface-border-divider);
+  margin: 5px 0 6px 0;
+}
+
+/* Atomic Feature Capsule Pool */
+.stock-atomic-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+  margin-bottom: 4px;
+}
+
+.atomic-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 5.5px;
+  border-radius: 3px;
+  font-size: 9px;
+  line-height: 1.25;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.atomic-chip:hover {
+  filter: brightness(1.15);
+}
+
+.atomic-chip.bull {
+  background: var(--color-up-bg);
+  border-color: var(--color-up-border);
+  color: var(--color-up-subtle);
+}
+
+.atomic-chip.bear {
+  background: var(--color-down-bg);
+  border-color: var(--color-down-border);
+  color: var(--color-down-subtle);
+}
+
+.atomic-chip.warn {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning-light);
+}
+
+.atomic-chip.neutral {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.quant-loading-pill {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* Light Theme Adaptability */
+:root[data-theme="light"] .stock-popover-insight {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+:root[data-theme="light"] .insight-content {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] .stock-popover-level {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .atomic-chip {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #334155;
+}
+
+:root[data-theme="light"] .atomic-chip.bull {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+  color: #dc2626;
+}
+
+:root[data-theme="light"] .atomic-chip.bear {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.25);
+  color: #16a34a;
+}
+
+:root[data-theme="light"] .atomic-chip.warn {
+  background: rgba(217, 119, 6, 0.1);
+  border-color: rgba(217, 119, 6, 0.3);
+  color: #b45309;
+}
+
+:root[data-theme="light"] .atomic-chip.neutral {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.07);
+  color: #64748b;
+}
+
+/* 5. Offline & Footer */
 .stock-offline-strip {
   display: flex;
   justify-content: space-between;

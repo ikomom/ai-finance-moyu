@@ -2,9 +2,7 @@
 //!
 //! Split from `types.ts` to stay inside the 300-line budget (AGENTS.md §11).
 
-// Mirrors the serde camelCase shapes emitted from src-tauri/src/quote.rs,
-// config.rs and state.rs.
-
+// Mirrors the serde camelCase shapes emitted from src-tauri/src/quote.rs, config.rs and state.rs.
 export type LineDirection = 'above' | 'below'
 
 import type { AiDecisionConfig } from './aiDecision'
@@ -139,6 +137,8 @@ export interface MarketIndex {
   upCount: number
   downCount: number
   flatCount: number
+  unweightedChangePct?: number
+  yellowLineSpread?: number
 }
 
 export interface SectorItem {
@@ -152,6 +152,26 @@ export interface SectorItem {
   leadStockZdf?: number
 }
 
+export interface SectorRankTag {
+  name: string
+  code?: string
+  rank?: number | null
+  changePct: number
+  deltaR: number
+  leaderName?: string | null
+  leaderChangePct?: number | null
+  role: string
+  stage: 'surging' | 'accumulating' | 'cooling' | 'normal'
+}
+
+export interface FallAttribution {
+  code: string
+  tag: string
+  reason: string
+  guidance: string
+  severity: 'danger' | 'warn' | 'neutral'
+}
+
 export interface SectorLinkage {
   sectorCode: string
   sectorName: string
@@ -163,6 +183,7 @@ export interface SectorLinkage {
   leaderChangePct: number
   role: string
   diagnosis: string
+  sectors?: SectorRankTag[]
 }
 
 export interface MarketOverview {
@@ -212,6 +233,7 @@ export interface TrendSignal {
   orbHigh?: number | null
   orbLow?: number | null
   sectorLinkage?: SectorLinkage | null
+  fallAttribution?: FallAttribution | null
 }
 
 export type ThemePreset = 'dark' | 'light' | 'transparent' | 'ocean' | 'cyberpunk'

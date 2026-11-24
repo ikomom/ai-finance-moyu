@@ -105,15 +105,18 @@ def evaluate_decision(state: dict) -> dict:
     elif buy_ratio >= 0.58 and bias_val >= 0.3 and imb_val >= 0:
         action = "hold" if bias_val < 2.0 else "buy"
         action_zh = "顺势持股" if bias_val < 2.0 else "顺势做多"
+    elif bias_val >= 0 and not is_near_resist:
+        action = "hold"
+        action_zh = "顺势持股"
     elif bias_val <= -1.5 and not is_near_support:
         action = "stop_loss" if buy_ratio < 0.45 else "wait"
-        action_zh = "严格止损" if buy_ratio < 0.45 else "观望防守"
+        action_zh = "严格止损" if buy_ratio < 0.45 else "观望蓄势"
     else:
         action = "wait"
-        action_zh = "观望防守"
+        action_zh = "观望蓄势"
 
     # 3. market_attribution (Choice)
-    is_bank_defensive = ("国有大行" in sector_style) or ("银行" in sector) or ("避险" in sector_style)
+    is_bank_defensive = ("国有大行" in sector_style) or ("银行" in sector)
     if is_bank_defensive and (bias_val < 0 or (market_scissors is not None and market_scissors > 0.3)):
         attr = "sector_rotation_bleed"
         attr_zh = "科技成长放量吸血，权重避险资金分流"

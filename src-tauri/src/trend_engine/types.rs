@@ -133,6 +133,8 @@ pub struct TrendSignal {
     pub orb_low: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sector_linkage: Option<crate::market_overview::SectorLinkage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fall_attribution: Option<super::FallAttribution>,
 }
 
 pub(super) fn now_epoch_secs() -> u64 {

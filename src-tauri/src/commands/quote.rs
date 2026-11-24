@@ -24,26 +24,15 @@ pub async fn search_securities(
 #[tauri::command]
 pub async fn set_trend_targets(app: AppHandle, targets: Vec<String>) -> Result<(), String> {
     let state = app.state::<AppState>();
-    let (changed, has_cached) = {
+    let changed = {
         let mut guard = state.active_trend_targets.lock().unwrap_or_else(|e| e.into_inner());
         let changed = guard.as_ref() != Some(&targets);
         *guard = Some(targets.clone());
-        if changed && !targets.is_empty() {
-            let trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
-            let has_cached = targets.iter().all(|c| trends.contains_key(c));
-            (true, has_cached)
-        } else {
-            (false, false)
-        }
+        changed && !targets.is_empty()
     };
 
     if changed {
-        // If we already have cached trend points in memory, push snapshot immediately
-        // so the frontend renders with 0ms blank-screen delay
-        if has_cached {
-            poller::emit_snapshot(&app);
-        }
-        // Always trigger an immediate background poll to fetch the freshest real-time ticks
+        // Trigger a background poll to fetch the freshest real-time ticks
         tauri::async_runtime::spawn(async move {
             let _ = poller::poll_trends(&app).await;
         });

@@ -43,7 +43,8 @@ export function computeUnifiedMaxDev(
   opts: DrawOptions
 ): number {
   let maxDev = 0
-  for (const p of points) {
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]
     if (p.price > 0) {
       maxDev = Math.max(maxDev, Math.abs(p.price - preClose))
     }
@@ -156,16 +157,19 @@ export function buildUnifiedChartData(
 
   // 2. Continuous Intraday Trend Points (09:30 - 14:57)
   const count = trendPts.length
+
   for (let i = 0; i < count; i++) {
     const tp = trendPts[i]
     const slot = isGlobal
       ? (i / Math.max(1, count - 1)) * 240
       : (useFullSpectrum ? slotOfFullTrend(tp.time) : slotOf(tp.time))
 
+    const avgPrice = tp.avgPrice && isValidAvg(tp.avgPrice, preClose) ? tp.avgPrice : undefined
+
     pricePoints.push({
       slot,
       price: tp.price,
-      avgPrice: tp.avgPrice,
+      avgPrice,
       isAuction: false,
       trendPoint: tp,
     })

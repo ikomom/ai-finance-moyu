@@ -1,13 +1,13 @@
-import { For, Show } from 'solid-js'
+import { Show } from 'solid-js'
 import { WatchEditor } from '../WatchEditor'
-import { SOURCE_NOTES, useSettings } from './SettingsContext'
+import { DataSourceCard } from './DataSourceCard'
+import { useSettings } from './SettingsContext'
 import './WatchlistTab.css'
 
 export function WatchlistTab() {
   const {
     form,
     setForm,
-    sources,
     updateItem,
     addItem,
     addItemWith,
@@ -25,33 +25,8 @@ export function WatchlistTab() {
 
   return (
     <div class="tab-pane">
-      {/* 1. 数据源通道 */}
-      <div class="card">
-        <div class="card-title-row">
-          <h2>数据源通道</h2>
-          <span class="card-badge">实时行情</span>
-        </div>
-        <p class="hint">
-          均使用公开行情通道，免登录。切换源后立即重连重新拉取。
-        </p>
-        <div class="source-pills">
-          <For each={sources()}>
-            {([value, label]) => (
-              <div
-                class="source-pill"
-                classList={{ active: form.dataSource === value }}
-                onClick={() => setForm('dataSource', value)}
-              >
-                <div class="pill-radio-dot" />
-                <div class="pill-content">
-                  <span class="pill-title">{label}</span>
-                  <span class="pill-desc">{SOURCE_NOTES[value] ?? ''}</span>
-                </div>
-              </div>
-            )}
-          </For>
-        </div>
-      </div>
+      {/* 1. 数据源通道与 API 配置 */}
+      <DataSourceCard />
 
       {/* 2. 行情指标策略默认档位 */}
       <div class="card">

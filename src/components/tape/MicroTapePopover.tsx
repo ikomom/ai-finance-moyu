@@ -21,6 +21,8 @@ export interface MicroTapePopoverProps {
   isPinned: boolean
   onClose: () => void
   onTogglePin?: () => void
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
   ref?: (el: HTMLDivElement) => void
 }
 
@@ -67,13 +69,15 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
       classList={{ pinned: props.isPinned }}
       onClick={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
+      onMouseEnter={props.onMouseEnter}
+      onMouseLeave={props.onMouseLeave}
       data-tauri-drag-region="none"
     >
       {/* 1. Header Bar */}
       <div class="tape-header">
         <div class="tape-title-group">
           <span class="tape-badge-tag">📊 核心盘口</span>
-          <span class="tape-stock-name">{q().name}</span>
+          <span class="tape-stock-name" title={q().name}>{q().name}</span>
           <span class="tape-stock-code">{q().code.replace(/^(sh|sz|bj|us|hk)/, '')}</span>
         </div>
         <div class="tape-actions">

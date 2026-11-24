@@ -8,6 +8,7 @@ import {
   fmtAmount,
   fmtHHMM,
   fmtVol,
+  isIndexCode,
   profitAmount,
   type AuctionPoint,
   type KLineBar,
@@ -260,10 +261,17 @@ export function createMiniDerived(args: MiniDerivedArgs) {
         const sideText = side === 'buy' ? '买多' : '卖多'
         return `撮合 ${fmtVol(m)}手 · ${sideText} ${fmtVol(u)}手`
       }
-      if (m > 0) {
-        return `撮合 ${fmtVol(m)}手 (完全撮合)`
+      return m > 0 ? `撮合 ${fmtVol(m)}手 (完全撮合)` : `量 ${fmtVol(ap.volume)}手`
+    }
+
+    if (isIndexCode(q().code)) {
+      const hp = hoveredPoint()
+      if (hp && hp.avgPrice && hp.avgPrice > 0 && q().preClose > 0) {
+        const yPct = ((hp.avgPrice - q().preClose) / q().preClose) * 100
+        const wPct = ((hp.price - q().preClose) / q().preClose) * 100
+        const sp = yPct - wPct
+        return `等权 ${hp.avgPrice.toFixed(1)} (${yPct >= 0 ? '+' : ''}${yPct.toFixed(1)}%) · 差 ${sp > 0 ? '+' : ''}${sp.toFixed(1)}%`
       }
-      return `量 ${fmtVol(ap.volume)}手`
     }
 
     const hpe = hoveredPointExtra()
@@ -271,13 +279,8 @@ export function createMiniDerived(args: MiniDerivedArgs) {
       if (subchartMode() === 'macd' && hpe.dif != null && hpe.macd != null) {
         return `DIF ${hpe.dif.toFixed(2)} · MACD ${hpe.macd.toFixed(2)}`
       }
-      let text = ''
-      if (hpe.minVol > 0) {
-        text = `量 ${fmtVol(hpe.minVol)}手`
-        if (hpe.amount && hpe.amount > 0) {
-          text += ` · 额 ${fmtAmount(hpe.amount)}`
-        }
-      }
+      let text = hpe.minVol > 0 ? `量 ${fmtVol(hpe.minVol)}手` : ''
+      if (hpe.amount && hpe.amount > 0) text += `${text ? ' · ' : ''}额 ${fmtAmount(hpe.amount)}`
       if (hpe.tradeGroup) {
         const tg = hpe.tradeGroup
         const verb = tg.type === 'B' ? '买' : tg.type === 'S' ? '卖' : '做T'

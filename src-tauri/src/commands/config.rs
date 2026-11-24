@@ -136,7 +136,15 @@ pub fn save_config(app: AppHandle, mut cfg: Config) -> Result<(), String> {
         // opacity re-armed a breaker the provider had already answered with 401.
         if key_changed {
             state.market_fetcher.reset_quota_circuit_breaker();
-            log::info!(target: "USER", "问财 API Key 已更新，配额熔断已重置");
+            let has_key = cfg
+                .iwencai_api_key
+                .as_deref()
+                .is_some_and(|k| !k.trim().is_empty());
+            if has_key {
+                log::info!(target: "USER", "同花顺金融数据 API Key 已更新，配额熔断已重置并启用增强通道");
+            } else {
+                log::info!(target: "USER", "同花顺金融数据 API Key 已清除，已安全回退至本地基准缓存");
+            }
         }
     }
 

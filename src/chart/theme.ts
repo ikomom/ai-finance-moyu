@@ -14,6 +14,8 @@ export function getChartTheme() {
       up: '#dc2626',
       down: '#16a34a',
       avg: '#2563eb',
+      indexWhite: '#1e293b',
+      indexYellow: '#d97706',
       font: FONT,
     }
   }
@@ -27,6 +29,8 @@ export function getChartTheme() {
       up: '#ff3366',
       down: '#00ff88',
       avg: '#00e5ff',
+      indexWhite: '#f8fafc',
+      indexYellow: '#facc15',
       font: FONT,
     }
   }
@@ -40,6 +44,8 @@ export function getChartTheme() {
       up: '#f43f5e',
       down: '#10b981',
       avg: '#0ea5e9',
+      indexWhite: '#f8fafc',
+      indexYellow: '#fbbf24',
       font: FONT,
     }
   }
@@ -52,6 +58,8 @@ export function getChartTheme() {
     up: UP,
     down: DOWN,
     avg: AVG,
+    indexWhite: '#f8fafc',
+    indexYellow: '#eab308',
     font: FONT,
   }
 }

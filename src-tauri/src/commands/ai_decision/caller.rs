@@ -95,7 +95,7 @@ pub async fn execute_decision(
             "criteria": {
                 "take_profit": "逢高止盈 / 冲高落袋",
                 "hold": "顺势持股 / 待涨",
-                "wait": "观望防守 / 暂不追高",
+                "wait": "观望蓄势 / 多看少动",
                 "stop_loss": "严格止损 / 减仓规避",
                 "buy": "顺势做多 / 逢低吸纳",
                 "oversold_bounce": "超跌反弹 / 低吸博弈",
@@ -198,7 +198,7 @@ pub async fn execute_decision(
     let action_label = match action_str {
         "take_profit" => "逢高止盈",
         "hold" => "顺势持股",
-        "wait" => "观望防守",
+        "wait" => "观望蓄势",
         "stop_loss" => "严格止损",
         "buy" => "顺势做多",
         "oversold_bounce" => "超跌反弹",
@@ -207,7 +207,7 @@ pub async fn execute_decision(
         "broken_limit_down" => "资金博弈",
         "sealed_limit_up" => "顺势持股",
         "broken_limit_up" => "逢高减仓",
-        _ => "观望防守",
+        _ => "观望蓄势",
     };
 
     // 3. market_attribution

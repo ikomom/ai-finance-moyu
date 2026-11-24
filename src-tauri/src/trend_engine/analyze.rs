@@ -42,6 +42,11 @@ pub fn analyze_trend(
                 updated_at: now,
                 orb_high: None,
                 orb_low: None,
+                fall_attribution: if quote.change_pct < 0.0 {
+                    super::evaluate_fall_attribution(quote, None, bias, sector_linkage.as_ref())
+                } else {
+                    None
+                },
                 sector_linkage,
             });
         }
@@ -70,10 +75,7 @@ pub fn analyze_trend(
             benchmark_curve.push(sum / (slice.len() as f64));
         }
     } else {
-        for p in points.iter() {
-            let bm = if p.avg_price > 0.0 { p.avg_price } else { p.price };
-            benchmark_curve.push(bm);
-        }
+        benchmark_curve.extend(points.iter().map(|p| if p.avg_price > 0.0 { p.avg_price } else { p.price }));
     }
 
     let benchmark = benchmark_curve[len - 1];
@@ -135,6 +137,12 @@ pub fn analyze_trend(
         }
     };
 
+    let fall_attr = super::evaluate_fall_attribution(
+        quote,
+        orb_low,
+        rounded_bias,
+        sector_linkage.as_ref(),
+    );
     let make_signal = |state: TrendState, score: i32, summary: String| {
         TrendSignal {
             state,
@@ -147,9 +155,9 @@ pub fn analyze_trend(
             orb_high,
             orb_low,
             sector_linkage: sector_linkage.clone(),
+            fall_attribution: fall_attr.clone(),
         }
     };
-
 
     let ctx = PatternCtx {
         quote,
@@ -175,7 +183,6 @@ pub fn analyze_trend(
     if let Some(signal) = early_patterns(&ctx, &make_signal) {
         return Some(signal);
     }
-
 
     // -------------------------------------------------------------
     // Pattern 8: Sector Linkage Divergence (逆势抗跌 / 独立下杀)
@@ -260,20 +267,10 @@ pub fn analyze_trend(
     // -------------------------------------------------------------
     let (score, label, compact_label, summary) = if price >= benchmark {
         let s = (bias_pct * 15.0).clamp(5.0, 30.0) as i32;
-        (
-            s,
-            "● 均线上方",
-            "多方",
-            format!("均线上方偏强震荡，偏离均线 +{bias_pct:.2}%"),
-        )
+        (s, "● 均线上方", "多方", format!("均线上方偏强震荡，偏离均线 +{bias_pct:.2}%"))
     } else {
         let s = (bias_pct * 15.0).clamp(-30.0, -5.0) as i32;
-        (
-            s,
-            "● 均线下方",
-            "空方",
-            format!("均线下方弱势运行，偏离均线 {bias_pct:.2}%"),
-        )
+        (s, "● 均线下方", "空方", format!("均线下方弱势运行，偏离均线 {bias_pct:.2}%"))
     };
 
     Some(TrendSignal {
@@ -287,5 +284,7 @@ pub fn analyze_trend(
         orb_high,
         orb_low,
         sector_linkage,
+        fall_attribution: fall_attr,
     })
 }
+

@@ -109,7 +109,7 @@ export function SettingsProvider(props: { children: JSX.Element }) {
           volumeBurst: true,
           limitBoard: true,
         },
-        iwencaiApiKey: '',
+        iwencaiApiKey: undefined,
         indicatorConfig: snapshot.config.indicatorConfig ?? {
           preset: 'classic',
           ma: [5, 10, 20],

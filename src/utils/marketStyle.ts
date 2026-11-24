@@ -10,7 +10,8 @@ export interface MarketStyleInfo {
 
 const OFFENSIVE_KEYWORDS = [
   '半导体', '芯片', '电子', '软件', '计算机', '算力', '通信',
-  '人工智能', 'AI', '机器人', '低空经济', '军工', '航天', '光伏', '电池', '新能源'
+  '人工智能', 'AI', '机器人', '低空经济', '军工', '航天', '光伏', '电池', '新能源',
+  '传媒', '游戏', '文化', '影视', '数字', '消费电子', '互联网'
 ]
 const WEIGHT_KEYWORDS = ['银行', '证券', '保险', '中字头', '建筑', '央企', '白酒', '酿酒', '房地产']
 const DEFENSIVE_KEYWORDS = ['煤炭', '石油', '石化', '电力', '公用事业', '燃气', '港口', '医药', '中药', '贵金属', '黄金']
@@ -65,7 +66,7 @@ export function extractStyle(sectors?: SectorItem[]): MarketStyleInfo {
     }
   }
 
-  if (defensiveCount > 0) {
+  if (defensiveCount > offensiveCount && defensiveCount > weightCount && defensiveCount > 0) {
     return {
       type: 'defensive',
       badge: '🛡️ 防御避险',

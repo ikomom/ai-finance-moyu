@@ -1,9 +1,7 @@
 import type { MarketOverview, Quote, TrendSignal } from '../types'
 import { fmtTurnover, isIndexCode } from '../types'
 import { extractStyle, type MarketStyleInfo } from './marketStyle'
-
 export type { MarketStyleInfo }
-
 export type DiagnosisTone = 'bull' | 'bear' | 'warn' | 'neutral'
 
 export type DiagnosisCode =
@@ -31,6 +29,7 @@ export interface IndexDiagnosis {
   upPct: number
   downPct: number
   totalTurnoverText: string
+  currentIndexTurnoverText?: string
   turnoverDeltaText: string
   turnoverDeltaDetail: string
   isVolumeSurge: boolean
@@ -38,6 +37,11 @@ export interface IndexDiagnosis {
   trendLabel: string
   trendSummary: string
   trendBiasText?: string
+  yellowWhiteSpread: number
+  yellowWhiteState: 'yellow_lead' | 'white_lead' | 'resonance'
+  yellowWhiteLabel: string
+  yellowWhiteDetail: string
+  unweightedPct: number
 }
 
 /**
@@ -94,6 +98,43 @@ export function diagnoseIndex(
 
   const styleInfo = extractStyle(overview?.topSectors)
 
+  // 4. 黄白线等权涨幅与剪刀差推演 (Yellow-White Scissors Spread)
+  const cleanCode = code.replace(/^(sh|sz|bj)/, '')
+  const matchingIdx = overview?.indices?.find((i) => i.code === cleanCode || code.includes(i.code))
+  const idxPct = quote?.changePct ?? 0
+  const unweightedPct = matchingIdx?.unweightedChangePct ?? (() => {
+    const sectors = overview?.topSectors ?? []
+    if (sectors.length > 0) {
+      const sum = sectors.reduce((acc, s) => acc + s.changePct, 0)
+      const avg = sum / sectors.length
+      if (cleanCode === '399006') {
+        const sse = overview?.indices?.find((i) => i.code === '000001')?.changePct ?? 0
+        const excess = avg - sse
+        return idxPct + (excess > 0 ? Math.max(0.6, excess * 0.5) : Math.min(-0.6, excess * 0.5))
+      }
+      return avg
+    }
+    return idxPct
+  })()
+  const yellowWhiteSpread = matchingIdx?.yellowLineSpread ?? (unweightedPct - idxPct)
+  const yellowWhiteState: 'yellow_lead' | 'white_lead' | 'resonance' =
+    yellowWhiteSpread > 0.3 ? 'yellow_lead' : yellowWhiteSpread < -0.3 ? 'white_lead' : 'resonance'
+  const yellowWhiteLabel = (() => {
+    const sign = yellowWhiteSpread > 0 ? '+' : ''
+    if (yellowWhiteState === 'yellow_lead') return `黄上白下 (${sign}${yellowWhiteSpread.toFixed(1)}%)`
+    if (yellowWhiteState === 'white_lead') return `白上黄下 (${sign}${yellowWhiteSpread.toFixed(1)}%)`
+    return `双线共振 (${sign}${yellowWhiteSpread.toFixed(1)}%)`
+  })()
+  const yellowWhiteDetail = (() => {
+    if (yellowWhiteState === 'yellow_lead') return '中小盘题材走势强于大盘蓝筹，全市场赚钱效应活跃，八二行情重个股。'
+    if (yellowWhiteState === 'white_lead') return '权重蓝筹护盘拉抬，但底层中小盘题材失血下挫，二八分化赚指数不赚钱。'
+    return '大盘蓝筹与中小盘齐头并进，多空合力共振运行。'
+  })()
+
+  const currentIndexTurnoverText = matchingIdx?.turnover && matchingIdx.turnover > 0
+    ? fmtTurnover(matchingIdx.turnover)
+    : undefined
+
   const buildResult = (
     code: DiagnosisCode,
     badgeLabel: string,
@@ -114,6 +155,7 @@ export function diagnoseIndex(
     upPct,
     downPct,
     totalTurnoverText: turnoverText,
+    currentIndexTurnoverText,
     turnoverDeltaText: deltaText,
     turnoverDeltaDetail: deltaDetail,
     isVolumeSurge,
@@ -121,28 +163,39 @@ export function diagnoseIndex(
     trendLabel,
     trendSummary,
     trendBiasText: trendSummary,
+    yellowWhiteSpread,
+    yellowWhiteState,
+    yellowWhiteLabel,
+    yellowWhiteDetail,
+    unweightedPct,
   })
 
   // 兜底未加载或非指数标的
   if (!isIdx || !overview || total <= 10) {
     return buildResult(
       'PENDING',
-      '● 大盘诊断中',
-      '诊断中',
+      '● 大盘诊断',
+      '诊断',
       'neutral',
       '【等待行情】',
       '全市场行情与情绪数据正在初始化更新…'
     )
   }
 
-  const idxPct = quote?.changePct ?? 0
+  const sectors = overview?.topSectors ?? []
+  const upSectors = sectors.filter(s => s.changePct > 0).length
+  const sectorRatio = sectors.length > 0 ? upSectors / sectors.length : 0.5
+  const indices = overview?.indices ?? []
+  const hasSurgingIndex = indices.some(
+    idx => (idx.code === '399001' || idx.code === '399006') && idx.changePct >= 0.5
+  )
 
-  // 1. 权重拉抬护盘 (指数微跌持平或红盘，但个股超6成下跌，二八失血严重)
-  if (idxPct >= -0.05 && downPct >= 60) {
+  // 1. 权重拉抬护盘 (指数微跌持平或红盘，但个股超6成下跌，二八失血严重；且中小创指数或行业板块未普遍上涨)
+  if (idxPct >= -0.05 && downPct >= 60 && sectorRatio < 0.55 && !hasSurgingIndex) {
     return buildResult(
       'DIVERGE_INDEX_PUMP',
-      `🚨拉权护盘 (${upPct}%涨)`,
-      '拉大票',
+      '🚨 权重护盘',
+      '护盘',
       'warn',
       '【谨防诱多】',
       '指数靠大市值权重护盘推升，但全市场多数个股下挫，二八失血严重，赚指数不赚钱。'
@@ -153,8 +206,8 @@ export function diagnoseIndex(
   if (idxPct <= 0.15 && upPct >= 65) {
     return buildResult(
       'DIVERGE_BREADTH_PUMP',
-      `💎题材活跃 (${upPct}%涨)`,
-      '做个股',
+      '💎 题材活跃',
+      '活跃',
       'bull',
       '【轻指数重个股】',
       '大盘指数受权重压制失真，底层题材个股百花齐放，真实赚钱效应强劲。'
@@ -165,8 +218,8 @@ export function diagnoseIndex(
   if (idxPct > 0.3 && isVolumeShrink && upPct < 65) {
     return buildResult(
       'VOLUME_SHORT_PUMP',
-      `⚠️缩量冲高 (${upPct}%涨)`,
-      '缩量拉',
+      '⚠️ 缩量冲高',
+      '冲高',
       'warn',
       '【切忌追高】',
       '指数缩量反弹后劲不足，多空存量博弈分歧加大，谨防午后乏力冲高回落。'
@@ -177,8 +230,8 @@ export function diagnoseIndex(
   if (idxPct >= 0.5 && isVolumeSurge && upPct >= 75) {
     return buildResult(
       'BULL_SURGE',
-      `🔥放量共振 (${upPct}%涨)`,
-      '共振普涨',
+      '🔥 放量共振',
+      '共振',
       'bull',
       '【顺势看多】',
       '两市真金白银放量进攻，超七成个股上涨，多头动能充沛，赚钱效应爆发。'
@@ -189,8 +242,8 @@ export function diagnoseIndex(
   if (upPct >= 60 && idxPct > 0) {
     return buildResult(
       'BULL_NORMAL',
-      `📈偏多走强 (${upPct}%涨)`,
-      '偏多走强',
+      '📈 偏多走强',
+      '偏多',
       'bull',
       '【逢低布局】',
       '多头占据盘面主动，买盘有序推升，盘面赚钱效应良好。'
@@ -201,8 +254,8 @@ export function diagnoseIndex(
   if (idxPct <= -0.8 && isVolumeSurge && downPct >= 75) {
     return buildResult(
       'PANIC_DUMP',
-      `❄️放量恐慌 (${downPct}%跌)`,
-      '恐慌砸盘',
+      '❄️ 恐慌杀跌',
+      '恐慌',
       'bear',
       '【多看少动】',
       '放量大跌恐慌盘与止损盘涌出，非理性杀跌明显，切莫盲目伸手接飞刀。'
@@ -213,8 +266,8 @@ export function diagnoseIndex(
   if (idxPct <= -1.0 && downPct >= 65) {
     return buildResult(
       'HEAVY_DROP',
-      `⚡破位重挫 (${downPct}%跌)`,
-      '重挫破位',
+      '⚡ 破位重挫',
+      '破位',
       'bear',
       '【防守避险】',
       '指数承压破位深跌，空头抛压沉重且个股普跌下挫，宜严格控制仓位规避风险。'
@@ -225,8 +278,8 @@ export function diagnoseIndex(
   if (idxPct < 0 && downPct >= 60) {
     return buildResult(
       'BLEEDING_DRIFT',
-      `📉弱势阴跌 (${downPct}%跌)`,
-      '弱势阴跌',
+      '📉 弱势阴跌',
+      '阴跌',
       'bear',
       '【防守控仓】',
       '市场买盘承接乏力，抛压占据主导，交投冷清弱势阴跌，宜以防守防御为主。'
@@ -236,8 +289,8 @@ export function diagnoseIndex(
   // 9. 默认多空对峙窄幅蓄势
   return buildResult(
     'CONSOLIDATION',
-    `⚖️多空对峙 (${upPct}%涨)`,
-    '窄幅震荡',
+    '⚖️ 多空对峙',
+    '对峙',
     'neutral',
     '【观望蓄势】',
     '涨跌家数参半，资金无序电风扇轮动，多空双方胶着，等待变盘方向确立。'

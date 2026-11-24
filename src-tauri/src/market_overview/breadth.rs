@@ -23,10 +23,13 @@ impl MarketFetcher {
             }
         }
 
-        // Only query during live trading sessions; outside market hours return cached
+        // Outside market hours, return cached if we already have a valid snapshot or have queried
         let session = crate::market::session_at(crate::market::beijing_now());
-        if !session.is_live() {
-            let cached = *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner());
+        let cached = *self.cached_breadth.lock().unwrap_or_else(|e| e.into_inner());
+        let has_valid_cache = cached.0 > 0 || cached.1 > 0;
+        let last_fetch = *self.last_breadth_fetch.lock().unwrap_or_else(|e| e.into_inner());
+
+        if !session.is_live() && (has_valid_cache || last_fetch.is_some()) {
             return Ok(cached);
         }
 
@@ -151,6 +154,15 @@ impl MarketFetcher {
             }
             _ => None,
         };
+
+        log::info!(
+            target: "NET",
+            "同花顺全景统计拉取成功: 涨={}, 跌={}, 平={}, 成交额环比={:?}%",
+            up_count,
+            down_count,
+            flat_count,
+            turnover_change_pct
+        );
 
         Ok((up_count, down_count, flat_count, turnover_change_pct, turnover_change_amount))
     }

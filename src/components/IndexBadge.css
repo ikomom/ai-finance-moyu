@@ -2,7 +2,7 @@
 .index-badge-wrap {
   display: inline-flex;
   align-items: center;
-  z-index: 20;
+  z-index: 30;
   position: relative;
 }
 
@@ -49,9 +49,10 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
-  z-index: 100;
+  z-index: 120;
   pointer-events: auto;
   text-align: left;
+  white-space: normal;
   max-height: calc(100vh - 45px);
   overflow-y: auto;
   scrollbar-width: none;
@@ -113,6 +114,25 @@
   word-break: break-word;
   font-weight: 400;
 }
+
+.index-breadth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8.5px;
+  margin-bottom: 2px;
+}
+.breadth-scope-lbl {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.breadth-scope-counts {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+}
+.breadth-scope-counts .sep { color: var(--text-dim, #6e7681); }
 
 .index-breadth-row {
   display: flex;
@@ -205,49 +225,6 @@
   color: var(--text-primary);
 }
 
-/* Sectors Card */
-.index-sectors-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  padding: 4px 6px;
-  margin-bottom: 5px;
-}
-
-.sectors-grid-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sector-mini-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 9px;
-  line-height: 1.25;
-}
-
-.sec-name {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.sec-pct {
-  font-weight: 500;
-  font-family: var(--font-mono);
-}
-
-.sec-leader {
-  color: var(--text-muted);
-  font-size: 8.5px;
-  margin-left: auto;
-  max-width: 125px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Footer Index Comparison */
 .index-indices-footer {
   display: flex;
@@ -272,3 +249,21 @@
   font-weight: 500;
   font-family: var(--font-mono);
 }
+
+/* Yellow-White Scissors Spread Card */
+.index-spread-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  margin-bottom: 5px;
+}
+:root[data-theme="light"] .index-spread-card { background: rgba(0, 0, 0, 0.03); border-color: rgba(0, 0, 0, 0.08); }
+.spread-card-header { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 2px; }
+.spread-title { font-size: 8.5px; font-weight: 600; color: var(--text-muted); }
+.spread-badge { font-size: 8.5px; font-weight: 600; padding: 0.5px 4px; border-radius: var(--radius-xs); font-family: var(--font-mono); }
+.spread-badge.yellow_lead { background: rgba(234, 179, 8, 0.16); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.35); }
+:root[data-theme="light"] .spread-badge.yellow_lead { background: rgba(217, 119, 6, 0.12); color: #b45309; border-color: rgba(217, 119, 6, 0.3); }
+.spread-badge.white_lead { background: var(--color-warning-bg); color: var(--color-warning-light); border: 1px solid var(--color-warning-border); }
+.spread-badge.resonance { background: rgba(255, 255, 255, 0.08); color: var(--text-secondary); border: 1px solid var(--surface-border-subtle); }
+.spread-card-detail { font-size: 8.5px; color: var(--text-secondary); line-height: 1.3; }

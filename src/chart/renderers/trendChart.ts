@@ -1,3 +1,4 @@
+import { isIndexCode } from '../../types'
 import { computeMinuteMacd } from '../../utils/indicators'
 import { drawCrosshair, drawHorizontalLevel, setupCanvasDpi } from '../canvasUtils'
 import { FONT, getChartTheme } from '../theme'
@@ -91,6 +92,8 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     return
   }
 
+  const isIdx = opts.isIndex ?? (opts.trend?.code ? isIndexCode(opts.trend.code) : false)
+
   // Draw price curves (auction and continuous) & average price line
   drawTrendPrice({
     ctx,
@@ -100,6 +103,7 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
     xOf,
     yOf,
     yPre,
+    isIndex: isIdx,
   })
 
   // --- subchart: switchable VOL vs MACD ------------------------------------
@@ -187,6 +191,16 @@ export function drawTrend(canvas: HTMLCanvasElement, opts: DrawOptions): void {
       dash: [2, 2],
       dotRadius: 2.5,
     })
+
+    if (isIdx && closest.avgPrice && closest.avgPrice > 0) {
+      const hyYellow = yOf(closest.avgPrice)
+      ctx.save()
+      ctx.fillStyle = theme.indexYellow
+      ctx.beginPath()
+      ctx.arc(hx, hyYellow, 2.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
   }
 
   // Draw cost & price levels

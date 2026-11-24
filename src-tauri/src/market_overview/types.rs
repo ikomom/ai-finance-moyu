@@ -14,6 +14,10 @@ pub struct MarketIndex {
     pub up_count: u32,
     pub down_count: u32,
     pub flat_count: u32,
+    #[serde(default)]
+    pub unweighted_change_pct: Option<f64>,
+    #[serde(default)]
+    pub yellow_line_spread: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -29,6 +33,26 @@ pub struct SectorItem {
     pub lead_stock_code: String,
     #[serde(default)]
     pub lead_stock_zdf: f64,
+}
+
+/// A sector/concept rank tag associated with an individual stock.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SectorRankTag {
+    pub name: String,
+    #[serde(default)]
+    pub code: String,
+    #[serde(default)]
+    pub rank: Option<u32>,
+    pub change_pct: f64,
+    pub delta_r: f64,
+    #[serde(default)]
+    pub leader_name: Option<String>,
+    #[serde(default)]
+    pub leader_change_pct: Option<f64>,
+    pub role: String,
+    /// "surging" | "accumulating" | "cooling" | "normal"
+    pub stage: String,
 }
 
 /// Sector and market beta linkage analysis for an individual stock.
@@ -49,6 +73,9 @@ pub struct SectorLinkage {
     pub role: String,
     /// 盘面微观评述
     pub diagnosis: String,
+    /// 所属多个核心题材标签及梯队排位
+    #[serde(default)]
+    pub sectors: Vec<SectorRankTag>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

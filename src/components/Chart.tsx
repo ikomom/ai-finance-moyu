@@ -52,6 +52,9 @@ export function Chart(props: ChartProps) {
       isGlobal: props.isGlobal,
       trades: props.trades,
       volumeScaleMode: props.volumeScaleMode,
+      isIndex: props.isIndex,
+      unweightedChangePct: props.unweightedChangePct,
+      yellowLineSpread: props.yellowLineSpread,
     })
 
   onMount(() => {

@@ -65,6 +65,8 @@ pub fn parse_global_indices(body: &str) -> Vec<MarketIndex> {
                     up_count: 0,
                     down_count: 0,
                     flat_count: 0,
+                    unweighted_change_pct: None,
+                    yellow_line_spread: None,
                 }));
             }
         } else if let Some(rest) = line.strip_prefix("v_") {
@@ -96,6 +98,8 @@ pub fn parse_global_indices(body: &str) -> Vec<MarketIndex> {
                     up_count: 0,
                     down_count: 0,
                     flat_count: 0,
+                    unweighted_change_pct: None,
+                    yellow_line_spread: None,
                 }));
             }
         }

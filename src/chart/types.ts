@@ -19,6 +19,9 @@ export interface DrawOptions {
   isGlobal?: boolean
   trades?: TradeRecord[]
   volumeScaleMode?: 'linear' | 'sqrt'
+  isIndex?: boolean
+  unweightedChangePct?: number
+  yellowLineSpread?: number
 }
 
 export interface LevelOptions {

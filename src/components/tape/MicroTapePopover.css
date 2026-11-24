@@ -2,7 +2,7 @@
 .micro-tape-popover {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
+  right: 0;
   width: 296px;
   box-sizing: border-box;
   padding: 8px 10px;
@@ -54,12 +54,18 @@
   margin-bottom: 7px;
   padding-bottom: 5px;
   border-bottom: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.08));
+  gap: 6px;
+  min-width: 0;
 }
 
 .tape-title-group {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .tape-badge-tag {
@@ -67,33 +73,47 @@
   font-weight: 600;
   color: var(--text-color, #e6edf3);
   letter-spacing: -0.2px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tape-stock-name {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted, #8b949e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+  flex-shrink: 1;
 }
 
 .tape-stock-code {
   font-size: 10px;
   color: var(--text-dim, #6e7681);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tape-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tape-pin-btn {
   font-size: 10px;
-  padding: 1px 5px;
+  padding: 1.5px 5px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--surface-border-subtle, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-xs, 3px);
   color: var(--text-muted, #8b949e);
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
   transition: all 0.15s ease;
 }
 
@@ -104,8 +124,14 @@
 
 .tape-pin-btn.active {
   background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.45);
   color: #60a5fa;
+  font-weight: 500;
+}
+:root[data-theme="light"] .tape-pin-btn.active {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #2563eb;
 }
 
 .tape-close-btn {
@@ -240,20 +266,10 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 :root[data-theme="light"] .tape-header { border-bottom-color: rgba(0, 0, 0, 0.06); }
-:root[data-theme="light"] .tape-grid-row.highlight-row {
-  background: rgba(0, 0, 0, 0.025);
-  border-color: rgba(0, 0, 0, 0.06);
-}
-:root[data-theme="light"] .tape-pin-btn {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
-}
+:root[data-theme="light"] .tape-grid-row.highlight-row { background: rgba(0, 0, 0, 0.025); border-color: rgba(0, 0, 0, 0.06); }
+:root[data-theme="light"] .tape-pin-btn { background: rgba(0, 0, 0, 0.04); border-color: rgba(0, 0, 0, 0.08); }
 :root[data-theme="light"] .tape-pin-btn:hover { background: rgba(0, 0, 0, 0.08); }
-:root[data-theme="light"] .tape-pin-btn.active {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.3);
-  color: #2563eb;
-}
+:root[data-theme="light"] .tape-pin-btn.active { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.3); color: #2563eb; }
 :root[data-theme="light"] .tape-side.up { color: #dc2626; }
 :root[data-theme="light"] .tape-side.down { color: #16a34a; }
 
@@ -276,14 +292,6 @@
   border-color: rgba(59, 130, 246, 0.5);
   color: #60a5fa;
 }
-:root[data-theme="light"] .tape-trigger-btn {
-  background: rgba(0, 0, 0, 0.05);
-  border-color: rgba(0, 0, 0, 0.1);
-  color: #4b5563;
-}
+:root[data-theme="light"] .tape-trigger-btn { background: rgba(0, 0, 0, 0.05); border-color: rgba(0, 0, 0, 0.1); color: #4b5563; }
 :root[data-theme="light"] .tape-trigger-btn:hover,
-:root[data-theme="light"] .tape-trigger-btn.active {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #2563eb;
-}
+:root[data-theme="light"] .tape-trigger-btn.active { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.4); color: #2563eb; }

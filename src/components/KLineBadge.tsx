@@ -3,7 +3,7 @@
 //! Complies with AGENTS.md §11 (isolated module, <=300 lines).
 
 import { KLineBadgePopover } from './KLineBadgePopover'
-import { BaseBadge, combineBadgeText } from './badge'
+import { BaseBadge } from './badge'
 import { useAiDecision } from '../services/useAiDecision'
 import type { KLineData, Quote, Snapshot } from '../types'
 
@@ -30,7 +30,10 @@ export function KLineBadge(props: KLineBadgeProps) {
     'kline'
   )
 
-  const aiResult = () => ai.result()
+  const aiResult = () => {
+    const res = ai.result()
+    return res && props.quote?.code && res.code === props.quote.code ? res : null
+  }
   const isAiActive = () => ai.isEnabled() && Boolean(aiResult())
 
   const badgeInfo = () => {
@@ -51,59 +54,59 @@ export function KLineBadge(props: KLineBadgeProps) {
     const m5 = b?.ma5
     const p = q()?.price ?? b?.close ?? 0
 
-    let prefix = '● 均线整理'
-    let action = data.klineAction || '蓄势观察'
-    let compactLabel = '整理(看)'
+    let prefix = '● 观望蓄势'
+    let action = data.klineAction || '观望蓄势'
+    let compactLabel = '蓄势'
     let tone: 'bull' | 'bear' | 'warn' | 'neutral' =
       (data.klineTone as 'bull' | 'bear' | 'warn' | 'neutral') || 'neutral'
 
     if (j > 100) {
-      prefix = '⚡ 日线超买'
+      prefix = '⚡ 逢高止盈'
       action = '逢高止盈'
-      compactLabel = '超买(止盈)'
+      compactLabel = '止盈'
       tone = 'warn'
     } else if (j < 10) {
-      prefix = '★ 日线超卖'
+      prefix = '▲ 谨防杀跌'
       action = '谨防杀跌'
-      compactLabel = '超卖(防杀)'
+      compactLabel = '防跌'
       tone = 'neutral'
     } else {
       switch (data.maSignal) {
         case 'bull_aligned':
-          prefix = '▲ 站稳MA5'
+          prefix = '▲ 顺势看多'
           action = '顺势看多'
-          compactLabel = '多头(看多)'
+          compactLabel = '看多'
           tone = 'bull'
           break
         case 'above_ma20':
           if (m5 && p < m5) {
-            prefix = '▲ 回踩MA5'
+            prefix = '▲ 观察支撑'
             action = '观察支撑'
-            compactLabel = '回踩(支撑)'
+            compactLabel = '支撑'
             tone = 'bull'
           } else {
-            prefix = '▲ 站上MA20'
-            action = '持股待涨'
-            compactLabel = '生命线(持)'
+            prefix = '▲ 顺势持股'
+            action = '顺势持股'
+            compactLabel = '持股'
             tone = 'bull'
           }
           break
         case 'below_ma20':
-          prefix = '❄️ 承压MA20'
+          prefix = '❄️ 防守控仓'
           action = '防守控仓'
-          compactLabel = '承压(控仓)'
+          compactLabel = '控仓'
           tone = 'bear'
           break
         case 'bear_aligned':
-          prefix = '❄️ 跌破MA5'
+          prefix = '❄️ 严格止损'
           action = '严格止损'
-          compactLabel = '破位(止损)'
+          compactLabel = '止损'
           tone = 'bear'
           break
         default:
-          prefix = '● 均线整理'
-          action = '蓄势观察'
-          compactLabel = '整理(观察)'
+          prefix = '● 观望蓄势'
+          action = '观望蓄势'
+          compactLabel = '蓄势'
           tone = 'neutral'
           break
       }
@@ -112,7 +115,7 @@ export function KLineBadge(props: KLineBadgeProps) {
     return {
       prefix,
       action,
-      fullLabel: `${prefix} · ${action}`,
+      fullLabel: prefix,
       compactLabel,
       tone,
       comment: data.maComment || '日线均线处于平稳运行状态。',
@@ -160,23 +163,18 @@ export function KLineBadge(props: KLineBadgeProps) {
     if (props.compact) {
       if (isAiActive()) {
         const clean = aiResult()!.actionLabel.replace(/[【】]/g, '')
-        const shortAct = clean.slice(0, 2)
-        const prefix = badgeInfo().compactLabel.split('(')[0] || badgeInfo().compactLabel
-        return `${prefix}(${shortAct})`
+        return clean.slice(0, 2)
       }
       return badgeInfo().compactLabel
     }
 
     if (isAiActive()) {
       const clean = aiResult()!.actionLabel.replace(/[【】]/g, '')
-      return combineBadgeText(badgeInfo().prefix, clean, badgeInfo().action)
+      const icon = badgeInfo().prefix.split(' ')[0] || '●'
+      return `${icon} ${clean}`
     }
 
-    if (ai.isEnabled() && ai.loading()) {
-      const prefix = badgeInfo().prefix
-      return `${prefix} · 研判中...`
-    }
-
+    // 始终零延迟呈现底层确定性量化决策，绝不阻塞显示“研判中...”
     return badgeInfo().fullLabel
   }
 

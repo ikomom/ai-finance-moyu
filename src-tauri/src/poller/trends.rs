@@ -151,6 +151,58 @@ pub(super) fn update_trend_signals(state: &AppState, enabled: bool) {
             )
         };
         if let Some(sig) = crate::trend_engine::analyze_trend(q, t, linkage) {
+            // Log diagnosis events when state transitions occur (AGENTS.md §7)
+            let prev_fall_tag = signals.get(code).and_then(|s| s.fall_attribution.as_ref().map(|f| f.tag.clone()));
+            let new_fall_tag = sig.fall_attribution.as_ref().map(|f| f.tag.clone());
+            if new_fall_tag != prev_fall_tag {
+                if let Some(ref attr) = sig.fall_attribution {
+                    log::info!(
+                        target: "ALERT",
+                        "[归因诊断] {} ({}): 触发【{}】 - {}",
+                        q.name,
+                        q.code,
+                        attr.tag,
+                        attr.reason
+                    );
+                } else if let Some(ref prev_tag) = prev_fall_tag {
+                    log::info!(
+                        target: "ALERT",
+                        "[归因诊断] {} ({}): 跌势企稳，解除【{}】预警",
+                        q.name,
+                        q.code,
+                        prev_tag
+                    );
+                }
+            }
+
+            let prev_stage = signals.get(code).and_then(|s| {
+                s.sector_linkage.as_ref().and_then(|l| l.sectors.first().map(|sec| (sec.name.clone(), sec.stage.clone())))
+            });
+            let new_stage = sig.sector_linkage.as_ref().and_then(|l| {
+                l.sectors.first().map(|sec| (sec.name.clone(), sec.stage.clone()))
+            });
+            if new_stage != prev_stage {
+                if let Some((sec_name, stage)) = new_stage {
+                    let rank_info = sig.sector_linkage.as_ref()
+                        .and_then(|l| l.sectors.first())
+                        .map(|s| format!("今日 #{} {:+.2}%", s.rank.unwrap_or(0), s.change_pct))
+                        .unwrap_or_default();
+                    let concepts_preview = sig.sector_linkage.as_ref()
+                        .map(|l| l.sectors.iter().take(3).map(|s| s.name.as_str()).collect::<Vec<_>>().join(" / "))
+                        .unwrap_or_default();
+                    log::info!(
+                        target: "NET",
+                        "[题材联动] {} ({}): 关联题材 [{}]，核心板块【{}】({}) 处于 [{}] 阶段",
+                        q.name,
+                        q.code,
+                        concepts_preview,
+                        sec_name,
+                        rank_info,
+                        stage
+                    );
+                }
+            }
+
             signals.insert(code.clone(), sig);
         }
     }

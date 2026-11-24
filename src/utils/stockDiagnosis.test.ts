@@ -48,8 +48,8 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('steadyBull', 45, 0.8)
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('▲ 稳步多头 · 可持股')
-    expect(res.compactLabel).toBe('多头(持)')
+    expect(res.badgeLabel).toBe('▲ 顺势持股')
+    expect(res.compactLabel).toBe('持股')
     expect(res.guidance).toBe('【顺势持股】')
     expect(res.tone).toBe('bull')
     expect(res.vwapStatusText).toContain('站稳均线 (+0.8%)')
@@ -64,11 +64,22 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('vwapOverbought', 15, 2.8)
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('⚡ 冲高乖离 · 慎盲追高')
-    expect(res.compactLabel).toBe('乖离(慎)')
+    expect(res.badgeLabel).toBe('⚡ 逢高止盈')
+    expect(res.compactLabel).toBe('止盈')
     expect(res.guidance).toBe('【慎盲追高】')
     expect(res.tone).toBe('warn')
     expect(res.vwapStatusText).toContain('站稳均线 (+2.8%)')
+  })
+
+  it('falls back to independent stock movement when sector linkage is absent (never mislabels as defense hedge)', () => {
+    const q = mockQuote(4.51, 4.38, { code: 'sh600892', name: '大晟文化' })
+    const sig = mockSignal('vwapOverbought', 15, 3.5)
+    const res = diagnoseStock(q, sig)
+
+    expect(res.sectorText).toBe('个股独立走势')
+    expect(res.sectorRoleText).toBe('个股独立博弈')
+    expect(res.sectorText).not.toContain('防御避险')
+    expect(res.sectorRoleText).not.toContain('大盘权重轮动')
   })
 
   it('diagnoses breakdown (放量破位·严守止损)', () => {
@@ -76,8 +87,8 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('breakdown', -65, -1.8)
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('❄️ 放量破位 · 严守止损')
-    expect(res.compactLabel).toBe('破位(止)')
+    expect(res.badgeLabel).toBe('❄️ 严格止损')
+    expect(res.compactLabel).toBe('止损')
     expect(res.guidance).toBe('【防守止损】')
     expect(res.tone).toBe('bear')
     expect(res.vwapStatusText).toContain('均线下破 (-1.8%)')
@@ -92,8 +103,8 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('consolidation', 0, 0.0)
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('● 窄幅整理 · 观望蓄势')
-    expect(res.compactLabel).toBe('整理(看)')
+    expect(res.badgeLabel).toBe('● 观望蓄势')
+    expect(res.compactLabel).toBe('蓄势')
     expect(res.guidance).toBe('【观望蓄势】')
     expect(res.tone).toBe('neutral')
     expect(res.vwapStatusText).toContain('均线平稳 (0.0%)')
@@ -133,8 +144,8 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('sealedLimitDown', -100, -9.98, { summary: '' })
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('🔒 封死跌停 · 观望封单')
-    expect(res.compactLabel).toBe('跌停(锁)')
+    expect(res.badgeLabel).toBe('🔒 封死跌停')
+    expect(res.compactLabel).toBe('跌停')
     expect(res.tone).toBe('bear')
     expect(res.guidance).toBe('【观望封单】')
     expect(res.actionSummary).toContain('买档真空流动性枯竭')
@@ -145,8 +156,8 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('brokenLimitDown', -35, -7.33)
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('⚡ 跌停翘板 · 资金博弈')
-    expect(res.compactLabel).toBe('翘板(察)')
+    expect(res.badgeLabel).toBe('⚡ 翘板博弈')
+    expect(res.compactLabel).toBe('撬板')
     expect(res.tone).toBe('warn')
   })
 
@@ -155,8 +166,8 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('sealedLimitUp', 100, 10.0)
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('🔒 封死涨停 · 顺势持股')
-    expect(res.compactLabel).toBe('涨停(持)')
+    expect(res.badgeLabel).toBe('🚀 封死涨停')
+    expect(res.compactLabel).toBe('涨停')
     expect(res.tone).toBe('bull')
   })
 
@@ -165,8 +176,69 @@ describe('StockDiagnosis engine (diagnoseStock)', () => {
     const sig = mockSignal('brokenLimitUp', 30, 8.0)
     const res = diagnoseStock(q, sig)
 
-    expect(res.badgeLabel).toBe('⚡ 涨停炸板 · 逢高减仓')
-    expect(res.compactLabel).toBe('炸板(减)')
+    expect(res.badgeLabel).toBe('⚡ 涨停炸板')
+    expect(res.compactLabel).toBe('炸板')
     expect(res.tone).toBe('warn')
+  })
+
+  it('correctly maps fallAttribution and multi-concept sectorTags', () => {
+    const q = mockQuote(9.5, 10.0, { changePct: -5.0 })
+    const sig = mockSignal('panicDumping', -70, -2.5, {
+      fallAttribution: {
+        code: 'panic_dumping',
+        tag: '🚨 主力砸盘',
+        reason: '脱离板块独立下杀，内盘卖单持续主动砸盘',
+        guidance: '主力资金单边净流出，严禁伸手接飞刀',
+        severity: 'danger',
+      },
+      sectorLinkage: {
+        sectorCode: 's1',
+        sectorName: '小家电',
+        sectorChangePct: 3.5,
+        deltaRSector: -8.5,
+        deltaRMarket: -4.0,
+        leaderCode: 'sz002032',
+        leaderName: '苏泊尔',
+        leaderChangePct: 5.6,
+        role: '脱离板块补跌',
+        diagnosis: '大幅落后小家电板块',
+        sectors: [
+          {
+            name: '小家电',
+            code: 's1',
+            rank: 2,
+            changePct: 3.5,
+            deltaR: -8.5,
+            leaderName: '苏泊尔',
+            leaderChangePct: 5.6,
+            role: '脱离补跌',
+            stage: 'surging',
+          },
+          {
+            name: '智能家居',
+            code: 's2',
+            rank: 18,
+            changePct: 1.2,
+            deltaR: -6.2,
+            leaderName: '海尔智家',
+            leaderChangePct: 2.1,
+            role: '跟随整理',
+            stage: 'accumulating',
+          },
+        ],
+      },
+    })
+    const res = diagnoseStock(q, sig)
+
+    expect(res.fallAttribution).toBeDefined()
+    expect(res.fallAttribution?.code).toBe('panic_dumping')
+    expect(res.fallAttribution?.tag).toBe('🚨 主力砸盘')
+    expect(res.fallAttribution?.severity).toBe('danger')
+
+    expect(res.sectorTags).toHaveLength(2)
+    expect(res.sectorTags[0].name).toBe('小家电')
+    expect(res.sectorTags[0].stage).toBe('surging')
+    expect(res.sectorTags[1].name).toBe('智能家居')
+    expect(res.sectorTags[1].stage).toBe('accumulating')
   })
 })

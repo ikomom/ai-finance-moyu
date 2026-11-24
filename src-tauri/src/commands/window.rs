@@ -66,10 +66,15 @@ pub fn open_url(url: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("rundll32")
+        let res = std::process::Command::new("rundll32")
             .args(["url.dll,FileProtocolHandler", &url])
-            .spawn()
-            .map_err(|e| format!("打开链接失败: {e}"))?;
+            .spawn();
+        if res.is_err() {
+            std::process::Command::new("cmd")
+                .args(["/c", "start", "", &url])
+                .spawn()
+                .map_err(|e| format!("打开链接失败: {e}"))?;
+        }
     }
     #[cfg(target_os = "macos")]
     {

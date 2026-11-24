@@ -2,7 +2,7 @@ import './StockBadge.css'
 import { diagnoseStock, type StockDiagnosisTone } from '../utils/stockDiagnosis'
 import { useAiDecision } from '../services/useAiDecision'
 import { StockBadgePopover } from './StockBadgePopover'
-import { BaseBadge, combineBadgeText } from './badge'
+import { BaseBadge } from './badge'
 import type { Quote, Snapshot, TrendSignal } from '../types'
 
 export interface StockBadgeProps {
@@ -26,7 +26,10 @@ export function StockBadge(props: StockBadgeProps) {
     () => props.snapshot
   )
 
-  const aiResult = () => ai.result()
+  const aiResult = () => {
+    const res = ai.result()
+    return res && props.quote?.code && res.code === props.quote.code ? res : null
+  }
   const isAiActive = () => ai.isEnabled() && Boolean(aiResult())
 
   const tone = (): StockDiagnosisTone => {
@@ -61,36 +64,25 @@ export function StockBadge(props: StockBadgeProps) {
     if (props.compact) {
       if (isAiActive()) {
         const clean = aiResult()!.actionLabel.replace(/[【】]/g, '')
-        const shortAct = clean.slice(0, 2)
-        const prefix = diag().compactLabel.split('(')[0] || diag().compactLabel
-        return `${prefix}(${shortAct})`
+        return clean.slice(0, 2)
       }
       return diag().compactLabel
     }
 
     if (isAiActive()) {
       const clean = aiResult()!.actionLabel.replace(/[【】]/g, '')
-      const prefix = diag().badgeLabel.split(' · ')[0]
-      if (prefix.includes('跌停') || prefix.includes('涨停') || prefix.includes('炸板') || prefix.includes('翘板')) {
-        return diag().badgeLabel
-      }
-      return combineBadgeText(prefix, clean, diag().badgeLabel.split(' · ')[1])
+      const icon = diag().badgeLabel.split(' ')[0] || '●'
+      return `${icon} ${clean}`
     }
 
-    if (ai.isEnabled() && ai.loading()) {
-      const prefix = diag().badgeLabel.split(' · ')[0]
-      return `${prefix} · 研判中...`
-    }
-
+    // 始终零延迟呈现底层确定性量化决策，绝不阻塞显示“研判中...”
     return diag().badgeLabel
   }
 
   const shortText = () => {
     if (isAiActive()) {
       const clean = aiResult()!.actionLabel.replace(/[【】]/g, '')
-      const shortAct = clean.slice(0, 2)
-      const prefix = diag().compactLabel.split('(')[0] || diag().compactLabel
-      return `${prefix}(${shortAct})`
+      return clean.slice(0, 2)
     }
     return diag().compactLabel
   }

@@ -1,4 +1,4 @@
-import { AVG, DOWN, UP } from '../theme'
+import { AVG, DOWN, UP, getChartTheme } from '../theme'
 import { isValidAvg } from '../scale'
 import type { UnifiedPricePoint } from './trendData'
 
@@ -10,18 +10,21 @@ export interface DrawTrendPriceOptions {
   xOf: (slot: number) => number
   yOf: (price: number) => number
   yPre: number
+  isIndex?: boolean
 }
 
 export function drawTrendPrice(
   opts: DrawTrendPriceOptions
 ): { lastX: number; lastY: number; priceColor: string } | null {
-  const { ctx, points, preClose, lastPrice, xOf, yOf, yPre } = opts
+  const { ctx, points, preClose, lastPrice, xOf, yOf, yPre, isIndex } = opts
   if (points.length === 0) return null
 
+  const theme = getChartTheme()
   const lastPt = points[points.length - 1]
   const currentPrice = lastPrice ?? lastPt.price
   const up = currentPrice >= preClose
-  const priceColor = up ? UP : DOWN
+  const priceColor = isIndex ? theme.indexWhite : (up ? UP : DOWN)
+  const avgColor = isIndex ? theme.indexYellow : AVG
 
   const path = new Path2D()
   const fill = new Path2D()
@@ -64,8 +67,8 @@ export function drawTrendPrice(
       if (i === 0) avgPath.moveTo(x, y)
       else avgPath.lineTo(x, y)
     })
-    ctx.strokeStyle = AVG
-    ctx.lineWidth = 1
+    ctx.strokeStyle = avgColor
+    ctx.lineWidth = isIndex ? 1.2 : 1
     ctx.stroke(avgPath)
   }
 

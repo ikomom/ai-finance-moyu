@@ -92,6 +92,11 @@ export function MiniBody(props: MiniBodyProps) {
   const isAuctionSession = () => ['CallAuctionCancelable', 'CallAuctionLocked', 'PreTrade'].includes(s().status?.session ?? '')
   const currentTrades = () => (!s().config.enablePortfolio || isIndex()) ? [] : (s().trades ?? []).filter((t) => t.code === q().code)
   const showOrderBook = () => !!(s().config.enablePortfolio && !isIndex() && activeMode() !== 'kline' && activeMode() !== 'five_day' && !props.historyDrillDay?.())
+  const matchingIndex = () => {
+    if (!isIndex()) return undefined
+    const clean = q().code.replace(/^(sh|sz|bj)/, '')
+    return s().marketOverview?.indices?.find((i) => i.code === clean || q().code.includes(i.code))
+  }
 
   return (
     <>
@@ -207,6 +212,9 @@ export function MiniBody(props: MiniBodyProps) {
                     macdParams={indicatorParams().macd}
                     trades={currentTrades()}
                     volumeScaleMode={s().config.volumeScaleMode}
+                    isIndex={isIndex()}
+                    unweightedChangePct={matchingIndex()?.unweightedChangePct}
+                    yellowLineSpread={matchingIndex()?.yellowLineSpread}
                     onHover={(point, extra) => { setHoveredPoint(point); setHoveredPointExtra(extra ? { ...extra, date: props.historyDrillDay?.()?.date, preClose: props.historyDrillDay?.()?.preClose } : null) }}
                   />
                 }

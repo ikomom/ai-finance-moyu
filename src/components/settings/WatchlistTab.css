@@ -131,3 +131,122 @@
   color: var(--color-accent-light);
 }
 
+/* API Key Configuration Section */
+.api-key-section {
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  margin-top: 12px;
+}
+
+.api-key-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.api-key-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.api-key-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.api-key-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.api-key-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+.api-key-status.configured {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+:root[data-theme="dark"] .api-key-status.configured,
+:root[data-theme="ocean"] .api-key-status.configured,
+:root[data-theme="cyberpunk"] .api-key-status.configured {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+.api-key-status.unconfigured {
+  background: rgba(120, 120, 128, 0.08);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.api-key-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-key-input {
+  flex: 1;
+  background: var(--surface-input-bg);
+  border: 1px solid var(--surface-input-border);
+  color: var(--fg);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  transition: all var(--transition-fast);
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.api-key-help-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.api-key-help-text {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.api-key-help-text code {
+  font-size: 10.5px;
+  background: rgba(120, 120, 128, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--fg);
+}
+
+.api-key-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  margin-left: 4px;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.api-key-link:hover {
+  text-decoration: underline;
+  color: var(--color-accent-light);
+}
+
+

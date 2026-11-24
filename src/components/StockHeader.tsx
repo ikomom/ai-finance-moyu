@@ -103,8 +103,6 @@ export function StockHeader(props: StockHeaderProps) {
     <div
       ref={headerRef}
       class="stock-header-container"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       {/* 头部元数据栏 */}
       <div class="mini-meta" data-tauri-drag-region>
@@ -119,6 +117,8 @@ export function StockHeader(props: StockHeaderProps) {
               class="stats-text"
               classList={{ pinned: isPinned() }}
               title="日内极值 (悬停预览核心盘口，点击锁定)"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
               onClick={(e) => {
                 e.stopPropagation()
                 togglePin()
@@ -159,6 +159,8 @@ export function StockHeader(props: StockHeaderProps) {
         <MicroTapePopover
           quote={props.quote!}
           isPinned={isPinned()}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
           onClose={() => {
             setIsPinned(false)
             setShowTape(false)

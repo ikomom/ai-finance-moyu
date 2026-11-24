@@ -1,12 +1,14 @@
 //! Market Overview data fetching from Eastmoney, Tencent, and iWenCai public endpoints.
 
 pub mod breadth;
+pub mod concepts_db;
 pub mod fetcher;
 pub mod global;
 pub mod sector_linkage;
 pub mod types;
 pub mod wencai;
 
+pub use concepts_db::*;
 pub use fetcher::*;
 pub use global::*;
 pub use sector_linkage::*;
@@ -145,5 +147,41 @@ v_gzFTSE="FTSE~英国富时100指数~2026-10-16 16:16:59~10826.96~-13.39~-0.12~E
         // Resetting circuit breaker clears it
         fetcher.reset_quota_circuit_breaker();
         assert!(fetcher.quota_exhausted_date.lock().unwrap_or_else(|e| e.into_inner()).is_none());
+    }
+
+    #[test]
+    fn test_estimate_breadth_from_market() {
+        use super::fetcher::estimate_breadth_from_market;
+        let positive_sectors: Vec<SectorItem> = (0..20)
+            .map(|i| SectorItem {
+                code: format!("s{i}"),
+                name: format!("行业{i}"),
+                change_pct: 2.0,
+                up_count: 0,
+                down_count: 0,
+                lead_stock_name: "".into(),
+                lead_stock_code: "".into(),
+                lead_stock_zdf: 0.0,
+            })
+            .collect();
+        let (up, down, flat) = estimate_breadth_from_market(&positive_sectors, &[]);
+        assert!(up >= 4000, "100% positive sectors should estimate over 4000 advancing stocks, got {up}");
+        assert!(down < 1000, "100% positive sectors should estimate fewer than 1000 declining stocks, got {down}");
+        assert_eq!(up + down + flat, 5350);
+
+        let mixed_sectors: Vec<SectorItem> = (0..20)
+            .map(|i| SectorItem {
+                code: format!("s{i}"),
+                name: format!("行业{i}"),
+                change_pct: if i < 10 { 1.5 } else { -1.5 },
+                up_count: 0,
+                down_count: 0,
+                lead_stock_name: "".into(),
+                lead_stock_code: "".into(),
+                lead_stock_zdf: 0.0,
+            })
+            .collect();
+        let (up_m, down_m, _flat_m) = estimate_breadth_from_market(&mixed_sectors, &[]);
+        assert!((up_m as i32 - down_m as i32).abs() < 500, "balanced sectors should estimate roughly balanced breadth");
     }
 }

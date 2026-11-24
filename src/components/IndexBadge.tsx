@@ -29,6 +29,7 @@ export function IndexBadge(props: IndexBadgeProps) {
   return (
     <BaseBadge
       label={props.compact ? diag().compactLabel : diag().badgeLabel}
+      shortLabel={props.compact ? undefined : diag().compactLabel}
       tone={diag().tone}
       compact={props.compact}
       showDetails={props.showDetails}
@@ -54,16 +55,36 @@ export function IndexBadge(props: IndexBadgeProps) {
           </div>
 
           {/* 3. 涨跌分布红绿条 */}
+          <div class="index-breadth-header">
+            <span class="breadth-scope-lbl">全市场情绪</span>
+            <span class="breadth-scope-counts">
+              <span class="breadth-tag up">涨 {diag().upCount} ({diag().upPct}%)</span>
+              <span class="sep">·</span>
+              <span class="breadth-tag down">跌 {diag().downCount} ({diag().downPct}%)</span>
+              <Show when={diag().flatCount > 0}>
+                <span class="sep">·</span>
+                <span class="breadth-tag flat">平 {diag().flatCount}</span>
+              </Show>
+            </span>
+          </div>
           <div class="index-breadth-row">
-            <span class="breadth-tag up">涨 {diag().upCount} ({diag().upPct}%)</span>
             <div class="index-breadth-bar">
               <div class="breadth-fill up" style={{ width: `${diag().upPct}%` }} />
               <div class="breadth-fill down" style={{ width: `${diag().downPct}%` }} />
             </div>
-            <span class="breadth-tag down">跌 {diag().downCount} ({diag().downPct}%)</span>
-            <Show when={diag().flatCount > 0}>
-              <span class="breadth-tag flat">平 {diag().flatCount}</span>
-            </Show>
+          </div>
+
+          {/* 3.5 黄白线分化分析 (Scissors Spread) */}
+          <div class="index-spread-card">
+            <div class="spread-card-header">
+              <span class="spread-title">⚡ 黄白线分化 (等权 vs 加权)</span>
+              <span class={`spread-badge ${diag().yellowWhiteState}`}>
+                {diag().yellowWhiteLabel}
+              </span>
+            </div>
+            <div class="spread-card-detail">
+              {diag().yellowWhiteDetail}
+            </div>
           </div>
 
           {/* 4. 两列结构卡片 (2-Column Grid Cards) */}
@@ -72,13 +93,13 @@ export function IndexBadge(props: IndexBadgeProps) {
             <div class="index-grid-card">
               <div class="grid-card-title">📊 资金量能</div>
               <div class="grid-card-row">
-                <span class="row-lbl">两市成交</span>
-                <span class="row-val font-mono">{diag().totalTurnoverText}</span>
+                <span class="row-lbl">本指成交</span>
+                <span class="row-val font-mono">{diag().currentIndexTurnoverText ?? diag().totalTurnoverText}</span>
               </div>
               <div class="grid-card-row" title={diag().turnoverDeltaDetail}>
-                <span class="row-lbl">量能变动</span>
-                <span class={`row-val font-mono ${diag().isVolumeSurge ? 'bull' : 'warn'}`}>
-                  {diag().turnoverDeltaText}
+                <span class="row-lbl">两市总计</span>
+                <span class="row-val font-mono text-truncate">
+                  {diag().totalTurnoverText}
                 </span>
               </div>
             </div>
@@ -99,31 +120,7 @@ export function IndexBadge(props: IndexBadgeProps) {
             </div>
           </div>
 
-          {/* 5. 领涨主线板块 */}
-          <Show when={diag().styleInfo.topSectors.length > 0}>
-            <div class="index-sectors-card">
-              <div class="grid-card-title">🔥 领涨行业</div>
-              <div class="sectors-grid-list">
-                <For each={diag().styleInfo.topSectors.slice(0, 2)}>
-                  {(sec) => (
-                    <div class="sector-mini-item">
-                      <span class="sec-name">{sec.name}</span>
-                      <span class={`sec-pct ${trendClass(sec.pct)}`}>
-                        {sec.pct >= 0 ? '+' : ''}{sec.pct.toFixed(1)}%
-                      </span>
-                      <Show when={sec.leader}>
-                        <span class="sec-leader" title={sec.leader}>
-                          {sec.leader}
-                        </span>
-                      </Show>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </div>
-          </Show>
-
-          {/* 6. 三大指数横向对比单行 */}
+          {/* 5. 三大指数横向对比单行 */}
           <Show when={majorIndices().length > 0}>
             <div class="index-indices-footer">
               <For each={majorIndices()}>

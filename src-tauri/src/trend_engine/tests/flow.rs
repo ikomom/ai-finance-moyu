@@ -78,6 +78,7 @@
             leader_change_pct: 0.8,
             role: "逆势抗跌核心".into(),
             diagnosis: "逆势走强，资金承接良好".into(),
+            sectors: vec![],
         };
 
         let sig = analyze_trend(&q, Some(&t), Some(linkage)).unwrap();

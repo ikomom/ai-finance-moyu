@@ -10,12 +10,14 @@
 //! - Composite score (-100 to +100) and human-readable diagnosis
 
 mod analyze;
+pub mod fall_attribution;
 mod limit_board;
 mod patterns;
 pub mod sector_style;
 mod types;
 
 pub use analyze::*;
+pub use fall_attribution::*;
 pub use sector_style::*;
 pub use types::*;
 

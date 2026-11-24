@@ -124,10 +124,11 @@ export function Mini(props: { flash: boolean }) {
     onClearHover: () => { setHoveredPoint(null); setHoveredPointExtra(null) },
   })
 
-  // Load disk archived dates on security switch with negative caching
+  // Load disk archived dates on demand (only for five_day/kline views or active history drill)
   createEffect(() => {
     const code = quote()?.code
-    if (code && !(code in diskDatesCache())) {
+    const mode = activeMode()
+    if ((mode === 'five_day' || mode === 'kline' || drill.historyDrillDay()) && code && !(code in diskDatesCache())) {
       void fetchAvailableHistoryDates(code).then((dates) => {
         setDiskDatesCache((prev) => ({ ...prev, [code]: dates ?? [] }))
       })
@@ -170,14 +171,19 @@ export function Mini(props: { flash: boolean }) {
   })
 
   let lastTrendTarget = ''
+  let trendDebounceTimer: ReturnType<typeof setTimeout> | undefined
   createEffect(() => {
     const code = item()?.code
     if (code && code !== lastTrendTarget) {
       lastTrendTarget = code
-      setTrendTargets([code])
+      if (trendDebounceTimer) clearTimeout(trendDebounceTimer)
+      trendDebounceTimer = setTimeout(() => {
+        setTrendTargets([code])
+      }, 100)
     }
   })
 
+  let lastWheelTime = 0
   const handleWheel = (e: WheelEvent) => {
     if (drill.historyDrillDay()) {
       e.preventDefault(); e.stopPropagation()
@@ -187,6 +193,9 @@ export function Mini(props: { flash: boolean }) {
     const n = quotes().length
     if (n <= 1) return
     e.preventDefault()
+    const now = Date.now()
+    if (now - lastWheelTime < 60) return
+    lastWheelTime = now
     if (e.deltaY > 0) setSelected((selectedIndex() + 1) % n)
     else if (e.deltaY < 0) setSelected((selectedIndex() - 1 + n) % n)
   }
