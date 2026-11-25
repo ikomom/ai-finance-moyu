@@ -1,4 +1,5 @@
 import { createSignal, Show } from 'solid-js'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import './PortfolioModal.css'
 import type { BrokerAccount } from '../../types/portfolio'
 import { fmtCurrency } from '../../types'
@@ -15,6 +16,10 @@ export function PortfolioTransferModal(props: TransferModalProps) {
   const [amount, setAmount] = createSignal<number>(10000)
   const [submitting, setSubmitting] = createSignal(false)
   const [errorMsg, setErrorMsg] = createSignal<string | null>(null)
+
+  useBackInterceptor(() => Boolean(props.isOpen && props.broker), () => {
+    props.onClose()
+  })
 
   const maxWithdraw = () => props.broker?.availableCash ?? 0
 

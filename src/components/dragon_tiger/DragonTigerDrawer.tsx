@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid
 import './DragonTigerDrawer.css'
 import type { DragonTigerSeat, StockDetailInfo } from './types'
 import { fetchStockDragonTiger } from '../../tauri'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import { navigateToStock } from '../../store'
 import { SeatDetailView } from './SeatDetailView'
 import { SeatRow } from './SeatRow'
@@ -31,6 +32,9 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
   const [highlightBranch, setHighlightBranch] = createSignal(props.highlightBranch)
   const [hoveredPairId, setHoveredPairId] = createSignal<string | null>(null)
   const [selectedSeat, setSelectedSeat] = createSignal<{ branchName: string; tradeDate?: string } | null>(null)
+  const [stockStack, setStockStack] = createSignal<
+    Array<{ code: string; name?: string; highlightBranch?: string }>
+  >([])
 
   const [data, setData] = createSignal<StockDetailInfo | null>(null)
   const [loading, setLoading] = createSignal(true)
@@ -39,6 +43,7 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
     setCurrentCode(props.code)
     setCurrentName(props.name)
     setHighlightBranch(props.highlightBranch)
+    setStockStack([])
   })
 
   let lastLoadedCode = ''
@@ -54,14 +59,31 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
     }
   }
 
+  const handleStepBack = () => {
+    if (selectedSeat()) {
+      setSelectedSeat(null)
+      return
+    }
+    const stack = stockStack()
+    if (stack.length > 0) {
+      const prev = stack[stack.length - 1]
+      setStockStack(stack.slice(0, -1))
+      setHighlightBranch(prev.highlightBranch)
+      setCurrentCode(prev.code)
+      setCurrentName(prev.name)
+      lastLoadedCode = ''
+      void loadData(prev.code)
+      return
+    }
+    props.onClose()
+  }
+
+  useBackInterceptor(() => true, handleStepBack)
+
   onMount(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (selectedSeat()) {
-          setSelectedSeat(null)
-        } else {
-          props.onClose()
-        }
+        handleStepBack()
       }
     }
     window.addEventListener('keydown', handleKey)
@@ -80,7 +102,7 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
       class="lhb-drawer-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          selectedSeat() ? setSelectedSeat(null) : props.onClose()
+          handleStepBack()
         }
       }}
     >
@@ -106,6 +128,10 @@ export function DragonTigerDrawer(props: DragonTigerDrawerProps) {
               tradeDate={selectedSeat()!.tradeDate}
               onBack={() => setSelectedSeat(null)}
               onSelectStock={(code, name) => {
+                setStockStack((prev) => [
+                  ...prev,
+                  { code: currentCode(), name: currentName(), highlightBranch: highlightBranch() },
+                ])
                 const seatToHighlight = selectedSeat()?.branchName
                 setSelectedSeat(null)
                 if (seatToHighlight) setHighlightBranch(seatToHighlight)

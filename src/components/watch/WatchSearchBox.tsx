@@ -3,6 +3,7 @@ import { Portal } from 'solid-js/web'
 import { invoke } from '@tauri-apps/api/core'
 import type { SearchResult, WatchGroup, WatchItem } from '../../types'
 import { DEFAULT_GROUP_ID } from '../../services/watchlistGroups'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import { SelectMenu } from '../SelectMenu'
 
 export interface WatchSearchBoxProps {
@@ -24,6 +25,13 @@ export function WatchSearchBox(props: WatchSearchBoxProps) {
 
   let searchBoxRef: HTMLDivElement | undefined
   let debounceTimer: number | undefined
+
+  useBackInterceptor(showDropdown, () => {
+    setShowDropdown(false)
+  })
+  useBackInterceptor(() => Boolean(pendingTargetItem()), () => {
+    setPendingTargetItem(null)
+  })
 
   const handleGlobalMouseDown = (e: MouseEvent) => {
     if (searchBoxRef && !searchBoxRef.contains(e.target as Node)) {

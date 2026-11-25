@@ -5,7 +5,7 @@ import { Grip } from '../components/Grip'
 import { PillTabs } from '../components/PillTabs'
 import { GlobalDetail } from './GlobalDetail'
 import { useSubchartMode } from '../hooks/useSubchartMode'
-import { snapshot } from '../store'
+import { selectGlobalIndex, selectedGlobalIndex, setSelectedGlobalIndex, snapshot } from '../store'
 import {
   fmtHHMM,
   fmtVol,
@@ -28,7 +28,6 @@ const getSavedGlobalKlinePeriod = (): KlinePeriod => {
 }
 
 // Module-level persistent state across unmount/remount (dock collapse/expand)
-const [selectedGlobalIndex, setSelectedGlobalIndex] = createSignal(0)
 const [persistedChartTab, setPersistedChartTab] = createSignal<'trend' | 'kline'>('trend')
 const [globalKlinePeriod, setGlobalKlinePeriod] = createSignal<KlinePeriod>(getSavedGlobalKlinePeriod())
 
@@ -260,7 +259,7 @@ export function Global(props: { flash: boolean }) {
         <PillTabs
           items={indices().map((it) => ({ id: it.code, label: it.name, title: `${it.name} (${it.code})` }))}
           selectedIndex={selectedIndex()}
-          onSelect={setSelectedIndex}
+          onSelect={selectGlobalIndex}
         />
       </Show>
 

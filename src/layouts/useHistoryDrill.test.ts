@@ -1,9 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createRoot, createSignal } from 'solid-js'
+import {
+  clearBackInterceptorsForTest,
+  hasActiveBackInterceptor,
+  tryConsumeBack,
+} from '../services/backInterceptor'
 import { useHistoryDrill } from './useHistoryDrill'
 import type { DayTrend, MultiDayTrend } from '../types'
 
 describe('useHistoryDrill', () => {
+  beforeEach(() => {
+    clearBackInterceptorsForTest()
+  })
   const dummyDays: DayTrend[] = [
     { date: '20261109', preClose: 10, points: [] },
     { date: '20261110', preClose: 10, points: [] },
@@ -89,6 +97,34 @@ describe('useHistoryDrill', () => {
       // Step backward (-1)
       drill.stepHistoryDay(-1)
       expect(drill.historyDrillDay()?.date).toBe('20261110')
+
+      dispose()
+    })
+  })
+
+  it('registers back interceptor only while drilling down and exits without leaking', () => {
+    createRoot((dispose) => {
+      const [code] = createSignal<string | undefined>('sh600000')
+      const [multiCache] = createSignal(dummyMultiTrend)
+      let currentManualMode = 'kline'
+
+      const drill = useHistoryDrill({
+        quoteCode: code,
+        multiTrendCache: multiCache,
+        setManualMode: (m) => { currentManualMode = m },
+        onClearHover: () => {},
+      })
+
+      expect(hasActiveBackInterceptor()).toBe(false)
+      expect(tryConsumeBack()).toBe(false)
+
+      drill.enterHistoryDrill(dummyDays[1], 'kline')
+      expect(hasActiveBackInterceptor()).toBe(true)
+
+      expect(tryConsumeBack()).toBe(true)
+      expect(drill.historyDrillDay()).toBeNull()
+      expect(currentManualMode).toBe('kline')
+      expect(hasActiveBackInterceptor()).toBe(false)
 
       dispose()
     })

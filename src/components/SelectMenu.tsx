@@ -4,6 +4,7 @@
 //! 而挂件窗口没有引入 Tailwind（只有设置窗口有），所以这里必须手写样式。
 
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { useBackInterceptor } from '../services/backInterceptor'
 import './SelectMenu.css'
 
 export interface SelectOption {
@@ -25,6 +26,10 @@ export interface SelectMenuProps {
 export function SelectMenu(props: SelectMenuProps) {
   const [open, setOpen] = createSignal(false)
   let containerRef: HTMLDivElement | undefined
+
+  useBackInterceptor(open, () => {
+    setOpen(false)
+  })
 
   const currentLabel = () =>
     props.options.find((o) => o.value === props.value)?.label ?? props.placeholder ?? '请选择'

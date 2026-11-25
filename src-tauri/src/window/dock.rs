@@ -8,6 +8,7 @@ use crate::poller;
 use crate::state::{AppState, DockEdge};
 use super::geometry::{dock_collapsed_geometry, size_for, suppress_move, suppress_resize, DISPLAY};
 use super::platform_win32::{disable_maximize, set_window_bounds};
+use super::side_buttons::set_side_button_main_collapsed;
 
 pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), String> {
     let Some(win) = app.get_webview_window(DISPLAY) else {
@@ -93,6 +94,7 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
             let mut dock = state.dock_state.lock().unwrap_or_else(|e| e.into_inner());
             dock.collapsed = true;
         }
+        set_side_button_main_collapsed(true);
     } else {
         let (expanded_x, expanded_y) = match current_dock.edge {
             DockEdge::Right => (mpos.x + msize.width - w, normal_y),
@@ -110,6 +112,7 @@ pub fn set_dock_collapsed_inner(app: &AppHandle, collapse: bool) -> Result<(), S
             let mut dock = state.dock_state.lock().unwrap_or_else(|e| e.into_inner());
             dock.collapsed = false;
         }
+        set_side_button_main_collapsed(false);
 
         let is_mini = {
             let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());

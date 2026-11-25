@@ -207,6 +207,7 @@ pub fn on_moved(app: &AppHandle, pos: tauri::PhysicalPosition<i32>, scale: f64) 
             dock.collapsed = false;
             cfg.clone()
         };
+        super::side_buttons::set_side_button_main_collapsed(false);
         let _ = config::save(&app, &cfg);
         poller::emit_snapshot(&app);
     });

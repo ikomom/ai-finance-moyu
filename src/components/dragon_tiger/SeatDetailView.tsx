@@ -6,6 +6,7 @@ import { createSignal, For, onMount, Show } from 'solid-js'
 import './SeatDetailView.css'
 import type { SeatDetailInfo, SeatOperationItem } from './types'
 import { fetchSeatDragonTiger } from '../../tauri'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import { cleanBranchName, shortenLhbReason } from './DragonTigerDrawer'
 import { StockTrendView } from './StockTrendView'
 import { resolveSeatLabel } from './seatDict'
@@ -25,6 +26,10 @@ export function SeatDetailView(props: SeatDetailViewProps) {
   const [loading, setLoading] = createSignal(true)
   /** Non-null while the intraday chart of one of this seat's stocks is open. */
   const [trendTarget, setTrendTarget] = createSignal<{ code: string; name: string } | null>(null)
+
+  useBackInterceptor(() => true, () => {
+    props.onBack()
+  })
 
   onMount(async () => {
     try {

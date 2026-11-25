@@ -10,11 +10,14 @@ import { listen } from '@tauri-apps/api/event'
 
 import { inTauri } from './tauri'
 import { ALL_GROUP_ID, DEFAULT_GROUP_ID, filterWatchlistByGroup } from './services/watchlistGroups'
+import { buildViewState, resolveViewTarget } from './services/viewStateResolver'
 import {
   navigateBack,
   navigateForward,
   recordExplicitJump,
   recordLayoutChange as recordHistoryLayoutChange,
+  type ApplyStateOptions,
+  type MiniViewMode,
   type ViewState,
 } from './services/viewHistory'
 import type { Layout, Snapshot } from './types'
@@ -27,67 +30,51 @@ export interface ToastAlert {
 }
 
 const [snapshot, setSnapshot] = createSignal<Snapshot | null>(null)
-/** Which security the mini and list layouts detail. */
 const [selected, setSelected] = createSignal(0)
-/** Bumped when a threshold is crossed, so the card can flash. */
+const [selectedGlobalIndex, setSelectedGlobalIndex] = createSignal(0)
 const [alertTick, setAlertTick] = createSignal(0)
-/** Transient structured message shown at the bottom of the widget. */
 const [toastAlert, setToastAlert] = createSignal<ToastAlert | null>(null)
 const toastMsg = () => toastAlert()?.message ?? null
-/** Discovered update version for non-intrusive notification */
 const [newVersionAvailable, setNewVersionAvailable] = createSignal<string | null>(null)
-/** Force mini layout to switch subchart mode on navigation */
-const [miniModeOverride, setMiniModeOverride] = createSignal<'trend' | 'kline' | 'auction' | null>(null)
+const [miniModeOverride, setMiniModeOverride] = createSignal<MiniViewMode | null>(null)
+
+let activeMiniMode: MiniViewMode = 'trend'
+
+export function setActiveMiniMode(mode: MiniViewMode): void {
+  activeMiniMode = mode
+}
 
 function getCurrentViewState(): ViewState | null {
   const s = snapshot()
-  if (!s) return null
-  const watchlist = s.config.watchlist
-  const activeGroupId = s.config.activeGroupId ?? ALL_GROUP_ID
-  const filtered = filterWatchlistByGroup(watchlist, activeGroupId)
-  const currentCode = filtered[selectedIndex()]?.code
-  return {
-    layout: s.config.layout,
-    code: currentCode,
-    groupId: activeGroupId,
-  }
+  return s ? buildViewState(s, selectedIndex(), selectedGlobalIndex(), activeMiniMode) : null
 }
 
-function applyViewState(target: ViewState): void {
+function applyViewState(target: ViewState, opts?: ApplyStateOptions): void {
   const s = snapshot()
   if (!s) return
-  const watchlist = s.config.watchlist
 
-  const effectiveGroupId = target.groupId ?? s.config.activeGroupId ?? ALL_GROUP_ID
-  if (s.config.activeGroupId !== effectiveGroupId) {
-    void invoke('set_active_watch_group', { id: effectiveGroupId }).catch(() => {})
+  const resolved = resolveViewTarget(s, target)
+  const nextGroup = resolved.effectiveGroupId === ALL_GROUP_ID ? null : resolved.effectiveGroupId
+
+  if (resolved.groupChanged) {
+    void invoke('set_active_watch_group', { id: nextGroup }).catch(() => {})
   }
+  if (resolved.nextGlobalIndex !== undefined) setSelectedGlobalIndex(resolved.nextGlobalIndex)
+  if (resolved.nextSelected !== undefined) setSelected(resolved.nextSelected)
 
-  if (target.code) {
-    const filtered = filterWatchlistByGroup(watchlist, effectiveGroupId)
-    const idx = filtered.findIndex((w) => w.code.toLowerCase() === target.code!.toLowerCase())
-    if (idx !== -1) {
-      setSelected(idx)
+  if (target.layout === 'mini') {
+    if (target.mode) {
+      activeMiniMode = target.mode
+      setMiniModeOverride(target.mode)
     }
-  }
-
-  if (target.mode) {
-    setMiniModeOverride(target.mode)
-  }
-
-  if (target.layout !== s.config.layout) {
-    void invoke('set_layout', { layout: target.layout })
   } else {
-    setSnapshot((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        config: {
-          ...prev.config,
-          activeGroupId: effectiveGroupId,
-        },
-      }
-    })
+    setMiniModeOverride(null)
+  }
+
+  if (target.layout !== s.config.layout || opts?.layoutChanged) {
+    void invoke('set_layout', { layout: target.layout })
+  } else if (resolved.groupChanged) {
+    setSnapshot((prev) => (prev ? { ...prev, config: { ...prev.config, activeGroupId: nextGroup } } : prev))
   }
 }
 
@@ -103,14 +90,42 @@ export function navigateLayoutForward(): void {
   navigateForward({ getCurrentState: getCurrentViewState, applyState: applyViewState })
 }
 
+export function selectMiniStock(index: number): void {
+  const s = snapshot()
+  if (!s) return
+  const activeGroupId = s.config.activeGroupId ?? ALL_GROUP_ID
+  const target = filterWatchlistByGroup(s.config.watchlist, activeGroupId)[index]
+  const currentState = getCurrentViewState()
+  if (currentState && target) {
+    recordExplicitJump(currentState, {
+      layout: 'mini',
+      code: target.code,
+      mode: activeMiniMode,
+      groupId: activeGroupId,
+    })
+  }
+  setSelected(index)
+}
+
+export function selectGlobalIndex(index: number): void {
+  const target = snapshot()?.marketOverview?.globalIndices?.[index]
+  const currentState = getCurrentViewState()
+  if (currentState && target) {
+    recordExplicitJump(currentState, { layout: 'global', code: target.code })
+  }
+  setSelectedGlobalIndex(index)
+}
+
 export {
   alertTick,
   miniModeOverride,
   newVersionAvailable,
   selected,
+  selectedGlobalIndex,
   setMiniModeOverride,
   setNewVersionAvailable,
   setSelected,
+  setSelectedGlobalIndex,
   setSnapshot,
   snapshot,
   toastAlert,
@@ -128,14 +143,12 @@ export function clearToast(): void {
   setToastAlert(null)
 }
 
-/**
- * Navigate to a specific stock in Mini layout:
- * - Selects the stock in the watchlist
- * - Switches manualMode to the requested subchart (default 'trend')
- * - Expands the dock if collapsed
- * - Switches layout to mini and records layout change
- */
-export function navigateToStock(code: string, mode: 'trend' | 'kline' | 'auction' = 'trend'): void {
+/** Navigate to a specific stock in Mini layout, recording view history cleanly. */
+export function navigateToStock(
+  code: string,
+  mode: MiniViewMode = 'trend',
+  opts?: { fromLayout?: Layout; layoutApplied?: boolean }
+): void {
   const s = snapshot()
   if (!s) return
   const watchlist = s.config.watchlist
@@ -149,58 +162,48 @@ export function navigateToStock(code: string, mode: 'trend' | 'kline' | 'auction
     void invoke('set_active_watch_group', { id: ALL_GROUP_ID }).catch(() => {})
   }
 
+  const needLayoutSwitch = s.config.layout !== 'mini'
   const currentState = getCurrentViewState()
   if (currentState) {
-    recordExplicitJump(currentState, {
-      layout: 'mini',
-      code: targetItem.code,
-      mode,
-      groupId: effectiveGroupId,
-    })
+    recordExplicitJump(
+      currentState,
+      { layout: 'mini', code: targetItem.code, mode, groupId: effectiveGroupId },
+      { expectLayoutSnapshot: needLayoutSwitch || opts?.layoutApplied, alreadySwitchedFrom: opts?.fromLayout }
+    )
   }
 
-  const filtered = filterWatchlistByGroup(watchlist, effectiveGroupId)
-  const idx = filtered.findIndex((w) => w.code.toLowerCase() === code.toLowerCase())
-  if (idx !== -1) {
-    setSelected(idx)
-  }
+  const idx = filterWatchlistByGroup(watchlist, effectiveGroupId).findIndex(
+    (w) => w.code.toLowerCase() === code.toLowerCase()
+  )
+  if (idx !== -1) setSelected(idx)
+  activeMiniMode = mode
   setMiniModeOverride(mode)
 
-  if (s.config.layout !== 'mini') {
-    recordLayoutChange('mini')
+  if (needLayoutSwitch && !opts?.layoutApplied) {
     void invoke('set_layout', { layout: 'mini' })
   } else {
-    setSnapshot((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        config: {
-          ...prev.config,
-          activeGroupId: effectiveGroupId,
-        },
-      }
-    })
-    if (s.dock?.collapsed) {
+    setSnapshot((prev) =>
+      prev ? { ...prev, config: { ...prev.config, activeGroupId: effectiveGroupId } } : prev
+    )
+    if (s.dock?.collapsed && !opts?.layoutApplied) {
       void invoke('set_dock_collapsed', { collapsed: false })
     }
   }
 }
 
-/**
- * The selection, clamped to the current watchlist. Derived rather than clamped
- * in place, so removing the selected stock can't leave a dangling index.
- */
+/** The selection, clamped to the active group's watchlist (falling back to quotes length). */
 export function selectedIndex(): number {
-  const n = snapshot()?.quotes.length ?? 0
-  if (n === 0) return 0
-  return Math.min(Math.max(selected(), 0), n - 1)
+  const s = snapshot()
+  if (!s) return 0
+  const activeGroupId = s.config.activeGroupId ?? ALL_GROUP_ID
+  const filteredLen = filterWatchlistByGroup(s.config.watchlist, activeGroupId).length
+  const n = filteredLen > 0 ? filteredLen : s.quotes.length
+  return n === 0 ? 0 : Math.min(Math.max(selected(), 0), n - 1)
 }
 
 /** Load initial state and subscribe to updates. Resolves to an error message. */
 export async function initStore(): Promise<string | null> {
   if (!inTauri()) {
-    // Loaded on demand so the ~330 lines of sample data never reach the bundle
-    // that runs inside Tauri, where this branch is unreachable.
     const { demoSnapshot } = await import('./demo')
     const snap = demoSnapshot()
     setSnapshot(snap)
@@ -223,19 +226,23 @@ export async function initStore(): Promise<string | null> {
   await listen<Array<{ code: string; name: string; message: string }>>('alert', (e) => {
     setAlertTick((n) => n + 1)
     const first = e.payload?.[0]
-    if (first?.message) {
-      showToast(first.message, first.code, first.name)
-    }
+    if (first?.message) showToast(first.message, first.code, first.name)
   })
-  await listen<{ code: string; mode?: 'trend' | 'kline' | 'auction' }>('navigate_stock', (e) => {
+  await listen<{
+    code: string
+    mode?: MiniViewMode
+    fromLayout?: Layout
+    layoutApplied?: boolean
+  }>('navigate_stock', (e) => {
     if (e.payload?.code) {
-      navigateToStock(e.payload.code, e.payload.mode ?? 'trend')
+      navigateToStock(e.payload.code, e.payload.mode ?? 'trend', {
+        fromLayout: e.payload.fromLayout,
+        layoutApplied: e.payload.layoutApplied,
+      })
     }
   })
   await listen<{ message: string }>('toast-message', (e) => {
-    if (e.payload?.message) {
-      showToast(e.payload.message)
-    }
+    if (e.payload?.message) showToast(e.payload.message)
   })
 
   return null

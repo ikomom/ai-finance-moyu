@@ -1,5 +1,6 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { listen } from '@tauri-apps/api/event'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import { snapshot } from '../../store'
 import { DragonTigerDrawer } from '../dragon_tiger/DragonTigerDrawer'
 import { MiniTradeDrawer } from '../portfolio/MiniTradeDrawer'
@@ -19,6 +20,17 @@ export function GlobalModals() {
     if (!code) return null
     return s()?.quotes.find((q) => q.code === code) ?? null
   }
+
+  useBackInterceptor(() => Boolean(tradeQuote()), () => {
+    setTradeCode(null)
+    setTradePrice(null)
+  })
+  useBackInterceptor(() => Boolean(costAlertCode()), () => {
+    setCostAlertCode(null)
+  })
+  useBackInterceptor(showQuickAdd, () => {
+    setShowQuickAdd(false)
+  })
 
   onMount(() => {
     const unlisteners: (() => void)[] = []

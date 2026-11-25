@@ -11,7 +11,7 @@ import { GroupDropdown } from '../components/watch/GroupDropdown'
 import { useHistoryDrill } from './useHistoryDrill'
 import { useSubchartMode } from '../hooks/useSubchartMode'
 import { ALL_GROUP_ID, filterQuotesByGroup, filterWatchlistByGroup } from '../services/watchlistGroups'
-import { miniModeOverride, selectedIndex, setMiniModeOverride, setSelected, snapshot } from '../store'
+import { miniModeOverride, selectMiniStock, selectedIndex, setActiveMiniMode, setMiniModeOverride, setSelected, snapshot } from '../store'
 import { fetchAvailableHistoryDates, fetchKLine, fetchMultiDayTrend, setTrendTargets } from '../tauri'
 import {
   isIndexCode,
@@ -103,6 +103,10 @@ export function Mini(props: { flash: boolean }) {
     if (m === 'kline' || m === 'five_day' || m === 'trend') return m
     return getSavedTrendSubmode() === 'five_day' ? 'five_day' : 'trend'
   }
+
+  createEffect(() => {
+    setActiveMiniMode(activeMode())
+  })
 
   const clearHover = () => {
     setHoveredPoint(null); setHoveredPointExtra(null); setHoveredAuctionPoint(null); setHoveredKBar(null); setHoveredKExtra(null)
@@ -206,8 +210,6 @@ export function Mini(props: { flash: boolean }) {
       classList={{ flash: props.flash }}
       data-tauri-drag-region
       onWheel={handleWheel}
-      onPointerDown={drill.handleSideButton}
-      onAuxClick={drill.handleSideButton}
       onContextMenu={(e) => {
         e.preventDefault(); e.stopPropagation()
         const c = quote()?.code
@@ -218,7 +220,7 @@ export function Mini(props: { flash: boolean }) {
         prefix={<GroupDropdown />}
         items={quotes().map((q) => ({ id: q.code, label: q.name, title: `${q.name} (${q.code})` }))}
         selectedIndex={selectedIndex()}
-        onSelect={setSelected}
+        onSelect={selectMiniStock}
         onItemContextMenu={(tabItem) => {
           void invoke('show_context_menu', { code: String(tabItem.id) })
         }}

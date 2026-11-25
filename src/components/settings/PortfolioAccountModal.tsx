@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import './PortfolioModal.css'
 import {
   CAPITAL_PRESETS,
@@ -29,6 +30,10 @@ export function PortfolioAccountModal(props: AccountModalProps) {
   const [cbComm, setCbComm] = createSignal(0.00005)
   const [cbMinComm, setCbMinComm] = createSignal(0.5)
   const [saving, setSaving] = createSignal(false)
+
+  useBackInterceptor(() => props.isOpen, () => {
+    props.onClose()
+  })
 
   createEffect(() => {
     if (props.isOpen) {

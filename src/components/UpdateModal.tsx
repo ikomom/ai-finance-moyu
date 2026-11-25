@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { renderMarkdown } from '../utils/markdown'
 import type { CheckResult } from '../services/updater'
+import { useBackInterceptor } from '../services/backInterceptor'
 import { formatBytes, startUpdateDownload, type DownloadProgress } from './updateDownload'
 import './UpdateModal.css'
 
@@ -21,6 +22,15 @@ export function UpdateModal(props: UpdateModalProps) {
     downloaded: 0,
     total: 0,
   })
+
+  useBackInterceptor(
+    () => Boolean(props.isOpen && (props.result?.update || props.result?.hasUpdate)),
+    () => {
+      if (downloadState().status !== 'downloading') {
+        props.onClose()
+      }
+    }
+  )
 
   const releasePageUrl = 'https://github.com/ikomom/ai-finance-moyu/releases/latest'
 

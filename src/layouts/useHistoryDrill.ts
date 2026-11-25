@@ -1,6 +1,7 @@
 import { createComputed, createEffect, createSignal, onCleanup, type Accessor } from 'solid-js'
 import type { DayTrend, MultiDayTrend } from '../types'
 import type { MiniMode } from './MiniBody'
+import { useBackInterceptor } from '../services/backInterceptor'
 import { fetchHistoricalDayTrend } from '../tauri'
 
 export function useHistoryDrill(params: {
@@ -97,13 +98,7 @@ export function useHistoryDrill(params: {
     onCleanup(() => window.removeEventListener('keydown', onKeyDown))
   })
 
-  const handleSideButton = (e: MouseEvent | PointerEvent) => {
-    if (historyDrillDay() && (e.button === 3 || e.button === 4)) {
-      e.preventDefault()
-      e.stopPropagation()
-      exitHistoryDrill()
-    }
-  }
+  useBackInterceptor(() => Boolean(historyDrillDay()), exitHistoryDrill)
 
   return {
     historyDrillDay,
@@ -114,6 +109,5 @@ export function useHistoryDrill(params: {
     exitHistoryDrill,
     clearHistoryDrill,
     enterHistoryDrill,
-    handleSideButton,
   }
 }

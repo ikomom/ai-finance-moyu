@@ -7,6 +7,7 @@ pub mod geometry;
 pub mod hotkey;
 pub mod move_resize;
 pub mod platform_win32;
+pub mod side_buttons;
 pub mod visibility;
 
 pub use context_menu::*;
@@ -15,4 +16,5 @@ pub use geometry::*;
 pub use hotkey::*;
 pub use move_resize::*;
 pub use platform_win32::*;
+pub use side_buttons::*;
 pub use visibility::*;

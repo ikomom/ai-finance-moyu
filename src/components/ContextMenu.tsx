@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
+import { useBackInterceptor } from '../services/backInterceptor'
 import './ContextMenu.css'
 
 import { newVersionAvailable, snapshot } from '../store'
@@ -45,6 +46,8 @@ export function isContextMenuOpen(): boolean {
 
 export function ContextMenu() {
   let el!: HTMLDivElement
+
+  useBackInterceptor(() => at() !== null, closeMenu)
 
   /** Keep the menu inside the window; the widget is small and sits near edges. */
   const position = () => {

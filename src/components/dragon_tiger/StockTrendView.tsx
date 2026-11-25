@@ -8,6 +8,7 @@ import './StockTrendView.css'
 import { Chart } from '../Chart'
 import { SelectMenu } from '../SelectMenu'
 import { fetchStockTrend } from '../../tauri'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import { showToast, snapshot } from '../../store'
 import { DEFAULT_GROUP_ID, ALL_GROUP_ID } from '../../services/watchlistGroups'
 import type { Trend, TrendPoint, WatchItem } from '../../types'
@@ -70,6 +71,10 @@ export function StockTrendView(props: StockTrendViewProps) {
   }
 
   createEffect(() => void load(props.code))
+
+  useBackInterceptor(() => true, () => {
+    props.onBack()
+  })
 
   // 分时视图压在席位名单之上，Esc 必须先退回名单，而不是直接关掉整个龙虎榜弹层。
   onMount(() => {

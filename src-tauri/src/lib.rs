@@ -107,7 +107,9 @@ pub fn run() {
                 let _ = win.show();
                 // Must come after `show()`, since the style needs a re-show to take hold.
                 window::hide_from_alt_tab(&win);
+                window::register_side_button_target(window::DISPLAY, &win);
             }
+            window::install_side_button_hook(app.handle());
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -138,6 +140,7 @@ pub fn run() {
                         }
                     }
                     WindowEvent::Destroyed => {
+                        window::clear_side_button_target(window::SETTINGS);
                         if let Some(main_win) = window.app_handle().get_webview_window(window::DISPLAY) {
                             let state = window.app_handle().state::<AppState>();
                             let mode = state.config.lock().map(|c| c.visibility_mode).unwrap_or_default();
@@ -249,6 +252,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app, event| {
             if let tauri::RunEvent::Exit = event {
+                window::uninstall_side_button_hook();
                 let _ = commands::stop_local_decision_service();
             }
         });

@@ -1,9 +1,11 @@
-import { For, Show } from 'solid-js'
+import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import { UpdateModal } from './components/UpdateModal'
+import { createLinearHistory } from './services/tabHistory'
 import { setSkippedVersion } from './services/updater'
-import { SettingsProvider, useSettings, TABS } from './components/settings/SettingsContext'
+import { SettingsProvider, useSettings, TABS, type TabKey } from './components/settings/SettingsContext'
+import { setupWidgetNavigation } from './utils/widgetInteraction'
 import { WatchlistTab } from './components/settings/WatchlistTab'
 import { AppearanceTab } from './components/settings/AppearanceTab'
 import { AlertsTab } from './components/settings/AlertsTab'
@@ -30,6 +32,25 @@ function SettingsContent() {
     say,
     save,
   } = useSettings()
+
+  const tabHistory = createLinearHistory<TabKey>(activeTab())
+  createEffect(() => {
+    tabHistory.push(activeTab())
+  })
+
+  onMount(() => {
+    const cleanupNav = setupWidgetNavigation({
+      onBack: () => {
+        const prev = tabHistory.back()
+        if (prev) setActiveTab(prev)
+      },
+      onForward: () => {
+        const next = tabHistory.forward()
+        if (next) setActiveTab(next)
+      },
+    })
+    onCleanup(cleanupNav)
+  })
 
   return (
     <div id="settings-root">

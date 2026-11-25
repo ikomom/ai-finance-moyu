@@ -2,6 +2,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import type { WatchGroup } from '../../types'
 import { ALL_GROUP_ID, DEFAULT_GROUP_ID, MAX_GROUP_NAME_LEN } from '../../services/watchlistGroups'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import './WatchGroupTabs.css'
 
 export interface WatchGroupTabsProps {
@@ -23,6 +24,16 @@ export function WatchGroupTabs(props: WatchGroupTabsProps) {
 
   const [deleteGroupTarget, setDeleteGroupTarget] = createSignal<WatchGroup | null>(null)
   const [moveToDefaultChecked, setMoveToDefaultChecked] = createSignal(true)
+
+  useBackInterceptor(showAddModal, () => {
+    setShowAddModal(false)
+  })
+  useBackInterceptor(() => Boolean(renameGroupTarget()), () => {
+    setRenameGroupTarget(null)
+  })
+  useBackInterceptor(() => Boolean(deleteGroupTarget()), () => {
+    setDeleteGroupTarget(null)
+  })
 
   const handleOpenAdd = () => {
     setNewGroupName('')

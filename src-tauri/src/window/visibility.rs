@@ -26,6 +26,7 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
         let state = app.state::<AppState>();
         state.dock_state.lock().unwrap_or_else(|e| e.into_inner()).collapsed = false;
     }
+    super::side_buttons::set_side_button_main_collapsed(false);
 
     // 2. If the window was hidden (e.g. by boss key) or minimized, reveal and show it immediately!
     if let Some(win) = app.get_webview_window(DISPLAY) {
@@ -57,15 +58,24 @@ pub fn apply_layout(app: &AppHandle, layout: Layout) {
 }
 
 /// Navigate to a specific stock in Mini layout (e.g. from notification click).
-/// Uncollapses the dock, switches layout to Mini if not already in Mini, reveals and focuses the window,
-/// and emits `navigate_stock` event to frontend.
+/// Emits `navigate_stock` with layout-switch context before applying layout/uncollapsing
+/// so frontend history avoids pushing an intermediate Mini state, then reveals and raises the window.
 pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
     let current_layout = {
         let state = app.state::<AppState>();
-        let l = state.config.lock().unwrap_or_else(|e| e.into_inner()).layout;
-        l
+        let layout = state.config.lock().unwrap_or_else(|e| e.into_inner()).layout;
+        layout
     };
-    if current_layout != Layout::Mini {
+    let will_switch_layout = current_layout != Layout::Mini;
+
+    let _ = app.emit("navigate_stock", serde_json::json!({
+        "code": code,
+        "mode": "trend",
+        "fromLayout": current_layout,
+        "layoutApplied": will_switch_layout
+    }));
+
+    if will_switch_layout {
         apply_layout(app, Layout::Mini);
     } else {
         let _ = set_dock_collapsed_inner(app, false);
@@ -95,11 +105,6 @@ pub fn navigate_to_stock_mini(app: &AppHandle, code: &str) {
             }
         }
     }
-
-    let _ = app.emit("navigate_stock", serde_json::json!({
-        "code": code,
-        "mode": "trend"
-    }));
 }
 
 pub fn apply_visibility_mode(app: &AppHandle, mode: VisibilityMode) -> Result<(), String> {
@@ -149,6 +154,7 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     }
 
     if let Some(win) = app.get_webview_window(SETTINGS) {
+        super::side_buttons::register_side_button_target(SETTINGS, &win);
         reveal_secondary(&win, "#settings-root");
         return Ok(());
     }
@@ -172,6 +178,7 @@ pub fn open_settings(app: &AppHandle) -> Result<(), String> {
     .build()
     .map_err(|e| format!("打开设置窗口失败: {e}"))?;
 
+    super::side_buttons::register_side_button_target(SETTINGS, &win);
     watch_new_window(win.clone(), "#settings-root");
     let _ = win.set_focus();
     Ok(())

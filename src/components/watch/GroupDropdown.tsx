@@ -1,5 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { listen } from '@tauri-apps/api/event'
+import { useBackInterceptor } from '../../services/backInterceptor'
 import { snapshot } from '../../store'
 import {
   ALL_GROUP_ID,
@@ -23,6 +24,13 @@ export function GroupDropdown(props: GroupDropdownProps) {
   const [pendingMoveCode, setPendingMoveCode] = createSignal<string | null>(null)
   let containerRef: HTMLDivElement | undefined
   let inputRef: HTMLInputElement | undefined
+
+  useBackInterceptor(open, () => {
+    setOpen(false)
+  })
+  useBackInterceptor(showCreateModal, () => {
+    setShowCreateModal(false)
+  })
 
   const s = () => snapshot()
   const groups = () => s()?.config.groups ?? [{ id: DEFAULT_GROUP_ID, name: '默认自选' }]

@@ -1,4 +1,5 @@
 import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
+import { useBackInterceptor } from '../services/backInterceptor'
 import { fmtPct, fmtPrice, trendClass, type Quote } from '../types'
 import { MicroTapePopover } from './tape/MicroTapePopover'
 import './StockHeader.css'
@@ -68,6 +69,11 @@ export function StockHeader(props: StockHeaderProps) {
     setIsPinned((prev) => !prev)
     setShowTape(true)
   }
+
+  useBackInterceptor(isPinned, () => {
+    setIsPinned(false)
+    setShowTape(false)
+  })
 
   // Keyboard and outside click dismiss when pinned
   createEffect(() => {

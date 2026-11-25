@@ -141,7 +141,6 @@ export function Widget() {
 
     const cleanupNav = setupWidgetNavigation({
       isCollapsed,
-      onExpand: () => void invoke('set_dock_collapsed', { collapsed: false }),
       onBack: navigateLayoutBack,
       onForward: navigateLayoutForward,
     })

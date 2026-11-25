@@ -1,5 +1,6 @@
 import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import type { SubchartMode } from '../hooks/useSubchartMode'
+import { useBackInterceptor } from '../services/backInterceptor'
 import type { KlinePeriod } from '../types'
 import './FooterControls.css'
 
@@ -44,6 +45,14 @@ export function FooterControls(props: FooterControlsProps) {
   let klineArrowBtnRef: HTMLButtonElement | undefined
   let trendPopoverRef: HTMLDivElement | undefined
   let trendArrowBtnRef: HTMLButtonElement | undefined
+
+  useBackInterceptor(
+    () => klinePopoverOpen() || trendPopoverOpen(),
+    () => {
+      setKlinePopoverOpen(false)
+      setTrendPopoverOpen(false)
+    }
+  )
 
   const showSubchart = () => props.showSubchart ?? true
   const currentPeriod = () => props.klinePeriod ?? 'day'
