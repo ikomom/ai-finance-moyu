@@ -5,71 +5,29 @@
 import { createSignal, createEffect, on, untrack, onCleanup, type Accessor } from 'solid-js'
 import { decideStockWithAi, startLocalDecisionService } from './aiDecision'
 import { buildStockDecisionPayload } from './aiDecisionPayload'
+import {
+  CACHE_TTL_MS,
+  DECISION_CACHE,
+  extractHHMMSS,
+  isDecisionCacheValid,
+  isLiveDecisionSession,
+  type DecisionCacheCheckContext,
+  type DecisionCacheEntry,
+} from './aiDecisionCache'
 import type { Quote, Snapshot, KLineData } from '../types'
 import type { StockDecisionResult } from '../types/aiDecision'
 
-export interface DecisionCacheEntry {
-  result: StockDecisionResult
-  ts: number
-  date?: string
-  quoteTime?: string
-  session?: string
-  isClosing?: boolean
+export {
+  CACHE_TTL_MS,
+  DECISION_CACHE,
+  extractHHMMSS,
+  isDecisionCacheValid,
+  isLiveDecisionSession,
+  type DecisionCacheCheckContext,
+  type DecisionCacheEntry,
 }
 
-export interface DecisionCacheCheckContext {
-  now?: number
-  session?: string
-  tradingToday?: boolean
-  quoteDate?: string
-  quoteTime?: string
-  feedDate?: string
-}
-
-export const DECISION_CACHE = new Map<string, DecisionCacheEntry>()
 const IN_FLIGHT_REQUESTS = new Map<string, Promise<StockDecisionResult>>()
-const CACHE_TTL_MS = 30_000
-
-/**
- * 校验决策缓存有效性（包含交易时段感知与收盘智能冻结）.
- */
-export function isDecisionCacheValid(
-  cached: DecisionCacheEntry | undefined,
-  ctx: DecisionCacheCheckContext,
-  ttlMs = CACHE_TTL_MS
-): boolean {
-  if (!cached) return false
-
-  const curDate = ctx.quoteDate || ctx.feedDate
-  if (curDate && cached.date && cached.date !== curDate) {
-    return false
-  }
-
-  const isTradingToday = ctx.tradingToday ?? true
-  const session = ctx.session
-  const now = ctx.now ?? Date.now()
-
-  // 1. 收盘或非交易日（周末/法定节假日）
-  if (!isTradingToday || session === 'Closed') {
-    return Boolean(cached.isClosing)
-  }
-
-  // 2. 午间休市 (11:31 - 12:59)
-  if (session === 'LunchBreak') {
-    if (cached.session === 'LunchBreak' || (cached.quoteTime && cached.quoteTime >= '11:30:00')) {
-      return true
-    }
-    return now - cached.ts < ttlMs
-  }
-
-  // 3. 盘前未开盘 (00:00 - 09:14)
-  if (session === 'PreOpen') {
-    return true
-  }
-
-  // 4. 连续交易及竞价时段：依常规 TTL 随盘面轮询刷新
-  return now - cached.ts < ttlMs
-}
 
 export interface AiDecisionHook {
   result: Accessor<StockDecisionResult | null>
@@ -169,10 +127,11 @@ export function useAiDecision(
       const res = await promise
       if (quote()?.code === code) {
         setResult(res)
+        const quoteClock = extractHHMMSS(q.time)
         const isClosing =
           !isTradingToday ||
           session === 'Closed' ||
-          Boolean(q.time && q.time >= '15:00:00')
+          Boolean(quoteClock && quoteClock >= '15:00:00')
         DECISION_CACHE.set(cacheKey, {
           result: res,
           ts: Date.now(),
@@ -205,7 +164,7 @@ export function useAiDecision(
           date: q.date || status?.feedDate || undefined,
           quoteTime: q.time,
           session,
-          isClosing: false,
+          isClosing: !isTradingToday || session === 'Closed',
         })
       }
     } finally {
@@ -245,16 +204,11 @@ export function useAiDecision(
         () => quote()?.code,
         () => snapshot()?.config?.aiDecision?.mode,
         () => snapshot()?.status?.session,
+        () => snapshot()?.status?.tradingToday,
       ],
-      ([code, mode, session]) => {
-        if (debounceTimer) {
-          clearTimeout(debounceTimer)
-          debounceTimer = undefined
-        }
-        if (autoRefreshTimer) {
-          clearInterval(autoRefreshTimer)
-          autoRefreshTimer = undefined
-        }
+      ([code, mode, session, tradingToday]) => {
+        if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = undefined }
+        if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = undefined }
         if (!code || (mode !== 'local' && mode !== 'online')) {
           setResult(null)
           return
@@ -262,10 +216,12 @@ export function useAiDecision(
         const cacheKey = modeType === 'kline' ? `${code}:kline` : code
         const cached = DECISION_CACHE.get(cacheKey)
         const status = snapshot()?.status
+        const effSession = session ?? status?.session
+        const effTradingToday = tradingToday ?? status?.tradingToday ?? true
         const checkCtx: DecisionCacheCheckContext = {
           now: Date.now(),
-          session: session ?? status?.session,
-          tradingToday: status?.tradingToday ?? true,
+          session: effSession,
+          tradingToday: effTradingToday,
           quoteDate: quote()?.date,
           quoteTime: quote()?.time,
           feedDate: status?.feedDate ?? undefined,
@@ -274,28 +230,21 @@ export function useAiDecision(
           setResult(cached!.result)
           setErrorMsg(null)
         } else {
-          // 切股瞬间立刻清除上一只股票的残留决策，绝不产生跨股残影
           setResult(null)
-          debounceTimer = setTimeout(() => {
-            runDecision(false)
-          }, 250)
+          debounceTimer = setTimeout(() => { runDecision(false) }, 250)
         }
 
-        // 持续看盘自动研判轮询：本地量化极速 (6ms) 每 5 秒刷新，线上大模型每 30 秒刷新
-        const intervalMs = mode === 'local' ? 5_000 : 30_000
-        autoRefreshTimer = setInterval(() => {
-          if (loading()) return
-          const curStatus = snapshot()?.status
-          const curSession = curStatus?.session
-          const isTradingToday = curStatus?.tradingToday ?? true
-          if (!isTradingToday) return
-          const isLiveSession =
-            curSession === 'Morning' ||
-            curSession === 'Afternoon' ||
-            curSession === 'ClosingAuction'
-          if (!isLiveSession) return
-          runDecision(true)
-        }, intervalMs)
+        // 仅在盘中交易时段开启自动轮询；收盘、午休与非交易日停止后台定时请求
+        if (effTradingToday && isLiveDecisionSession(effSession)) {
+          const intervalMs = mode === 'local' ? 5_000 : 30_000
+          autoRefreshTimer = setInterval(() => {
+            if (loading()) return
+            const cur = snapshot()?.status
+            if ((cur?.tradingToday ?? true) && isLiveDecisionSession(cur?.session)) {
+              runDecision(true)
+            }
+          }, intervalMs)
+        }
       },
       { defer: false }
     )

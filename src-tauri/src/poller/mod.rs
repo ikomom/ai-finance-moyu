@@ -49,6 +49,7 @@ pub async fn run(app: AppHandle) {
     let mut last_session: Option<market::Session> = None;
 
     loop {
+        let mut session_switched = false;
         let (session, poll_ms, trend_ms, feed_is_today, need_retry, is_market, need_market_init) = {
             let state = app.state::<AppState>();
             let now = crate::market::beijing_now();
@@ -56,6 +57,7 @@ pub async fn run(app: AppHandle) {
             if last_session != Some(session) {
                 if let Some(prev) = last_session {
                     log::info!(target: "SESSION", "A股交易时段切换: {:?} -> {:?}", prev, session);
+                    session_switched = true;
                 } else {
                     log::info!(target: "SESSION", "初始识别A股交易时段: {:?}", session);
                 }
@@ -69,26 +71,31 @@ pub async fn run(app: AppHandle) {
                     }
                     state.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clear();
                 }
+                status::sync_session(&app, now, session);
                 last_session = Some(session);
             }
             let cfg = state.config.lock().unwrap_or_else(|e| e.into_inner());
+            let quotes_empty = state.quotes.lock().unwrap_or_else(|e| e.into_inner()).is_empty();
             let st = state.status.lock().unwrap_or_else(|e| e.into_inner());
-            let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
             // A retry may only burn requests while the market can actually
             // produce new data; see `Session::allows_retry`.
-            let need_retry = (quotes.is_empty() || st.error.is_some()) && session.allows_retry();
+            let need_retry = (quotes_empty || st.error.is_some()) && session.allows_retry();
             let is_market = cfg.layout == crate::config::Layout::Market
                 || cfg.layout == crate::config::Layout::Global;
             let need_market_init = state.market_overview.lock().unwrap_or_else(|e| e.into_inner()).is_none();
             (session, cfg.poll_quotes_ms, cfg.poll_trend_ms, st.trading_today, need_retry, is_market, need_market_init)
         };
 
+        if session_switched {
+            emit_snapshot(&app);
+        }
+
         let market_interval = if is_market {
             Duration::from_secs(5)
         } else {
             Duration::from_secs(20)
         };
-        let market_due = need_market_init
+        let market_due = (need_market_init && (last_market.is_none() || session.allows_retry()))
             || ((session.is_live() || need_retry)
                 && last_market.is_none_or(|t| t.elapsed() >= market_interval));
         if market_due {

@@ -60,7 +60,9 @@ describe('getClearedPnl helper', () => {
       },
     ]
     // 12000 - 9 = 11991, 10000 + 5 = 10005, pnl = 11991 - 10005 = 1986.00
-    expect(getClearedPnl('sh600000', trades)).toBe(1986)
+    expect(getClearedPnl('sh600000', trades, undefined, '2026-11-04')).toBe(1986)
+    // Next day: cleared badge expires cleanly
+    expect(getClearedPnl('sh600000', trades, undefined, '2026-11-05')).toBeNull()
   })
 
   it('computes net loss for multi-tranche buy and sell', () => {
@@ -111,7 +113,42 @@ describe('getClearedPnl helper', () => {
     // Buy cost = 5002.5 + 6003 = 11005.5
     // Sell proceeds = 9000 - 4.5 = 8995.5
     // PnL = 8995.5 - 11005.5 = -2010.00
-    expect(getClearedPnl('sh600000', trades)).toBe(-2010)
+    expect(getClearedPnl('sh600000', trades, undefined, '2026-11-04')).toBe(-2010)
+  })
+
+  it('keeps multi-day position settled PnL on the sell-out day and hides it the next day', () => {
+    const trades: TradeRecord[] = [
+      {
+        id: 't1',
+        brokerId: 'b1',
+        brokerName: '券商',
+        code: 'sh600000',
+        name: '浦发银行',
+        action: 'Buy',
+        price: 10,
+        shares: 1000,
+        amount: 10000,
+        fee: 5,
+        timestamp: '2026-11-01 10:00:00',
+        status: 'Filled',
+      },
+      {
+        id: 't2',
+        brokerId: 'b1',
+        brokerName: '券商',
+        code: 'sh600000',
+        name: '浦发银行',
+        action: 'Sell',
+        price: 12,
+        shares: 1000,
+        amount: 12000,
+        fee: 9,
+        timestamp: '2026-11-04 14:00:00',
+        status: 'Filled',
+      },
+    ]
+    expect(getClearedPnl('sh600000', trades, undefined, '2026-11-04')).toBe(1986)
+    expect(getClearedPnl('sh600000', trades, undefined, '2026-11-05')).toBeNull()
   })
 
   it('ignores pending or cancelled orders and respects brokerId filter', () => {
@@ -161,8 +198,8 @@ describe('getClearedPnl helper', () => {
     ]
 
     // Scoped to b1: only has buy (10005 cost, 0 proceeds) -> -10005
-    expect(getClearedPnl('sh600000', trades, 'b1')).toBe(-10005)
+    expect(getClearedPnl('sh600000', trades, 'b1', '2026-11-04')).toBe(-10005)
     // Scoped to b2: only has sell (11994 proceeds, 0 buy cost) -> 11994
-    expect(getClearedPnl('sh600000', trades, 'b2')).toBe(11994)
+    expect(getClearedPnl('sh600000', trades, 'b2', '2026-11-04')).toBe(11994)
   })
 })

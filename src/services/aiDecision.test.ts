@@ -6,6 +6,7 @@ import {
   saveAiDecisionConfig,
 } from './aiDecision'
 import {
+  extractHHMMSS,
   isDecisionCacheValid,
   type DecisionCacheEntry,
   type DecisionCacheCheckContext,
@@ -185,5 +186,26 @@ describe('isDecisionCacheValid - Session Awareness & Closing Freeze', () => {
       quoteDate: '2026-11-03',
     }
     expect(isDecisionCacheValid(entry, ctxExpired, 30_000)).toBe(false)
+  })
+
+  it('normalizes 14-digit Tencent timestamps so morning quotes do not fake lunch/closing freezes', () => {
+    expect(extractHHMMSS('20261126093500')).toBe('09:35:00')
+    expect(extractHHMMSS('20261126150000')).toBe('15:00:00')
+    expect(extractHHMMSS('11:30:00')).toBe('11:30:00')
+
+    const morningTencentEntry: DecisionCacheEntry = {
+      ...baseEntry,
+      ts: 1_000_000,
+      quoteTime: '20261126093500',
+      session: 'Morning',
+      isClosing: false,
+    }
+    const lunchExpiredCtx: DecisionCacheCheckContext = {
+      now: 1_000_000 + 3_600_000,
+      session: 'LunchBreak',
+      tradingToday: true,
+      quoteDate: '2026-11-03',
+    }
+    expect(isDecisionCacheValid(morningTencentEntry, lunchExpiredCtx, 30_000)).toBe(false)
   })
 })

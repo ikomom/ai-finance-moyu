@@ -121,24 +121,38 @@ export function isPendingLimitOrder(
   }
 }
 
+/** Returns today's local calendar date formatted as `YYYY-MM-DD`. */
+export function localTodayYmd(now = new Date()): string {
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 /**
- * Calculates settled/cleared profit & loss (元) for a security when shares === 0.
- * Returns null if there are no historical filled trades for this security.
+ * Calculates settled/cleared profit & loss (元) for a security cleared today (`shares === 0`).
+ * Automatically returns null starting the next calendar day so the `已结` badge expires next day.
  */
 export function getClearedPnl(
   code: string,
   trades?: TradeRecord[] | null,
-  brokerId?: string | null
+  brokerId?: string | null,
+  todayDate: string = localTodayYmd()
 ): number | null {
   if (!trades || trades.length === 0) return null
   const cleanCode = code.toLowerCase()
   let hasFilledTrade = false
+  let latestFilledDate = ''
   let totalBuyCost = 0
   let totalSellNet = 0
   for (const t of trades) {
     if (brokerId && t.brokerId !== brokerId) continue
     if (t.code.toLowerCase() === cleanCode && (t.status === 'Filled' || !t.status)) {
       hasFilledTrade = true
+      const tradeDate = t.timestamp?.slice(0, 10) ?? ''
+      if (tradeDate > latestFilledDate) {
+        latestFilledDate = tradeDate
+      }
       if (t.action === 'Buy' || (t.action as string) === 'buy') {
         totalBuyCost += t.amount + (t.fee ?? 0)
       } else if (t.action === 'Sell' || (t.action as string) === 'sell') {
@@ -146,6 +160,6 @@ export function getClearedPnl(
       }
     }
   }
-  if (!hasFilledTrade) return null
+  if (!hasFilledTrade || (todayDate && latestFilledDate !== todayDate)) return null
   return Math.round((totalSellNet - totalBuyCost) * 100) / 100
 }

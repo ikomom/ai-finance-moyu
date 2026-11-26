@@ -9,6 +9,7 @@ import { render } from 'solid-js/web'
 
 import { Global } from './Global'
 import { Mini } from './Mini'
+import { localTodayYmd } from '../components/portfolio/tradeHelpers'
 import { setSnapshot } from '../store'
 import type { MarketIndex, Snapshot } from '../types'
 
@@ -186,7 +187,8 @@ describe('Mini layout', () => {
     host.remove()
   })
 
-  it('renders cleared settled profit badge (已结 +¥xxx) when position is 0 but historical trades exist', () => {
+  it('renders cleared settled profit badge (已结 +¥xxx) when cleared today and hides it the next day', () => {
+    const today = localTodayYmd()
     const snap = snapshotWith({
       config: {
         ...snapshotWith().config,
@@ -205,7 +207,7 @@ describe('Mini layout', () => {
           shares: 1000,
           amount: 10000,
           fee: 5,
-          timestamp: '2026-11-04 10:00:00',
+          timestamp: `${today} 10:00:00`,
           status: 'Filled',
         },
         {
@@ -219,7 +221,7 @@ describe('Mini layout', () => {
           shares: 1000,
           amount: 12000,
           fee: 9,
-          timestamp: '2026-11-04 14:00:00',
+          timestamp: `${today} 14:00:00`,
           status: 'Filled',
         },
       ],
@@ -232,6 +234,19 @@ describe('Mini layout', () => {
     expect(host.textContent).toContain('+¥1,986.00')
     expect(host.textContent).not.toContain('浮盈')
     host.remove()
+
+    const prevDaySnap = {
+      ...snap,
+      trades: snap.trades!.map((t) => ({
+        ...t,
+        timestamp: t.timestamp.replace(today, '2026-11-04'),
+      })),
+    }
+    setSnapshot(prevDaySnap)
+    const nextDayHost = mount(() => Mini({ flash: false }))
+    expect(nextDayHost.textContent).toContain('浦发银行')
+    expect(nextDayHost.textContent).not.toContain('已结')
+    nextDayHost.remove()
   })
 
   it('renders negative cost and hides profit percentage when holding has negative cost', () => {
