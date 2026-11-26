@@ -140,8 +140,22 @@ impl Fetcher {
         code: &str,
         pre_close: f64,
     ) -> Result<Trend, FetchError> {
+        self.fetch_trend_for_quote(source, code, pre_close, "").await
+    }
+
+    /// Intraday series validated against `quote_date` and `pre_close`.
+    pub async fn fetch_trend_for_quote(
+        &self,
+        source: DataSource,
+        code: &str,
+        pre_close: f64,
+        quote_date: &str,
+    ) -> Result<Trend, FetchError> {
         if crate::market::is_index(code) {
-            if let Some(trend) = super::ths::fetch_index_trend(&self.client, code, pre_close).await {
+            if let Some(trend) =
+                super::ths::fetch_index_trend_for_quote(&self.client, code, pre_close, quote_date)
+                    .await
+            {
                 return Ok(trend);
             }
         }
@@ -178,53 +192,39 @@ impl Fetcher {
         if trend.pre_close <= 0.0 {
             trend.pre_close = pre_close;
         }
+        if super::trend_guard::has_future_points_at(&trend, crate::market::beijing_now()) {
+            return Err(parse_err(format!("{code} 分时包含超前时间点")));
+        }
         Ok(trend)
     }
 
     pub(super) async fn get_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
-        let mut last_err = None;
-        for attempt in 0..2 {
-            if attempt > 0 {
-                tokio::time::sleep(Duration::from_millis(250)).await;
-            }
-            let mut req = self.client.get(url);
-            if let Some(r) = referer {
-                req = req.header(reqwest::header::REFERER, r);
-            }
-            match req.send().await {
-                Ok(resp) => {
-                    let status = resp.status();
-                    if !status.is_success() {
-                        last_err = Some(FetchError {
-                            kind: FetchErrorKind::Network,
-                            message: format!("HTTP {status}"),
-                        });
-                        continue;
-                    }
-                    match resp.bytes().await {
-                        Ok(b) => return Ok(b.to_vec()),
-                        Err(e) => {
-                            last_err = Some(net_err(e));
-                        }
-                    }
-                }
-                Err(e) => {
-                    last_err = Some(net_err(e));
-                }
-            }
-        }
-        Err(last_err.unwrap_or_else(|| net_err("网络请求失败")))
+        self.get_bytes_with(&self.client, url, referer, false, "网络请求失败").await
     }
 
     pub(super) async fn get_global_bytes(&self, url: &str, referer: Option<&str>) -> Result<Vec<u8>, FetchError> {
+        self.get_bytes_with(&self.global_client, url, referer, true, "全球网络请求失败").await
+    }
+
+    async fn get_bytes_with(
+        &self,
+        client: &reqwest::Client,
+        url: &str,
+        referer: Option<&str>,
+        global_headers: bool,
+        fallback_msg: &str,
+    ) -> Result<Vec<u8>, FetchError> {
         let mut last_err = None;
         for attempt in 0..2 {
             if attempt > 0 {
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
-            let mut req = self.global_client.get(url)
-                .header(reqwest::header::ACCEPT, "*/*")
-                .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7");
+            let mut req = client.get(url);
+            if global_headers {
+                req = req
+                    .header(reqwest::header::ACCEPT, "*/*")
+                    .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7");
+            }
             if let Some(r) = referer {
                 req = req.header(reqwest::header::REFERER, r);
             }
@@ -240,17 +240,13 @@ impl Fetcher {
                     }
                     match resp.bytes().await {
                         Ok(b) => return Ok(b.to_vec()),
-                        Err(e) => {
-                            last_err = Some(net_err(e));
-                        }
+                        Err(e) => last_err = Some(net_err(e)),
                     }
                 }
-                Err(e) => {
-                    last_err = Some(net_err(e));
-                }
+                Err(e) => last_err = Some(net_err(e)),
             }
         }
-        Err(last_err.unwrap_or_else(|| net_err("全球网络请求失败")))
+        Err(last_err.unwrap_or_else(|| net_err(fallback_msg)))
     }
 
     /// Fetch daily candlestick series with forward adjustment (QFQ) and moving averages.

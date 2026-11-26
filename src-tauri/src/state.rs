@@ -149,21 +149,13 @@ impl AppState {
             quotes_map.insert(q.code.clone(), q);
         }
         let now = crate::market::beijing_now();
-        let session = crate::market::session_at(now);
-        let today_str = now.format("%Y%m%d").to_string();
-        let is_morning_pretrade = matches!(
-            session,
-            crate::market::Session::PreOpen
-                | crate::market::Session::CallAuctionCancelable
-                | crate::market::Session::CallAuctionLocked
-                | crate::market::Session::PreTrade
-        );
         let mut trends_map = HashMap::new();
         for (code, mut t) in cache.trends {
-            if is_morning_pretrade && t.date < today_str {
-                t.points.clear();
-                t.date = today_str.clone();
-            }
+            let (q_date, q_pre) = quotes_map
+                .get(&code)
+                .map(|q| (q.date.as_str(), q.pre_close))
+                .unwrap_or(("", 0.0));
+            crate::quote::sanitize_trend_for_quote(&mut t, q_date, q_pre, now);
             trends_map.insert(code, t);
         }
         let mut auction_tracker = crate::auction_engine::AuctionTracker::new();

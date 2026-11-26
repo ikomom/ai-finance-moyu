@@ -169,3 +169,4 @@
 
 mod kline_tests;
 mod sina_tests;
+mod ths_tests;

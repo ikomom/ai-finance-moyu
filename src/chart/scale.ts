@@ -1,3 +1,6 @@
+import type { Trend } from '../types'
+import { isIndexCode } from '../types/format'
+
 export const MORNING_START = 9 * 60 + 30 // 09:30
 export const MORNING_END = 11 * 60 + 30 // 11:30
 export const AFTERNOON_START = 13 * 60 // 13:00
@@ -115,4 +118,32 @@ export function createSymmetricScale(preClose: number, maxDev: number, plotTop: 
   const yMin = preClose - maxDev
   const span = maxDev * 2 || 1
   return (price: number) => plotTop + (1 - (price - yMin) / span) * plotHeight
+}
+
+/**
+ * Guard intraday trend data against cross-day cache staleness or index
+ * baseline mismatch before rendering on a chart or table sparkline.
+ */
+export function sanitizeTrendForQuote(
+  trend: Trend | undefined,
+  quote?: { code?: string; date?: string; preClose?: number }
+): Trend | undefined {
+  if (!trend) return undefined
+  const qDate = quote?.date
+  if (qDate && trend.date && trend.date < qDate) {
+    return { ...trend, points: [] }
+  }
+  const code = quote?.code ?? trend.code
+  const qPre = quote?.preClose ?? 0
+  if (
+    code &&
+    isIndexCode(code) &&
+    qPre > 0 &&
+    trend.preClose > 0 &&
+    (!qDate || !trend.date || qDate >= trend.date) &&
+    Math.abs(trend.preClose - qPre) / qPre > 0.002
+  ) {
+    return { ...trend, preClose: qPre, points: [] }
+  }
+  return trend
 }

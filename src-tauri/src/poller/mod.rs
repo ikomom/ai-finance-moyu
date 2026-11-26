@@ -61,12 +61,10 @@ pub async fn run(app: AppHandle) {
                 }
                 if session.is_morning_pretrade() {
                     state.tracker.lock().unwrap_or_else(|e| e.into_inner()).reset_intraday();
-                    let today_str = now.format("%Y%m%d").to_string();
-                    let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
-                    for t in trends.values_mut() {
-                        if t.date < today_str {
-                            t.points.clear();
-                            t.date = today_str.clone();
+                    {
+                        let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
+                        for t in trends.values_mut() {
+                            crate::quote::sanitize_trend_for_quote(t, "", 0.0, now);
                         }
                     }
                     state.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clear();
@@ -160,3 +158,57 @@ mod status;
 mod trends;
 
 pub use trends::poll_trends;
+
+#[cfg(test)]
+mod tests {
+    use chrono::NaiveDate;
+
+    use super::*;
+
+    #[test]
+    fn update_and_snapshot_trends_purges_stale_and_syncs_without_deadlock() {
+        let mut cache = crate::config::QuotesCache::default();
+        cache.trends.insert(
+            "sh000001".to_string(),
+            crate::quote::Trend {
+                code: "sh000001".to_string(),
+                date: "20261125".to_string(),
+                pre_close: 3548.37,
+                points: vec![crate::quote::TrendPoint {
+                    time: 1500,
+                    price: 3476.47,
+                    cum_volume: 100.0,
+                    cum_amount: 1000.0,
+                    avg_price: 3428.0,
+                }],
+            },
+        );
+        let state = AppState::new(
+            crate::config::Config::default(),
+            crate::quote::Fetcher::new().unwrap(),
+            cache,
+            Default::default(),
+        );
+        let q = crate::quote::Quote {
+            code: "sh000001".to_string(),
+            price: 3477.06,
+            pre_close: 3476.47,
+            volume: 5000.0,
+            date: "20261126".to_string(),
+            ..Default::default()
+        };
+        let now = NaiveDate::from_ymd_opt(2026, 11, 26)
+            .unwrap()
+            .and_hms_opt(14, 32, 0)
+            .unwrap();
+
+        let _store = state.quotes.lock().unwrap();
+        let snap = quotes::update_and_snapshot_trends(&state, &[q], now, true);
+        let t = snap.get("sh000001").expect("trend entry preserved");
+        assert_eq!(t.date, "20261126");
+        assert_eq!(t.pre_close, 3476.47);
+        assert_eq!(t.points.len(), 1);
+        assert_eq!(t.points[0].time, 1432);
+        assert_eq!(t.points[0].price, 3477.06);
+    }
+}

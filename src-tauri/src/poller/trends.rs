@@ -52,13 +52,19 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
         let code_clone = code.clone();
         handles.push(tokio::spawn(async move {
             let _permit = sem.acquire().await;
-            let pre_close = {
+            let (pre_close, quote_date) = {
                 let state = app_handle.state::<AppState>();
                 let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
-                quotes.get(&code_clone).map(|q| q.pre_close).unwrap_or(0.0)
+                quotes
+                    .get(&code_clone)
+                    .map(|q| (q.pre_close, q.date.clone()))
+                    .unwrap_or((0.0, String::new()))
             };
             let state = app_handle.state::<AppState>();
-            let fetched = state.fetcher.fetch_trend(source, &code_clone, pre_close).await;
+            let fetched = state
+                .fetcher
+                .fetch_trend_for_quote(source, &code_clone, pre_close, &quote_date)
+                .await;
             (code_clone, fetched)
         }));
     }
@@ -68,23 +74,31 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
             Ok((code, Ok(mut trend))) => {
                 let state = app.state::<AppState>();
                 let now = crate::market::beijing_now();
-                let today_str = now.format("%Y%m%d").to_string();
-                let session = crate::market::session_at(now);
-                let is_morning_pretrade = session.is_morning_pretrade();
-                let quote_date = {
+                let (quote_date, quote_pre) = {
                     let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
-                    quotes.get(&code).map(|q| q.date.clone()).unwrap_or_default()
+                    quotes
+                        .get(&code)
+                        .map(|q| (q.date.clone(), q.pre_close))
+                        .unwrap_or((String::new(), 0.0))
                 };
-                let is_stale = (!quote_date.is_empty() && trend.date < quote_date)
-                    || (is_morning_pretrade && trend.date < today_str);
-                if is_stale {
-                    trend.points.clear();
-                    trend.date = if !quote_date.is_empty() { quote_date } else { today_str };
-                }
+                crate::quote::sanitize_trend_for_quote(&mut trend, &quote_date, quote_pre, now);
                 state.trends.lock().unwrap_or_else(|e| e.into_inner()).insert(code, trend);
             }
             Ok((code, Err(e))) => {
                 log::warn!(target: "NET", "分时拉取失败 {code}: {e}");
+                let state = app.state::<AppState>();
+                let now = crate::market::beijing_now();
+                let (quote_date, quote_pre) = {
+                    let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
+                    quotes
+                        .get(&code)
+                        .map(|q| (q.date.clone(), q.pre_close))
+                        .unwrap_or((String::new(), 0.0))
+                };
+                let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(t) = trends.get_mut(&code) {
+                    crate::quote::sanitize_trend_for_quote(t, &quote_date, quote_pre, now);
+                }
             }
             Err(e) => {
                 log::error!(target: "SYSTEM", "分时拉取任务异常: {e}");

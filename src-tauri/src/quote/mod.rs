@@ -9,6 +9,7 @@ pub mod fetcher;
 pub mod global;
 pub mod multi_trend;
 pub mod ths;
+pub mod trend_guard;
 
 #[allow(unused_imports)]
 pub use types::*;
@@ -24,6 +25,8 @@ pub use global::*;
 pub use multi_trend::*;
 #[allow(unused_imports)]
 pub use ths::*;
+#[allow(unused_imports)]
+pub use trend_guard::*;
 
 #[cfg(test)]
 mod tests;

@@ -18,6 +18,7 @@ import {
   type WatchItem,
 } from '../types'
 import type { HoverExtra } from '../components/Chart'
+import { sanitizeTrendForQuote } from '../chart'
 import { getClearedPnl } from '../components/portfolio/tradeHelpers'
 
 export type MiniMode = 'trend' | 'five_day' | 'kline' | 'auction'
@@ -88,15 +89,7 @@ export function createMiniDerived(args: MiniDerivedArgs) {
     if (pos && pos.shares > 0) return null
     return getClearedPnl(q().code, s().trades)
   }
-  const trend = () => {
-    const t = s().trends[q().code]
-    if (!t) return undefined
-    const qDate = q().date
-    if (qDate && t.date && t.date < qDate) {
-      return { ...t, points: [] }
-    }
-    return t
-  }
+  const trend = () => sanitizeTrendForQuote(s().trends[q().code], q())
   const auction = () => s().auctions?.[q().code]
 
   // High / Low stats from trend points or K-line bar

@@ -146,54 +146,13 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
             store.insert(q.code.clone(), q.clone());
         }
 
-        // Synchronize live tick price into intraday trends in real time so that rapid moves (e.g. 炸板) immediately reflect
-        if is_continuous {
-            let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
-            let current_hhmm = (now.hour() * 100 + now.minute()) as u32;
-            for q in &quotes {
-                if q.price <= 0.0 {
-                    continue;
-                }
-                if let Some(t) = trends.get_mut(&q.code) {
-                    let last_info = t.points.last().map(|p| (p.time, p.cum_amount, p.avg_price));
-                    match last_info {
-                        Some((time, cum_amount, avg_price)) if current_hhmm > time && current_hhmm <= 1500 => {
-                            t.points.push(crate::quote::TrendPoint {
-                                time: current_hhmm,
-                                price: q.price,
-                                cum_volume: q.volume,
-                                cum_amount,
-                                avg_price: if avg_price > 0.0 { avg_price } else { q.price },
-                            });
-                        }
-                        Some((time, _, _)) if current_hhmm == time => {
-                            if let Some(last_p) = t.points.last_mut() {
-                                last_p.price = q.price;
-                                if q.volume > 0.0 {
-                                    last_p.cum_volume = q.volume;
-                                }
-                            }
-                        }
-                        None if (930..=1500).contains(&current_hhmm) => {
-                            t.points.push(crate::quote::TrendPoint {
-                                time: current_hhmm,
-                                price: q.price,
-                                cum_volume: q.volume,
-                                cum_amount: 0.0,
-                                avg_price: q.price,
-                            });
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
+        let trends_snapshot = update_and_snapshot_trends(&state, &quotes, now, is_continuous);
 
         // Snapshot what the cache needs and persist it *after* the block, so no
         // state guard is held while blocking file I/O runs.
         let cache = crate::config::QuotesCache {
             quotes: store.values().cloned().collect(),
-            trends: state.trends.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            trends: trends_snapshot,
             auctions: state.auction_tracker.lock().unwrap_or_else(|e| e.into_inner()).data.clone(),
         };
 
@@ -262,4 +221,64 @@ pub(super) async fn poll_quotes(app: &AppHandle) -> Result<(), String> {
 
     emit_snapshot(app);
     Ok(())
+}
+
+/// Sanitize cached trends against fresh quotes, optionally push continuous live ticks,
+/// and return a cloned map for disk caching while releasing the `trends` mutex immediately.
+pub(super) fn update_and_snapshot_trends(
+    state: &AppState,
+    quotes: &[crate::quote::Quote],
+    now: chrono::NaiveDateTime,
+    is_continuous: bool,
+) -> std::collections::HashMap<String, crate::quote::Trend> {
+    let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
+    for q in quotes {
+        if let Some(t) = trends.get_mut(&q.code) {
+            crate::quote::sanitize_trend_for_quote(t, &q.date, q.pre_close, now);
+        }
+    }
+    if is_continuous {
+        let current_hhmm = now.hour() * 100 + now.minute();
+        for q in quotes {
+            if q.price <= 0.0 {
+                continue;
+            }
+            if let Some(t) = trends.get_mut(&q.code) {
+                if !q.date.is_empty() && !t.date.is_empty() && t.date != q.date {
+                    continue;
+                }
+                let last_info = t.points.last().map(|p| (p.time, p.cum_amount, p.avg_price));
+                match last_info {
+                    Some((time, cum_amount, avg_price)) if current_hhmm > time && current_hhmm <= 1500 => {
+                        t.points.push(crate::quote::TrendPoint {
+                            time: current_hhmm,
+                            price: q.price,
+                            cum_volume: q.volume,
+                            cum_amount,
+                            avg_price: if avg_price > 0.0 { avg_price } else { q.price },
+                        });
+                    }
+                    Some((time, _, _)) if current_hhmm == time => {
+                        if let Some(last_p) = t.points.last_mut() {
+                            last_p.price = q.price;
+                            if q.volume > 0.0 {
+                                last_p.cum_volume = q.volume;
+                            }
+                        }
+                    }
+                    None if (930..=1500).contains(&current_hhmm) => {
+                        t.points.push(crate::quote::TrendPoint {
+                            time: current_hhmm,
+                            price: q.price,
+                            cum_volume: q.volume,
+                            cum_amount: 0.0,
+                            avg_price: q.price,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    trends.clone()
 }

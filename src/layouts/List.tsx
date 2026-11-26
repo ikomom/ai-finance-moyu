@@ -208,6 +208,8 @@ export function List(props: { flash: boolean }) {
                         trend={s().trends[q.code]}
                         preClose={q.preClose}
                         lastPrice={q.price}
+                        quoteDate={q.date}
+                        code={q.code}
                       />
                     </div>
                     <div

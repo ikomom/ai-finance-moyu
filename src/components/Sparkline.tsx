@@ -1,12 +1,14 @@
 import { createEffect, onCleanup, onMount } from 'solid-js'
 
-import { drawSparkline } from '../chart'
+import { drawSparkline, sanitizeTrendForQuote } from '../chart'
 import type { Trend } from '../types'
 
 interface Props {
   trend?: Trend
   preClose: number
   lastPrice?: number
+  quoteDate?: string
+  code?: string
 }
 
 export function Sparkline(props: Props) {
@@ -16,7 +18,12 @@ export function Sparkline(props: Props) {
 
   const draw = () => {
     if (!canvas) return
-    drawSparkline(canvas, props.trend, props.preClose, props.lastPrice)
+    const safeTrend = sanitizeTrendForQuote(props.trend, {
+      code: props.code,
+      date: props.quoteDate,
+      preClose: props.preClose,
+    })
+    drawSparkline(canvas, safeTrend, props.preClose, props.lastPrice)
   }
 
   onMount(() => {

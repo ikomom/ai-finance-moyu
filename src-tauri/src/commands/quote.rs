@@ -83,31 +83,36 @@ pub async fn get_stock_trend(app: AppHandle, code: String) -> Result<quote::Tren
 
     // 两次加锁各自独立取值，不嵌套，避免与 poller 的锁序相冲。
     let source = state.config.lock().unwrap_or_else(|e| e.into_inner()).data_source;
-    let cached_pre_close = state
+    let cached = state
         .quotes
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .get(&norm_code)
-        .map(|q| q.pre_close);
+        .map(|q| (q.pre_close, q.date.clone()));
 
-    // 不在自选里的标的没有被轮询，缺昨收就没有基准线，单独补一次报价。
-    let pre_close = match cached_pre_close {
-        Some(p) if p > 0.0 => p,
-        _ => state
+    let today_str = market::beijing_now().format("%Y%m%d").to_string();
+    let cached_fresh = cached.filter(|(p, d)| *p > 0.0 && (d == &today_str || market::session_at(market::beijing_now()) == market::Session::Closed));
+
+    // 不在自选里的标的没有被轮询，缺昨收或缓存过旧时单独补一次最新报价。
+    let (pre_close, quote_date) = match cached_fresh {
+        Some((p, d)) => (p, d),
+        None => state
             .fetcher
             .fetch_quotes(source, std::slice::from_ref(&norm_code))
             .await
             .ok()
             .and_then(|qs| qs.into_iter().find(|q| q.code == norm_code))
-            .map(|q| q.pre_close)
-            .unwrap_or(0.0),
+            .map(|q| (q.pre_close, q.date))
+            .unwrap_or((0.0, String::new())),
     };
 
-    state
+    let mut trend = state
         .fetcher
-        .fetch_trend(source, &norm_code, pre_close)
+        .fetch_trend_for_quote(source, &norm_code, pre_close, &quote_date)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    quote::sanitize_trend_for_quote(&mut trend, &quote_date, pre_close, market::beijing_now());
+    Ok(trend)
 }
 
 #[tauri::command]

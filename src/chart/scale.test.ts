@@ -10,6 +10,7 @@ import {
   createSymmetricScale,
   isValidAvg,
   FULL_SLOTS,
+  sanitizeTrendForQuote,
   slotOf,
   slotOfAuctionTime,
   slotOfFullTrend,
@@ -126,5 +127,37 @@ describe('full-spectrum trend slot mapping (09:15 - 15:00)', () => {
     expect(slotOfFullTrend(1500)).toBe(FULL_SLOTS)
     // 3-second tick at 14:58:12 -> 252 + 1 + 12/60 = 253.2
     expect(slotOfFullTrend(145812)).toBeCloseTo(253.2, 2)
+  })
+})
+
+describe('sanitizeTrendForQuote', () => {
+  const baseTrend = {
+    code: 'sh000001',
+    date: '20261125',
+    preClose: 3548.37,
+    points: [
+      { time: 930, price: 3522.59, cumVolume: 100, cumAmount: 1000, avgPrice: 3516 },
+      { time: 1500, price: 3476.47, cumVolume: 200, cumAmount: 2000, avgPrice: 3428 },
+    ],
+  }
+
+  it('clears points when trend date is older than quote date', () => {
+    const res = sanitizeTrendForQuote(baseTrend, { code: 'sh000001', date: '20261126', preClose: 3476.47 })
+    expect(res?.points).toEqual([])
+  })
+
+  it('clears points when an index trend claiming today has a mismatched preClose baseline', () => {
+    const poisoned = { ...baseTrend, date: '20261126', preClose: 3548.37 }
+    const res = sanitizeTrendForQuote(poisoned, { code: 'sh000001', date: '20261126', preClose: 3476.47 })
+    expect(res?.points).toEqual([])
+    expect(res?.preClose).toBe(3476.47)
+  })
+
+  it('preserves fresh index trend and tolerates individual stock preClose adjustments', () => {
+    const freshIdx = { ...baseTrend, date: '20261126', preClose: 3476.47 }
+    expect(sanitizeTrendForQuote(freshIdx, { code: 'sh000001', date: '20261126', preClose: 3476.47 })?.points).toHaveLength(2)
+
+    const stockTrend = { ...baseTrend, code: 'sh600000', date: '20261126', preClose: 10.5 }
+    expect(sanitizeTrendForQuote(stockTrend, { code: 'sh600000', date: '20261126', preClose: 10.0 })?.points).toHaveLength(2)
   })
 })
