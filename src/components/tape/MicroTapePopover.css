@@ -250,7 +250,24 @@
   transition: width 0.3s ease;
 }
 
-/* 4. Footer Hint */
+/* 4. Historical Notice & Footer Hint */
+.tape-history-note {
+  margin-top: 4px;
+  margin-bottom: 6px;
+  padding: 5px 6px;
+  background: var(--surface-card-subtle, rgba(255, 255, 255, 0.03));
+  border: 1px dashed var(--surface-border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-sm, 4px);
+  font-size: 9.5px;
+  color: var(--text-muted, #8b949e);
+  text-align: center;
+  line-height: 1.3;
+}
+:root[data-theme="light"] .tape-history-note {
+  background: rgba(0, 0, 0, 0.025);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
 .tape-footer-hint {
   font-size: 9px;
   color: var(--text-dim, #6e7681);

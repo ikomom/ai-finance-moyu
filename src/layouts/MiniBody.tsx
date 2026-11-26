@@ -19,6 +19,7 @@ import { MiniOrderBook } from '../components/portfolio/MiniOrderBook'
 import { StatusLine } from '../components/StatusLine'
 import { StockHeader } from '../components/StockHeader'
 import { StockBadge } from '../components/StockBadge'
+import { resolveTapeDisplay } from '../components/tape/historicalTape'
 import {
   fmtMoney,
   fmtPct,
@@ -97,6 +98,8 @@ export function MiniBody(props: MiniBodyProps) {
     const clean = q().code.replace(/^(sh|sz|bj)/, '')
     return s().marketOverview?.indices?.find((i) => i.code === clean || q().code.includes(i.code))
   }
+  const tapeInfo = () =>
+    resolveTapeDisplay({ quote: q(), drillDay: props.historyDrillDay?.(), kline: kline(), klinePeriod: props.klinePeriod?.() })
 
   return (
     <>
@@ -110,7 +113,8 @@ export function MiniBody(props: MiniBodyProps) {
         activePct={activePct()}
         high={stats().high}
         low={stats().low}
-        quote={q()}
+        quote={tapeInfo().quote}
+        historicalDate={tapeInfo().historicalDate}
         badge={
           <Show
             when={props.historyDrillDay?.()}

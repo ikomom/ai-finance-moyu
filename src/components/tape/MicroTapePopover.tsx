@@ -19,6 +19,7 @@ import './MicroTapePopover.css'
 export interface MicroTapePopoverProps {
   quote: Quote
   isPinned: boolean
+  historicalDate?: string | null
   onClose: () => void
   onTogglePin?: () => void
   onMouseEnter?: () => void
@@ -28,6 +29,7 @@ export interface MicroTapePopoverProps {
 
 export function MicroTapePopover(props: MicroTapePopoverProps) {
   const q = () => props.quote
+  const isHistorical = () => Boolean(props.historicalDate)
   const isIndex = () => isIndexCode(q().code)
   const preClose = () => q().preClose || q().price
 
@@ -39,27 +41,26 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
   const amt = () => q().amount
   const mktCap = () => q().circulatingMarketCap
 
-  // Ratio calculations for tape energy bar
   const activeBuyRatio = () => {
     const abr = q().activeBuyRatio
-    if (abr != null && abr > 0 && abr < 1) {
-      return abr
-    }
+    if (abr != null && abr > 0 && abr < 1) return abr
     const outer = q().outerVol ?? 0
     const inner = q().innerVol ?? 0
-    if (outer + inner > 0) {
-      return outer / (outer + inner)
-    }
-    return 0.5
+    return outer + inner > 0 ? outer / (outer + inner) : 0.5
   }
 
   const buyPct = () => (activeBuyRatio() * 100).toFixed(1)
   const sellPct = () => ((1 - activeBuyRatio()) * 100).toFixed(1)
 
-  // Price helper with color relative to preClose
   const priceColor = (val?: number | null) => {
     if (val == null || val <= 0 || !preClose()) return 'flat'
     return trendClass(val - preClose())
+  }
+
+  const formatAmtCell = () => {
+    const v = amt()
+    if (isHistorical() && (v == null || v <= 0)) return '--'
+    return fmtAmount(v)
   }
 
   return (
@@ -76,7 +77,7 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
       {/* 1. Header Bar */}
       <div class="tape-header">
         <div class="tape-title-group">
-          <span class="tape-badge-tag">📊 核心盘口</span>
+          <span class="tape-badge-tag">{isHistorical() ? '📊 历史盘口' : '📊 核心盘口'}</span>
           <span class="tape-stock-name" title={q().name}>{q().name}</span>
           <span class="tape-stock-code">{q().code.replace(/^(sh|sz|bj|us|hk)/, '')}</span>
         </div>
@@ -104,7 +105,7 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
       {/* 2. Row 1: 基准价格组 */}
       <div class="tape-grid-row">
         <div class="tape-cell">
-          <span class="tape-label">今开</span>
+          <span class="tape-label">{isHistorical() ? '开盘' : '今开'}</span>
           <span class={`tape-val font-mono ${priceColor(q().open)}`}>
             {q().open > 0 ? fmtPrice(q().open, 2) : '--'}
           </span>
@@ -129,7 +130,7 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
         </div>
       </div>
 
-      {/* 3. Row 2: 超短动能核心组 (重点高亮) */}
+      {/* 3. Row 2: 超短动能核心组 */}
       <div class="tape-grid-row highlight-row">
         <Show
           when={!isIndex()}
@@ -137,7 +138,7 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
             <>
               <div class="tape-cell col-span-2">
                 <span class="tape-label">成交总额</span>
-                <span class="tape-val font-mono font-bold">{fmtAmount(amt())}</span>
+                <span class="tape-val font-mono font-bold">{formatAmtCell()}</span>
               </div>
               <div class="tape-cell col-span-2">
                 <span class="tape-label">全天振幅</span>
@@ -160,7 +161,7 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
           </div>
           <div class="tape-cell">
             <span class="tape-label">成交额</span>
-            <span class="tape-val font-mono font-bold">{fmtAmount(amt())}</span>
+            <span class="tape-val font-mono font-bold">{formatAmtCell()}</span>
           </div>
           <div class="tape-cell">
             <span class="tape-label">量比</span>
@@ -183,41 +184,73 @@ export function MicroTapePopover(props: MicroTapePopoverProps) {
         </Show>
       </div>
 
-      {/* 4. Row 3: 盘口博弈与流通市值组 */}
+      {/* 4. Row 3 & 5: 历史回溯摘要 vs 实时盘口博弈 */}
       <Show when={!isIndex()}>
-        <div class="tape-grid-row">
-          <div class="tape-cell">
-            <span class="tape-label">流通市值</span>
-            <span class="tape-val font-mono">{fmtMarketCap(mktCap())}</span>
+        <Show
+          when={!isHistorical()}
+          fallback={
+            <>
+              <div class="tape-grid-row">
+                <div class="tape-cell">
+                  <span class="tape-label">流通市值</span>
+                  <span class="tape-val font-mono">{fmtMarketCap(mktCap())}</span>
+                </div>
+                <div class="tape-cell">
+                  <span class="tape-label">昨收</span>
+                  <span class="tape-val font-mono">{preClose() > 0 ? fmtPrice(preClose(), 2) : '--'}</span>
+                </div>
+                <div class="tape-cell">
+                  <span class="tape-label">收盘</span>
+                  <span class={`tape-val font-mono ${priceColor(q().price)}`}>
+                    {q().price > 0 ? fmtPrice(q().price, 2) : '--'}
+                  </span>
+                </div>
+                <div class="tape-cell">
+                  <span class="tape-label">总成交</span>
+                  <span class="tape-val font-mono">
+                    {q().volume > 0 ? `${fmtVol(q().volume)}手` : '--'}
+                  </span>
+                </div>
+              </div>
+              <div class="tape-history-note">
+                📅 {props.historicalDate} 历史回溯 · 实时委比与逐笔外内盘仅盘中可用
+              </div>
+            </>
+          }
+        >
+          <div class="tape-grid-row">
+            <div class="tape-cell">
+              <span class="tape-label">流通市值</span>
+              <span class="tape-val font-mono">{fmtMarketCap(mktCap())}</span>
+            </div>
+            <div class="tape-cell">
+              <span class="tape-label">委比</span>
+              <span class={`tape-val font-mono ${trendClass(wb() ?? 0)}`}>
+                {wb() != null ? fmtPct(wb()!) : '--'}
+              </span>
+            </div>
+            <div class="tape-cell">
+              <span class="tape-label">外盘(买)</span>
+              <span class="tape-val font-mono up">{fmtVol(q().outerVol ?? 0)}手</span>
+            </div>
+            <div class="tape-cell">
+              <span class="tape-label">内盘(卖)</span>
+              <span class="tape-val font-mono down">{fmtVol(q().innerVol ?? 0)}手</span>
+            </div>
           </div>
-          <div class="tape-cell">
-            <span class="tape-label">委比</span>
-            <span class={`tape-val font-mono ${trendClass(wb() ?? 0)}`}>
-              {wb() != null ? fmtPct(wb()!) : '--'}
-            </span>
-          </div>
-          <div class="tape-cell">
-            <span class="tape-label">外盘(买)</span>
-            <span class="tape-val font-mono up">{fmtVol(q().outerVol ?? 0)}手</span>
-          </div>
-          <div class="tape-cell">
-            <span class="tape-label">内盘(卖)</span>
-            <span class="tape-val font-mono down">{fmtVol(q().innerVol ?? 0)}手</span>
-          </div>
-        </div>
 
-        {/* 5. 多空力量红绿能量条 */}
-        <div class="tape-energy-section">
-          <div class="tape-energy-labels">
-            <span class="tape-side up">买方主动 {buyPct()}%</span>
-            <span class="tape-mid-label">多空对抗</span>
-            <span class="tape-side down">卖方砸盘 {sellPct()}%</span>
+          <div class="tape-energy-section">
+            <div class="tape-energy-labels">
+              <span class="tape-side up">买方主动 {buyPct()}%</span>
+              <span class="tape-mid-label">多空对抗</span>
+              <span class="tape-side down">卖方砸盘 {sellPct()}%</span>
+            </div>
+            <div class="tape-energy-bar">
+              <div class="tape-bar-segment buy" style={{ width: `${buyPct()}%` }} />
+              <div class="tape-bar-segment sell" style={{ width: `${sellPct()}%` }} />
+            </div>
           </div>
-          <div class="tape-energy-bar">
-            <div class="tape-bar-segment buy" style={{ width: `${buyPct()}%` }} />
-            <div class="tape-bar-segment sell" style={{ width: `${sellPct()}%` }} />
-          </div>
-        </div>
+        </Show>
       </Show>
 
       {/* 6. Footer Hint */}

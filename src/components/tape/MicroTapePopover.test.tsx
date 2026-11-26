@@ -131,4 +131,51 @@ describe('MicroTapePopover', () => {
     expect(text).not.toContain('换手率')
     expect(text).not.toContain('流通市值')
   })
+
+  it('renders historical day summary and hides live order-book fields when historicalDate is provided', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+
+    render(
+      () => (
+        <MicroTapePopover
+          quote={{
+            ...sampleStock,
+            open: 8.07,
+            high: 8.07,
+            low: 7.55,
+            price: 7.55,
+            preClose: 8.1,
+            avgPrice: 7.76,
+            amount: 85360000,
+            turnoverRate: 2.55,
+            amplitude: 6.42,
+            volume: 110000,
+            circulatingMarketCap: 32.49,
+            weibi: undefined,
+            outerVol: 0,
+            innerVol: 0,
+          }}
+          historicalDate="2026-11-20"
+          isPinned={true}
+          onClose={() => {}}
+        />
+      ),
+      container
+    )
+
+    const text = container.textContent || ''
+    expect(text).toContain('历史盘口')
+    expect(text).toContain('2026-11-20 历史回溯')
+    expect(text).toContain('8.07')
+    expect(text).toContain('7.55')
+    expect(text).toContain('7.76')
+    expect(text).toContain('8536.0万')
+    expect(text).toContain('11.0万手')
+    expect(text).toContain('昨收8.10')
+    expect(text).toContain('收盘7.55')
+    expect(text).not.toContain('今开')
+    expect(text).not.toContain('外盘(买)')
+    expect(text).not.toContain('买方主动')
+  })
 })

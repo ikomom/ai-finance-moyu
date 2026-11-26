@@ -18,6 +18,7 @@ export interface StockHeaderProps {
   hoverExtra?: string | null
   extraInfo?: JSX.Element
   quote?: Quote
+  historicalDate?: string | null
 }
 
 /**
@@ -165,6 +166,7 @@ export function StockHeader(props: StockHeaderProps) {
         <MicroTapePopover
           quote={props.quote!}
           isPinned={isPinned()}
+          historicalDate={props.historicalDate}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           onClose={() => {
