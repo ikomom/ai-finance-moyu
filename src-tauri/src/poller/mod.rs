@@ -61,14 +61,8 @@ pub async fn run(app: AppHandle) {
                 } else {
                     log::info!(target: "SESSION", "初始识别A股交易时段: {:?}", session);
                 }
-                if session.is_morning_pretrade() {
+                if session.is_morning_auction() {
                     state.tracker.lock().unwrap_or_else(|e| e.into_inner()).reset_intraday();
-                    {
-                        let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
-                        for t in trends.values_mut() {
-                            crate::quote::sanitize_trend_for_quote(t, "", 0.0, now);
-                        }
-                    }
                     state.trend_signals.lock().unwrap_or_else(|e| e.into_inner()).clear();
                 }
                 status::sync_session(&app, now, session);

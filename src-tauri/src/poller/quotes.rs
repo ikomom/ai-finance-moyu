@@ -231,10 +231,18 @@ pub(super) fn update_and_snapshot_trends(
     now: chrono::NaiveDateTime,
     is_continuous: bool,
 ) -> std::collections::HashMap<String, crate::quote::Trend> {
+    let today_str = now.format("%Y%m%d").to_string();
+    let market_trading_today = quotes.iter().any(|q| q.date == today_str);
     let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
     for q in quotes {
         if let Some(t) = trends.get_mut(&q.code) {
-            crate::quote::sanitize_trend_for_quote(t, &q.date, q.pre_close, now);
+            crate::quote::sanitize_trend_for_quote_with_market(
+                t,
+                &q.date,
+                q.pre_close,
+                market_trading_today,
+                now,
+            );
         }
     }
     if is_continuous {

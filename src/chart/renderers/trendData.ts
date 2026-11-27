@@ -114,10 +114,15 @@ export function buildUnifiedChartData(
     opts.trend?.date &&
     opts.trend.date < opts.auction.date
   )
+  const isStaleAuction = Boolean(
+    opts.trend?.date &&
+    opts.auction?.date &&
+    opts.auction.date < opts.trend.date
+  )
   const trendPts = isStaleTrend ? [] : (opts.trend?.points ?? [])
 
   // 1. Morning Call Auction Points (09:15 - 09:25) — only in full spectrum mode
-  const auctionPts = opts.auction?.points ?? []
+  const auctionPts = isStaleAuction ? [] : (opts.auction?.points ?? [])
   if (useFullSpectrum && !isGlobal && auctionPts.length > 0) {
     for (const ap of auctionPts) {
       const slot = slotOfFullTrend(ap.time)
@@ -227,8 +232,9 @@ export function buildUnifiedChartData(
   }
 
   // 3. Closing Call Auction Points (14:57 - 15:00)
-  const closingPts = opts.auction?.closingPoints ?? []
-  if (!isGlobal && closingPts.length > 0) {
+  // Guard with `trendPts.length > 0` so an empty continuous gap never bridges straight across from 09:25 to 15:00.
+  const closingPts = isStaleAuction ? [] : (opts.auction?.closingPoints ?? [])
+  if (!isGlobal && closingPts.length > 0 && trendPts.length > 0) {
     for (const cp of closingPts) {
       const slot = useFullSpectrum ? slotOfFullTrend(cp.time) : slotOf(cp.time)
       pricePoints.push({

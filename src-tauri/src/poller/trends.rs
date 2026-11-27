@@ -74,30 +74,48 @@ pub async fn poll_trends(app: &AppHandle) -> Result<(), String> {
             Ok((code, Ok(mut trend))) => {
                 let state = app.state::<AppState>();
                 let now = crate::market::beijing_now();
-                let (quote_date, quote_pre) = {
+                let today_str = now.format("%Y%m%d").to_string();
+                let (quote_date, quote_pre, market_trading_today) = {
                     let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
-                    quotes
+                    let trading = quotes.values().any(|q| q.date == today_str);
+                    let (d, p) = quotes
                         .get(&code)
                         .map(|q| (q.date.clone(), q.pre_close))
-                        .unwrap_or((String::new(), 0.0))
+                        .unwrap_or((String::new(), 0.0));
+                    (d, p, trading)
                 };
-                crate::quote::sanitize_trend_for_quote(&mut trend, &quote_date, quote_pre, now);
+                crate::quote::sanitize_trend_for_quote_with_market(
+                    &mut trend,
+                    &quote_date,
+                    quote_pre,
+                    market_trading_today,
+                    now,
+                );
                 state.trends.lock().unwrap_or_else(|e| e.into_inner()).insert(code, trend);
             }
             Ok((code, Err(e))) => {
                 log::warn!(target: "NET", "分时拉取失败 {code}: {e}");
                 let state = app.state::<AppState>();
                 let now = crate::market::beijing_now();
-                let (quote_date, quote_pre) = {
+                let today_str = now.format("%Y%m%d").to_string();
+                let (quote_date, quote_pre, market_trading_today) = {
                     let quotes = state.quotes.lock().unwrap_or_else(|e| e.into_inner());
-                    quotes
+                    let trading = quotes.values().any(|q| q.date == today_str);
+                    let (d, p) = quotes
                         .get(&code)
                         .map(|q| (q.date.clone(), q.pre_close))
-                        .unwrap_or((String::new(), 0.0))
+                        .unwrap_or((String::new(), 0.0));
+                    (d, p, trading)
                 };
                 let mut trends = state.trends.lock().unwrap_or_else(|e| e.into_inner());
                 if let Some(t) = trends.get_mut(&code) {
-                    crate::quote::sanitize_trend_for_quote(t, &quote_date, quote_pre, now);
+                    crate::quote::sanitize_trend_for_quote_with_market(
+                        t,
+                        &quote_date,
+                        quote_pre,
+                        market_trading_today,
+                        now,
+                    );
                 }
             }
             Err(e) => {

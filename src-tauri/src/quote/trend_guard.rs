@@ -42,18 +42,34 @@ pub fn is_index_pre_close_mismatched(
 /// Clear `trend.points` in-place when cached or newly fetched intraday data is stale
 /// relative to `quote_date`, `quote_pre_close`, or `now`.
 ///
-/// Returns `true` if stale points were cleared.
+/// Never clears the previous trading day's curve during `Session::PreOpen` (`00:00..09:14`)
+/// before today's quotes start rolling over.
 pub fn sanitize_trend_for_quote(
     trend: &mut Trend,
     quote_date: &str,
     quote_pre_close: f64,
     now: NaiveDateTime,
 ) -> bool {
+    sanitize_trend_for_quote_with_market(trend, quote_date, quote_pre_close, false, now)
+}
+
+/// Variant of [`sanitize_trend_for_quote`] aware of whether the broader exchange feed has
+/// already opened today (`market_trading_today`), allowing quiet/index symbols to clear
+/// stale previous-day data as soon as morning call auction starts at `09:15`.
+pub fn sanitize_trend_for_quote_with_market(
+    trend: &mut Trend,
+    quote_date: &str,
+    quote_pre_close: f64,
+    market_trading_today: bool,
+    now: NaiveDateTime,
+) -> bool {
     let today_str = now.format("%Y%m%d").to_string();
-    let is_morning_pretrade = crate::market::session_at(now).is_morning_pretrade();
+    let session = crate::market::session_at(now);
+    let is_active_today = !matches!(session, crate::market::Session::PreOpen | crate::market::Session::Closed)
+        && market_trading_today;
 
     let date_stale = (!quote_date.is_empty() && !trend.date.is_empty() && trend.date.as_str() < quote_date)
-        || (is_morning_pretrade && !trend.date.is_empty() && trend.date < today_str);
+        || (is_active_today && !trend.date.is_empty() && trend.date < today_str);
 
     // Only compare pre_close against the quote when the quote is at least as fresh as the trend.
     let can_check_pre =
@@ -68,10 +84,14 @@ pub fn sanitize_trend_for_quote(
 
     let cleared_points = !trend.points.is_empty();
     trend.points.clear();
-    if !quote_date.is_empty() {
+    if is_active_today || future_stale {
+        trend.date = if !quote_date.is_empty() && quote_date >= today_str.as_str() {
+            quote_date.to_string()
+        } else {
+            today_str
+        };
+    } else if !quote_date.is_empty() && quote_date >= trend.date.as_str() {
         trend.date = quote_date.to_string();
-    } else if is_morning_pretrade || future_stale {
-        trend.date = today_str;
     }
     if quote_pre_close > 0.0 {
         trend.pre_close = quote_pre_close;
@@ -160,5 +180,37 @@ mod tests {
         assert!(sanitize_trend_for_quote(&mut poisoned, "20261126", 3476.47, now));
         assert!(poisoned.points.is_empty());
         assert_eq!(poisoned.pre_close, 3476.47);
+    }
+
+    #[test]
+    fn preserves_previous_day_trend_before_0915_and_clears_when_call_auction_is_live() {
+        let preopen_now = NaiveDate::from_ymd_opt(2026, 11, 27)
+            .unwrap()
+            .and_hms_opt(8, 55, 35)
+            .unwrap();
+        let mut prev_stock = sample_trend("sz000592", "20261126", 5.68, &[930, 1130, 1500]);
+        assert!(!sanitize_trend_for_quote_with_market(
+            &mut prev_stock,
+            "20261126",
+            5.68,
+            false,
+            preopen_now
+        ));
+        assert_eq!(prev_stock.points.len(), 3);
+
+        let call_auction_now = NaiveDate::from_ymd_opt(2026, 11, 27)
+            .unwrap()
+            .and_hms_opt(9, 18, 0)
+            .unwrap();
+        let mut quiet_index = sample_trend("sh000001", "20261126", 3476.47, &[930, 1500]);
+        assert!(sanitize_trend_for_quote_with_market(
+            &mut quiet_index,
+            "20261126",
+            3476.47,
+            true,
+            call_auction_now
+        ));
+        assert!(quiet_index.points.is_empty());
+        assert_eq!(quiet_index.date, "20261127");
     }
 }
