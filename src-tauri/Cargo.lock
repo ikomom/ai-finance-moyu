@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "ai-finance-moyu"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "chrono",
  "encoding_rs",
